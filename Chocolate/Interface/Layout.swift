@@ -147,7 +147,6 @@ struct Layout {
 		let width:Native?
 		let height:Native?
 		
-		var vector:Native.Vector2 { return Native.vector2(width ?? .greatestFiniteMagnitude, height ?? .greatestFiniteMagnitude) }
 		var size:CGSize { return CGSize(width:width ?? .greatestFiniteMagnitude, height:height ?? .greatestFiniteMagnitude) }
 		
 		init(width:Native? = nil, height:Native? = nil) {
@@ -164,11 +163,6 @@ struct Layout {
 				height = nil
 			}
 		}
-		
-		init(vector:Native.Vector2) {
-			self.width = vector.x < Limit.unlimited ? vector.x : nil
-			self.height = vector.y < Limit.unlimited ? vector.y : nil
-		}
 	}
 	
 	struct Dimension {
@@ -181,7 +175,6 @@ struct Layout {
 		var fraction:Native
 		
 		var isUnbounded:Bool { return minimum <= 0 && constant == 0 && fraction == 0 && maximum >= Limit.unlimited }
-		var vector:Native.Vector4 { return Native.vector4(constant, minimum, maximum, fraction) }
 		
 		init(constant:Native, range:ClosedRange<Native> = 0 ... Dimension.unbound, fraction:Native = 0) {
 			self.constant = constant
@@ -195,13 +188,6 @@ struct Layout {
 			minimum = value
 			maximum = value
 			fraction = 0
-		}
-		
-		init(_ vector:Native.Vector4) {
-			constant = vector.x
-			minimum = vector.y
-			maximum = vector.z
-			fraction = vector.w
 		}
 		
 		init?(value:Native?) {
@@ -251,7 +237,6 @@ struct Layout {
 		var minimum:CGSize { return CGSize(width:width.minimum, height:height.minimum) }
 		var maximum:CGSize { return CGSize(width:width.maximum, height:height.maximum) }
 		var data:Data { return withUnsafeBytes(of:self) { Data($0) } }
-		var vector:Native.Vector8 { return Native.vector8(width.vector, height.vector) }
 		
 		init(width:Dimension, height:Dimension) {
 			self.width = width
@@ -266,11 +251,6 @@ struct Layout {
 		init(intrinsicSize size:CGSize) {
 			self.width = size.width < 0 ? Dimension(constant:0) : Dimension(value:size.width.native)
 			self.height = size.height < 0 ? Dimension(constant:0) : Dimension(value:size.height.native)
-		}
-		
-		init(_ vector:Native.Vector8) {
-			self.width = Dimension(vector.lowHalf)
-			self.height = Dimension(vector.highHalf)
 		}
 		
 		init?(data:Data) {
