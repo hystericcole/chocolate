@@ -17,21 +17,28 @@ protocol Positionable {
 	func orderablePositionables(environment:Layout.Environment) -> [Positionable]
 }
 
+//	MARK: -
+
 struct Layout {
+	typealias Native = CGFloat.NativeType
+	
 	enum Axis {
 		case horizontal, vertical
 	}
 	
 	enum Alignment {
 		/// Position within available bounds
-		case fraction(Double)
+		case fraction(Native)
+		/// Position within available bounds adapting to environment
+		case adaptiveFraction(Native)
 		/// Fill available bounds
 		case fill
-		case leading, trailing
 		
 		static let start = Alignment.fraction(0.0)
 		static let center = Alignment.fraction(0.5)
 		static let end = Alignment.fraction(1.0)
+		static let leading = Alignment.adaptiveFraction(0.0)
+		static let trailing = Alignment.adaptiveFraction(1.0)
 		static let `default` = center
 		
 		var isFill:Bool {
@@ -41,11 +48,10 @@ struct Layout {
 			}
 		}
 		
-		func value(axis:Axis, environment:Environment) -> Double? {
+		func value(axis:Axis, environment:Environment) -> Native? {
 			switch self {
 			case .fraction(let value): return value
-			case .leading: return environment.leadingValue(axis)
-			case .trailing: return environment.trailingValue(axis)
+			case .adaptiveFraction(let value): return environment.adaptiveFractionValue(value, axis:axis)
 			default: return nil
 			}
 		}
@@ -53,18 +59,21 @@ struct Layout {
 	
 	enum Position {
 		///	Position within available bounds
-		case fraction(Double)
+		case fraction(Native)
+		/// Position within available bounds adapting to environment
+		case adaptiveFraction(Native)
 		/// Fill available bounds by stretching elements
 		case stretch
 		/// Fill available bounds by stretching space
 		case distribute
 		/// Position around the primary element
 		case float
-		case leading, trailing
 		
 		static let start = Position.fraction(0.0)
 		static let center = Position.fraction(0.5)
 		static let end = Position.fraction(1.0)
+		static let leading = Alignment.adaptiveFraction(0.0)
+		static let trailing = Alignment.adaptiveFraction(1.0)
 		static let `default` = center
 		
 		var isFill:Bool {
@@ -85,19 +94,17 @@ struct Layout {
 		var alignment:Alignment {
 			switch self {
 			case .fraction(let value): return .fraction(value)
-			case .leading: return .leading
-			case .trailing: return .trailing
+			case .adaptiveFraction(let value): return .adaptiveFraction(value)
 			case .float: return .center
 			case .stretch, .distribute: return .fill
 			}
 		}
 		
-		func value(axis:Axis, environment:Environment) -> Double? {
+		func value(axis:Axis, environment:Environment) -> Native? {
 			switch self {
 			case .fraction(let value): return value
+			case .adaptiveFraction(let value): return environment.adaptiveFractionValue(value, axis:axis)
 			case .float: return 0.5
-			case .leading: return environment.leadingValue(axis)
-			case .trailing: return environment.trailingValue(axis)
 			default: return nil
 			}
 		}
@@ -121,8 +128,7 @@ struct Layout {
 		
 		let isRTL:Bool
 		
-		func leadingValue(_ axis:Axis) -> Double { return axis == .horizontal && isRTL ? 1.0 : 0.0 }
-		func trailingValue(_ axis:Axis) -> Double { return axis == .horizontal && isRTL ? 0.0 : 1.0 }
+		func adaptiveFractionValue(_ value:Native, axis:Axis) -> Native { return axis == .horizontal && isRTL ? 1.0 - value : value }
 	}
 	
 	struct Context {
@@ -136,90 +142,102 @@ struct Layout {
 		}
 	}
 	
+	struct Limit {
+		static let unlimited:Native = 0x1p30
+		let width:Native?
+		let height:Native?
+		
+		var vector:Native.Vector2 { return Native.vector2(width ?? .greatestFiniteMagnitude, height ?? .greatestFiniteMagnitude) }
+		var size:CGSize { return CGSize(width:width ?? .greatestFiniteMagnitude, height:height ?? .greatestFiniteMagnitude) }
+		
+		init(width:Native? = nil, height:Native? = nil) {
+			self.width = width
+			self.height = height
+		}
+		
+		init(size:CGSize?) {
+			if let size = size {
+				width = size.width.native < Limit.unlimited ? size.width.native : nil
+				height = size.height.native < Limit.unlimited ? size.height.native : nil
+			} else {
+				width = nil
+				height = nil
+			}
+		}
+		
+		init(vector:Native.Vector2) {
+			self.width = vector.x < Limit.unlimited ? vector.x : nil
+			self.height = vector.y < Limit.unlimited ? vector.y : nil
+		}
+	}
+	
 	struct Dimension {
-		static let unlimited:ClosedRange<Double> = 0 ... 0x1p31
+		static let unbound = Limit.unlimited * 0x1p10
 		static let zero = Dimension(value:0)
 		
-		var prefer:Double
-		var minimum:Double
-		var maximum:Double
-		var fraction:Double
+		var constant:Native
+		var minimum:Native
+		var maximum:Native
+		var fraction:Native
 		
-		var isUnbounded:Bool { return minimum <= 0 && prefer == 0 && fraction == 0 && maximum > 0x1p30 }
-		var vector:Double.Vector4 { return Double.vector4(prefer, minimum, maximum, fraction) }
+		var isUnbounded:Bool { return minimum <= 0 && constant == 0 && fraction == 0 && maximum >= Limit.unlimited }
+		var vector:Native.Vector4 { return Native.vector4(constant, minimum, maximum, fraction) }
 		
-		init(prefer:Double, range:ClosedRange<Double> = unlimited, fraction:Double = 0) {
-			self.prefer = prefer
+		init(constant:Native, range:ClosedRange<Native> = 0 ... Dimension.unbound, fraction:Native = 0) {
+			self.constant = constant
 			self.minimum = range.lowerBound
 			self.maximum = range.upperBound
 			self.fraction = fraction
 		}
 		
-		init(value:Double) {
-			prefer = value
+		init(value:Native) {
+			constant = value
 			minimum = value
 			maximum = value
 			fraction = 0
 		}
 		
-		init(_ vector:Double.Vector4) {
-			prefer = vector.x
+		init(_ vector:Native.Vector4) {
+			constant = vector.x
 			minimum = vector.y
 			maximum = vector.z
 			fraction = vector.w
 		}
 		
-		init?(value:Double?) {
+		init?(value:Native?) {
 			guard let value = value else { return nil }
 			
 			self.init(value:value)
 		}
 		
-		init?(minimum:Double?) {
+		init?(minimum:Native?) {
 			guard let minimum = minimum else { return nil }
 			
-			self.init(prefer:minimum, range:minimum ... Dimension.unlimited.upperBound, fraction:0)
+			self.init(constant:minimum, range:minimum ... Dimension.unbound, fraction:0)
 		}
 		
-		func resolve(_ limit:Double) -> Double {
-			return min(max(minimum, prefer + fraction * limit), maximum)
+		func resolve(_ limit:Native) -> Native {
+			return min(max(minimum, constant + fraction * limit), maximum)
 		}
 		
-		mutating func add(value:Double) {
-			prefer += value
+		mutating func add(value:Native) {
+			constant += value
 			minimum = max(minimum + value, 0)
 			maximum = max(minimum, maximum + value)
 		}
 		
 		mutating func add(_ dimension:Dimension) {
-			prefer += dimension.prefer
+			constant += dimension.constant
 			minimum = max(minimum + dimension.minimum, 0)
-			maximum = max(minimum, maximum + dimension.maximum)
+			maximum = min(max(minimum, maximum + dimension.maximum), Dimension.unbound)
 			fraction += dimension.fraction
 		}
 		
 		mutating func increase(_ dimension:Dimension) {
-			prefer = max(prefer, dimension.prefer)
+			constant = max(constant, dimension.constant)
 			minimum = max(minimum, dimension.minimum)
 			maximum = max(maximum, dimension.maximum)
 			fraction = max(fraction, dimension.fraction)
-		}
-	}
-	
-	struct Limit {
-		let width:Double?
-		let height:Double?
-		
-		var vector:Double.Vector2 { return Double.vector2(width ?? .greatestFiniteMagnitude, height ?? .greatestFiniteMagnitude) }
-		
-		init(width:Double? = nil, height:Double? = nil) {
-			self.width = width
-			self.height = height
-		}
-		
-		init(_ vector:Double.Vector2) {
-			self.width = vector.x < .greatestFiniteMagnitude ? vector.x : nil
-			self.height = vector.y < .greatestFiniteMagnitude ? vector.y : nil
 		}
 	}
 	
@@ -229,11 +247,11 @@ struct Layout {
 		var width:Dimension
 		var height:Dimension
 		
-		var prefer:CGSize { return CGSize(width:width.prefer, height:height.prefer) }
+		var constant:CGSize { return CGSize(width:width.constant, height:height.constant) }
 		var minimum:CGSize { return CGSize(width:width.minimum, height:height.minimum) }
 		var maximum:CGSize { return CGSize(width:width.maximum, height:height.maximum) }
 		var data:Data { return withUnsafeBytes(of:self) { Data($0) } }
-		var vector:Double.Vector8 { return Double.vector8(width.vector, height.vector) }
+		var vector:Native.Vector8 { return Native.vector8(width.vector, height.vector) }
 		
 		init(width:Dimension, height:Dimension) {
 			self.width = width
@@ -246,11 +264,11 @@ struct Layout {
 		}
 		
 		init(intrinsicSize size:CGSize) {
-			self.width = size.width < 0 ? Dimension(prefer:0) : Dimension(value:size.width.native)
-			self.height = size.height < 0 ? Dimension(prefer:0) : Dimension(value:size.height.native)
+			self.width = size.width < 0 ? Dimension(constant:0) : Dimension(value:size.width.native)
+			self.height = size.height < 0 ? Dimension(constant:0) : Dimension(value:size.height.native)
 		}
 		
-		init(_ vector:Double.Vector8) {
+		init(_ vector:Native.Vector8) {
 			self.width = Dimension(vector.lowHalf)
 			self.height = Dimension(vector.highHalf)
 		}
@@ -265,15 +283,15 @@ struct Layout {
 	}
 	
 	struct EdgeInsets {
-		var minX, maxX, minY, maxY:Double
+		var minX, maxX, minY, maxY:Native
 		
-		var horizontal:Double { return minX + maxX }
-		var vertical:Double { return minY + maxY }
+		var horizontal:Native { return minX + maxX }
+		var vertical:Native { return minY + maxY }
 		
-		init(top:Double = 0, bottom:Double = 0, leading:Double = 0, trailing:Double = 0, environment:Environment) { self.minX = environment.isRTL ? trailing : leading; self.maxX = environment.isRTL ? leading : trailing; self.minY = top; self.maxY = bottom }
-		init(minX:Double = 0, maxX:Double = 0, minY:Double = 0, maxY:Double = 0) { self.minX = minX; self.maxX = maxX; self.minY = minY; self.maxY = maxY }
-		init(horizontal:Double, vertical:Double) { minX = horizontal; maxX = horizontal; minY = vertical; maxY = vertical }
-		init(uniform:Double) { minX = uniform; maxX = uniform; minY = uniform; maxY = uniform }
+		init(top:Native = 0, bottom:Native = 0, leading:Native = 0, trailing:Native = 0, environment:Environment) { self.minX = environment.isRTL ? trailing : leading; self.maxX = environment.isRTL ? leading : trailing; self.minY = top; self.maxY = bottom }
+		init(minX:Native = 0, maxX:Native = 0, minY:Native = 0, maxY:Native = 0) { self.minX = minX; self.maxX = maxX; self.minY = minY; self.maxY = maxY }
+		init(horizontal:Native, vertical:Native) { minX = horizontal; maxX = horizontal; minY = vertical; maxY = vertical }
+		init(uniform:Native) { minX = uniform; maxX = uniform; minY = uniform; maxY = uniform }
 		
 		func paddingSize(_ size:CGSize) -> CGSize { return CGSize(width:size.width + CGFloat(minX + maxX), height:size.height + CGFloat(minY + maxY)) }
 		func paddingBox(_ box:CGRect) -> CGRect { return CGRect(x:box.origin.x - CGFloat(minX), y:box.origin.y - CGFloat(minY), width:box.size.width + CGFloat(minX + maxX), height:box.size.height + CGFloat(minY + maxY)) }
@@ -317,7 +335,7 @@ struct Layout {
 		
 		var frame:CGRect { return .zero }
 		
-		init(width:Double = 0, height:Double = 0) { self.size = CGSize(width:width, height:height) }
+		init(width:Native = 0, height:Native = 0) { self.size = CGSize(width:width, height:height) }
 		init(_ size:CGSize) { self.size = size }
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -339,7 +357,7 @@ struct Layout {
 			self.insets = insets
 		}
 		
-		init(target:Positionable, uniform:Double) {
+		init(target:Positionable, uniform:Native) {
 			self.target = target
 			self.insets = EdgeInsets(uniform:uniform)
 		}
@@ -374,8 +392,8 @@ struct Layout {
 		
 		var frame:CGRect {
 			var result = target.frame
-			if let width = width { result.size.width = CGFloat(width.prefer) }
-			if let height = height { result.size.height = CGFloat(height.prefer) }
+			if let width = width { result.size.width = CGFloat(width.constant) }
+			if let height = height { result.size.height = CGFloat(height.constant) }
 			return result
 		}
 		
@@ -385,11 +403,11 @@ struct Layout {
 			self.height = height
 		}
 		
-		init(target:Positionable, width:Double? = nil, height:Double? = nil) {
+		init(target:Positionable, width:Native? = nil, height:Native? = nil) {
 			self.init(target:target, width:Dimension(value:width), height:Dimension(value:height))
 		}
 		
-		init(target:Positionable, minimumWidth:Double? = nil, minimumHeight:Double? = nil) {
+		init(target:Positionable, minimumWidth:Native? = nil, minimumHeight:Native? = nil) {
 			self.init(target:target, width:Dimension(minimum:minimumWidth), height:Dimension(minimum:minimumHeight))
 		}
 		
@@ -421,7 +439,7 @@ struct Layout {
 			return target.frame
 		}
 		
-		init(target:Positionable, ratio:Double, position:Double = 0.5) {
+		init(target:Positionable, ratio:Native, position:Native = 0.5) {
 			self.init(target:target, ratio:CGSize(width:ratio, height:1), position:CGPoint(x:position, y:position))
 		}
 		
@@ -435,12 +453,12 @@ struct Layout {
 			var size = target.positionableSize(fitting:limit)
 			
 			if size.width.isUnbounded && size.height.fraction == 0 && ratio.height > 0 {
-				size.width.prefer = size.height.prefer * ratio.width.native / ratio.height.native
+				size.width.constant = size.height.constant * ratio.width.native / ratio.height.native
 				size.width.minimum = size.height.minimum * ratio.width.native / ratio.height.native
 			}
 			
 			if size.height.isUnbounded && size.width.fraction == 0 && ratio.width > 0 {
-				size.height.prefer = size.width.prefer * ratio.height.native / ratio.width.native
+				size.height.constant = size.width.constant * ratio.height.native / ratio.width.native
 				size.height.minimum = size.width.minimum * ratio.height.native / ratio.width.native
 			}
 			
@@ -477,7 +495,7 @@ struct Layout {
 		var alignment:Alignment
 		var position:Position
 		var primaryIndex:Int
-		var spacing:Double
+		var spacing:Native
 		var direction:Direction
 		
 		var isFloating:Bool {
@@ -492,7 +510,7 @@ struct Layout {
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
 		}
 		
-		init(targets:[Positionable], spacing:Double = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+		init(targets:[Positionable], spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
 			self.targets = targets
 			self.spacing = spacing
 			self.position = position
@@ -506,7 +524,7 @@ struct Layout {
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
 			
 			var result:Layout.Size = .zero
-			let spacingSum = spacing * Double(targets.count - 1)
+			let spacingSum = spacing * Native(targets.count - 1)
 			
 			for target in targets {
 				let size = target.positionableSize(fitting: limit)
@@ -533,7 +551,7 @@ struct Layout {
 			var offset = 0.0
 			
 			if isFloating {
-				offset = -axial.sizeBefore(primaryIndex, isPositive:isPositive)
+				offset = -axial.sizeBeforeElement(primaryIndex, isPositive:isPositive)
 			} else if let value = position.value(axis:.vertical, environment:context.environment) {
 				offset = axial.offset(fraction:value, available:available, index:primaryIndex, isPositive:isPositive)
 			}
@@ -572,7 +590,7 @@ struct Layout {
 		var targets:[Positionable]
 		var alignment:Alignment
 		var position:Position
-		var spacing:Double
+		var spacing:Native
 		var primaryIndex:Int
 		var direction:Direction
 		
@@ -588,7 +606,7 @@ struct Layout {
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
 		}
 		
-		init(targets:[Positionable], spacing:Double = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+		init(targets:[Positionable], spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
 			self.targets = targets
 			self.spacing = spacing
 			self.position = position
@@ -602,7 +620,7 @@ struct Layout {
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
 			var result:Layout.Size = .zero
-			let spacingSum = spacing * Double(targets.count - 1)
+			let spacingSum = spacing * Native(targets.count - 1)
 			
 			for target in targets {
 				let size = target.positionableSize(fitting:limit)
@@ -629,7 +647,7 @@ struct Layout {
 			var offset = 0.0
 			
 			if isFloating {
-				offset = -axial.sizeBefore(primaryIndex, isPositive:isPositive)
+				offset = -axial.sizeBeforeElement(primaryIndex, isPositive:isPositive)
 			} else if let value = position.value(axis:.horizontal, environment:context.environment) {
 				offset = axial.offset(fraction:value, available:available, index:primaryIndex, isPositive:isPositive)
 			}
@@ -760,16 +778,16 @@ struct Layout {
 		}
 		
 		/// Unused space
-		let empty:Double
+		let empty:Native
 		/// Uniform distance between sizes
-		let space:Double
+		let space:Native
 		/// Computed sizes along axis
-		let sizes:[Double]
+		let sizes:[Native]
 		
-		init(_ dimensions:[Dimension], available:Double, spacing:Double, fit:Fit) {
+		init(_ dimensions:[Dimension], available:Native, spacing:Native, fit:Fit) {
 			var minimum = 0.0, maximum = 0.0, prefer = 0.0
 			var dimensions = dimensions
-			let spaceCount = Double(dimensions.count - 1)
+			let spaceCount = Native(dimensions.count - 1)
 			let space = spacing * spaceCount
 			
 			for index in dimensions.indices {
@@ -777,19 +795,19 @@ struct Layout {
 				
 				dimension.minimum = min(max(0, dimension.minimum), available)
 				dimension.maximum = min(max(dimension.minimum, dimension.maximum), available * 4)
-				dimension.prefer = min(max(dimension.minimum, dimension.prefer + dimension.fraction * available), dimension.maximum)
+				dimension.constant = min(max(dimension.minimum, dimension.constant + dimension.fraction * available), dimension.maximum)
 				dimensions[index] = dimension
 				
 				minimum += dimension.minimum
 				maximum += dimension.maximum
-				prefer += dimension.prefer
+				prefer += dimension.constant
 			}
 			
 			if available < minimum + space {
 				if available < minimum || fit == .distribute {
 					let space = fit == .stretch ? 0 : space
 					let reduction = minimum + space - available
-					let denominator = Double(dimensions.count)
+					let denominator = Native(dimensions.count)
 					
 					self.empty = 0
 					self.space = spacing
@@ -805,17 +823,17 @@ struct Layout {
 				
 				self.empty = 0
 				self.space = spacing
-				self.sizes = dimensions.map { $0.prefer - ($0.prefer - $0.minimum) * reduction / denominator }
+				self.sizes = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
 			} else if available < maximum + space {
 				let expansion = available - prefer - space
 				let denominator = maximum - prefer
 				
 				self.empty = 0
 				self.space = spacing
-				self.sizes = dimensions.map { $0.prefer + ($0.maximum - $0.prefer) * expansion / denominator }
+				self.sizes = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
 			} else if fit == .stretch {
 				let expansion = available - maximum - space
-				let denominator = Double(dimensions.count)
+				let denominator = Native(dimensions.count)
 				
 				self.empty = 0
 				self.space = spacing
@@ -833,28 +851,30 @@ struct Layout {
 			}
 		}
 		
-		func sizeBefore(_ index:Int, isPositive:Bool) -> Double {
+		func sizeBeforeElement(_ index:Int, isPositive:Bool) -> Native {
 			if isPositive {
-				return sizes.prefix(index).reduce(0, +) + Double(index) * space
+				return sizes.prefix(index).reduce(0, +) + Native(index) * space
 			} else {
-				return sizes.suffix(from:index + 1).reduce(0, +) + Double(sizes.count - index) * space
+				return sizes.suffix(from:index + 1).reduce(0, +) + Native(sizes.count - index) * space
 			}
 		}
 		
-		func offset(fraction:Double, available:Double, index:Int, isPositive:Bool) -> Double {
+		func offset(fraction:Native, available:Native, index:Int, isPositive:Bool) -> Native {
 			guard sizes.indices.contains(index) else { return fraction * empty }
 			
 			let size = sizes[index]
 			let remainder = available - size
 			let nominal = remainder * fraction
 			
-			let minimumBeforeOffset = sizeBefore(index, isPositive:isPositive)
-			let minimumAfterOffset = sizeBefore(index, isPositive:!isPositive)
+			let minimumBeforeOffset = sizeBeforeElement(index, isPositive:isPositive)
+			let minimumAfterOffset = sizeBeforeElement(index, isPositive:!isPositive)
 			
 			return min(max(minimumBeforeOffset, nominal), available - minimumAfterOffset)
 		}
 	}
 }
+
+//	MARK: -
 
 extension Positionable {
 	func ignoringSafeBounds() -> Positionable {
@@ -865,22 +885,28 @@ extension Positionable {
 		return Layout.Padding(target:self, insets:insets)
 	}
 	
-	func padding(uniform:Double = 8) -> Positionable {
+	func padding(uniform:Layout.Native = 8) -> Positionable {
 		return Layout.Padding(target:self, uniform:uniform)
 	}
 	
-	func padding(horizontal:Double, vertical:Double) -> Positionable {
+	func padding(horizontal:Layout.Native, vertical:Layout.Native) -> Positionable {
 		return Layout.Padding(target:self, insets:Layout.EdgeInsets(horizontal:horizontal, vertical:vertical))
 	}
 	
-	func fixed(width:Double? = nil, height:Double? = nil) -> Positionable {
+	func fixed(width:Layout.Native? = nil, height:Layout.Native? = nil) -> Positionable {
 		return Layout.Sizing(target:self, width:width, height:height)
 	}
 	
-	func minimum(width:Double? = nil, height:Double? = nil) -> Positionable {
+	func minimum(width:Layout.Native? = nil, height:Layout.Native? = nil) -> Positionable {
 		return Layout.Sizing(target:self, minimumWidth:width, minimumHeight:height)
 	}
+	
+	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {
+		return Layout.Aspect(target:self, ratio:ratio, position:position)
+	}
 }
+
+//	MARK: -
 
 extension PlatformView: Positionable {
 	var positionableEnvironment:Layout.Environment {
@@ -904,14 +930,14 @@ extension PlatformView: Positionable {
 	}
 	
 	@objc
-	func positionableSizeFitting(_ size:Double.Vector2) -> Data {
+	func positionableSizeFitting(_ size:CGSize) -> Data {
 		let intrinsicSize = intrinsicContentSize
 		
 		return Layout.Size(intrinsicSize:intrinsicSize).data
 	}
 	
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-		return Layout.Size(data:positionableSizeFitting(limit.vector)) ?? .zero
+		return Layout.Size(data:positionableSizeFitting(limit.size)) ?? .zero
 	}
 	
 	@objc
@@ -1056,11 +1082,13 @@ extension PlatformView: Positionable {
 	}
 }
 
+//	MARK: -
+
 extension PlatformLabel {
-	override func positionableSizeFitting(_ size:Double.Vector2) -> Data {
-		guard size.x < .greatestFiniteMagnitude || size.y < .greatestFiniteMagnitude else { return super.positionableSizeFitting(size) }
+	override func positionableSizeFitting(_ size:CGSize) -> Data {
+		guard size.width.native < Layout.Limit.unlimited || size.height.native < Layout.Limit.unlimited else { return super.positionableSizeFitting(size) }
 		
-		let fits = sizeThatFits(CGSize(width:size.x, height:size.y))
+		let fits = sizeThatFits(size)
 		
 		return Layout.Size(size:fits).data
 	}

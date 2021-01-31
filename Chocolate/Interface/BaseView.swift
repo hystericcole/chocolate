@@ -123,6 +123,12 @@ class BaseView: PlatformView {
 	func sizeChanged() { if let layout = makeLayout() { applyLayout(layout) } }
 	
 	func invalidateLayout() { priorSize = .zero }
+	
+	override func positionableSizeFitting(_ size:CGSize) -> Data {
+		guard let layout = makeLayout() else { return super.positionableSizeFitting(size) }
+		
+		return layout.positionableSize(fitting:Layout.Limit(size:size)).data
+	}
 }
 
 class BaseViewController: PlatformViewController {
