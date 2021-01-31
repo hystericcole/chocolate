@@ -1,0 +1,20 @@
+//
+//  DisplayStrings.swift
+//  Chocolate
+//
+//  Created by Eric Cole on 1/27/21.
+//
+
+import Foundation
+
+enum DisplayStrings {
+	enum Chocolate {
+		static let title = "Chocolate"
+		static let primary = "Color"
+		static let derived = "Derived Colors"
+		static let contrast = "Contrast"
+		static let saturation = "Saturation"
+		
+		static func example(foreground:Int, background:Int) -> String { return "Foreground \(foreground), Background \(background)" }
+	}
+}
