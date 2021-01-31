@@ -137,6 +137,7 @@ struct Layout {
 	}
 	
 	struct Dimension {
+		static let unlimited:ClosedRange<Double> = 0 ... 0x1p31
 		static let zero = Dimension(value:0)
 		
 		var prefer:Double
@@ -144,9 +145,10 @@ struct Layout {
 		var maximum:Double
 		var fraction:Double
 		
+		var isUnbounded:Bool { return minimum <= 0 && prefer == 0 && fraction == 0 && maximum > 0x1p30 }
 		var vector:Double.Vector4 { return Double.vector4(prefer, minimum, maximum, fraction) }
 		
-		init(prefer:Double, range:ClosedRange<Double> = 0 ... .greatestFiniteMagnitude, fraction:Double = 0) {
+		init(prefer:Double, range:ClosedRange<Double> = unlimited, fraction:Double = 0) {
 			self.prefer = prefer
 			self.minimum = range.lowerBound
 			self.maximum = range.upperBound
@@ -176,7 +178,7 @@ struct Layout {
 		init?(minimum:Double?) {
 			guard let minimum = minimum else { return nil }
 			
-			self.init(prefer:minimum, range:minimum ... .greatestFiniteMagnitude, fraction:0)
+			self.init(prefer:minimum, range:minimum ... Dimension.unlimited.upperBound, fraction:0)
 		}
 		
 		func resolve(_ limit:Double) -> Double {
@@ -186,13 +188,13 @@ struct Layout {
 		mutating func add(value:Double) {
 			prefer += value
 			minimum = max(minimum + value, 0)
-			maximum = min(max(minimum, maximum + value), .greatestFiniteMagnitude)
+			maximum = max(minimum, maximum + value)
 		}
 		
 		mutating func add(_ dimension:Dimension) {
 			prefer += dimension.prefer
 			minimum = max(minimum + dimension.minimum, 0)
-			maximum = min(max(minimum, maximum + dimension.maximum), .greatestFiniteMagnitude)
+			maximum = max(minimum, maximum + dimension.maximum)
 			fraction += dimension.fraction
 		}
 		
@@ -402,6 +404,66 @@ struct Layout {
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			target.applyPositionableFrame(box, context:context)
+		}
+		
+		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+			return target.orderablePositionables(environment:environment)
+		}
+	}
+	
+	struct Aspect: Positionable {
+		var target:Positionable
+		var position:CGPoint
+		var ratio:CGSize
+		
+		var frame:CGRect {
+			return target.frame
+		}
+		
+		init(target:Positionable, ratio:Double, position:Double = 0.5) {
+			self.init(target:target, ratio:CGSize(width:ratio, height:1), position:CGPoint(x:position, y:position))
+		}
+		
+		init(target:Positionable, ratio:CGSize, position:CGPoint = CGPoint(x:0.5, y:0.5)) {
+			self.target = target
+			self.ratio = ratio
+			self.position = position
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			var size = target.positionableSize(fitting:limit)
+			
+			if size.width.isUnbounded && size.height.fraction == 0 && ratio.height > 0 {
+				size.width.prefer = size.height.prefer * ratio.width.native / ratio.height.native
+				size.width.minimum = size.height.minimum * ratio.width.native / ratio.height.native
+			}
+			
+			if size.height.isUnbounded && size.width.fraction == 0 && ratio.width > 0 {
+				size.height.prefer = size.width.prefer * ratio.height.native / ratio.width.native
+				size.height.minimum = size.width.minimum * ratio.height.native / ratio.width.native
+			}
+			
+			return size
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			var box = box
+			let ratioWidth = box.size.width * ratio.height
+			let ratioHeight = box.size.height * ratio.width
+			
+			if ratioWidth > ratioHeight {
+				let width = ratioHeight / ratio.height
+				
+				box.origin.x += (box.size.width - width) * position.x
+				box.size.width = width
+			} else {
+				let height = ratioWidth / ratio.width
+				
+				box.origin.y += (box.size.height - height) * position.y
+				box.size.height = height
+			}
+			
 			target.applyPositionableFrame(box, context:context)
 		}
 		
