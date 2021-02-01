@@ -85,6 +85,10 @@ extension CGSize {
 		return CGSize(width:width.rounded(rule), height:height.rounded(rule))
 	}
 	
+	public func display(scale:CGFloat = 1) -> CGSize {
+		return CGSize(width:ceil(width * scale) / scale, height:ceil(height * scale) / scale)
+	}
+	
 	public static func + (lhs:CGSize, rhs:CGSize) -> CGSize { return CGSize(width:lhs.width + rhs.width, height:lhs.height + rhs.height) }
 	public static func - (lhs:CGSize, rhs:CGSize) -> CGSize { return CGSize(width:lhs.width - rhs.width, height:lhs.height - rhs.height) }
 	public static func * (lhs:CGSize, rhs:CGSize) -> CGSize { return CGSize(width:lhs.width * rhs.width, height:lhs.height * rhs.height) }
@@ -108,6 +112,15 @@ extension CGRect {
 	
 	public init(center:CGPoint, size:CGSize) { self.init(origin:center - size * 0.5, size:size) }
 	public init(corner c1:CGPoint, _ c2:CGPoint) { self.init(x:min(c1.x, c2.x), y:min(c1.y, c2.y), width:abs(c1.x - c2.x), height:abs(c1.y - c2.y)) }
+	
+	public func display(scale:CGFloat = 1) -> CGRect {
+		let width = ceil(size.width * scale)
+		let height = ceil(size.height * scale)
+		let x = round(origin.x * scale + (size.width * scale - width) / 2)
+		let y = round(origin.y * scale + (size.height * scale - height) / 2)
+		
+		return CGRect(x:x / scale, y:y / scale, width:width / scale, height:height / scale)
+	}
 	
 	public func square(size:CGFloat) -> CGRect { return CGRect(center:center, size:CGSize(square:size)) }
 	

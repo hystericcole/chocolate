@@ -14,13 +14,16 @@ typealias PlatformFont = NSFont
 typealias PlatformFontDescriptor = NSFontDescriptor
 typealias PlatformColor = NSColor
 typealias PlatformImage = NSImage
+typealias PlatformResponder = NSResponder
 typealias PlatformViewController = NSViewController
 typealias PlatformView = NSView
 typealias PlatformControl = NSControl
 typealias PlatformSlider = NSSlider
 typealias PlatformLabel = NSTextField
 typealias PlatformImageView = NSImageView
-typealias PlatformScroller = NSScrollView
+typealias PlatformScroller = NSScroller
+typealias PlatformScrollingView = NSScrollView
+typealias PlatformSpinner = NSProgressIndicator
 typealias PlatformVisualEffectView = NSVisualEffectView
 
 @available(macOS 10.15, *)
@@ -32,6 +35,7 @@ typealias PlatformFont = UIFont
 typealias PlatformFontDescriptor = UIFontDescriptor
 typealias PlatformColor = UIColor
 typealias PlatformImage = UIImage
+typealias PlatformResponder = UIResponder
 typealias PlatformViewController = UIViewController
 typealias PlatformView = UIView
 typealias PlatformControl = UIControl
@@ -39,7 +43,8 @@ typealias PlatformSlider = UISlider
 typealias PlatformSwitch = UISwitch
 typealias PlatformLabel = UILabel
 typealias PlatformImageView = UIImageView
-typealias PlatformScroller = UIScrollView
+typealias PlatformScrollingView = UIScrollView
+typealias PlatformSpinner = UIActivityIndicatorView
 typealias PlatformVisualEffectView = UIVisualEffectView
 #endif
 

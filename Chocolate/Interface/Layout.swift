@@ -72,8 +72,8 @@ struct Layout {
 		static let start = Position.fraction(0.0)
 		static let center = Position.fraction(0.5)
 		static let end = Position.fraction(1.0)
-		static let leading = Alignment.adaptiveFraction(0.0)
-		static let trailing = Alignment.adaptiveFraction(1.0)
+		static let leading = Position.adaptiveFraction(0.0)
+		static let trailing = Position.adaptiveFraction(1.0)
 		static let `default` = center
 		
 		var isFill:Bool {
@@ -110,6 +110,7 @@ struct Layout {
 		}
 	}
 	
+	/// Display order of elements within a container
 	enum Direction: CustomStringConvertible {
 		case positive, negative, natural, reverse
 		
@@ -132,6 +133,7 @@ struct Layout {
 		}
 	}
 	
+	/// Environment for applying layout
 	struct Environment: CustomStringConvertible {
 		static var current:Environment { return Environment(isRTL:false) }
 		
@@ -142,19 +144,34 @@ struct Layout {
 		func adaptiveFractionValue(_ value:Native, axis:Axis) -> Native { return axis == .horizontal && isRTL ? 1.0 - value : value }
 	}
 	
+	/// Context for a layout pass
 	struct Context: CustomStringConvertible {
 		var bounds:CGRect
 		var safeBounds:CGRect
 		var isDownPositive:Bool
+		var scale:CGFloat
 		var environment:Environment
 		
-		var description:String { return "\(bounds) \(isDownPositive ? "↓+" : "↑+") \(environment)" }
+		var description:String { return "\(bounds) @\(scale)x \(isDownPositive ? "↓+" : "↑+") \(environment)" }
+		
+		func viewFrame(_ box:CGRect) -> CGRect {
+#if os(macOS)
+			var box = box
+			
+			if !isDownPositive {
+				box.origin.y = bounds.height - box.origin.y - box.size.height
+			}
+#endif
+			
+			return box.display(scale:scale)
+		}
 		
 		func performLayout(_ layout:Positionable) {
 			layout.applyPositionableFrame(safeBounds, context:self)
 		}
 	}
 	
+	/// The space available during layout
 	struct Limit: CustomStringConvertible {
 		static let unlimited:Native = 0x1p30
 		let width:Native?
@@ -179,6 +196,7 @@ struct Layout {
 		}
 	}
 	
+	/// The space requested during layout in one direction
 	struct Dimension: CustomStringConvertible {
 		static let unbound = Limit.unlimited * 0x1p10
 		static let zero = Dimension(value:0)
@@ -217,6 +235,9 @@ struct Layout {
 			self.init(constant:minimum, range:minimum ... Dimension.unbound, fraction:0)
 		}
 		
+		/// Computes constant + fraction × limit, clamped between minimum and maximum
+		/// - Parameter limit: Bounds of container
+		/// - Returns: Resolved value
 		func resolve(_ limit:Native) -> Native {
 			return min(max(minimum, constant + fraction * limit), maximum)
 		}
@@ -240,8 +261,14 @@ struct Layout {
 			maximum = max(maximum, dimension.maximum)
 			fraction = max(fraction, dimension.fraction)
 		}
+		
+		mutating func decreaseRange(_ range:ClosedRange<Double>) {
+			minimum = min(minimum, range.lowerBound)
+			maximum = min(maximum, range.upperBound)
+		}
 	}
 	
+	/// The size requested during layout
 	struct Size: CustomStringConvertible {
 		static let zero = Size(width:.zero, height:.zero)
 		
@@ -276,6 +303,11 @@ struct Layout {
 		}
 		
 		func resolve(_ size:CGSize) -> CGSize { return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native)) }
+		
+		mutating func decreaseRange(minimum:CGSize, maximum:CGSize) {
+			width.decreaseRange(minimum.width.native ... maximum.width.native)
+			height.decreaseRange(minimum.height.native ... maximum.height.native)
+		}
 	}
 	
 	struct EdgeInsets: CustomStringConvertible {
@@ -299,6 +331,7 @@ struct Layout {
 		static let zero = EdgeInsets(uniform:0)
 	}
 	
+	/// Targets that reach the safe bounds will be extended to the outer bounds
 	struct IgnoreSafeBounds: Positionable {
 		var target:Positionable
 		
@@ -313,10 +346,11 @@ struct Layout {
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
-			let minX = box.minX > context.safeBounds.minX ? 0 : max(box.minX - context.bounds.minX, 0) 
-			let minY = box.minY > context.safeBounds.minY ? 0 : max(box.minY - context.bounds.minY, 0)
-			let maxX = box.maxX < context.safeBounds.maxX ? 0 : max(context.bounds.maxX - box.maxX, 0)
-			let maxY = box.maxY < context.safeBounds.maxY ? 0 : max(context.bounds.maxY - box.maxY, 0)
+			let epsilon = 0.5 / context.scale
+			let minX = box.minX - epsilon > context.safeBounds.minX ? 0 : max(box.minX - context.bounds.minX, 0) 
+			let minY = box.minY - epsilon > context.safeBounds.minY ? 0 : max(box.minY - context.bounds.minY, 0)
+			let maxX = box.maxX + epsilon < context.safeBounds.maxX ? 0 : max(context.bounds.maxX - box.maxX, 0)
+			let maxY = box.maxY + epsilon < context.safeBounds.maxY ? 0 : max(context.bounds.maxY - box.maxY, 0)
 			let box = CGRect(x:box.origin.x - minX, y:box.origin.y - minY, width:box.size.width + minX + maxX, height:box.size.height + minY + maxY)
 			
 			target.applyPositionableFrame(box, context:context)
@@ -343,6 +377,7 @@ struct Layout {
 		func orderablePositionables(environment:Layout.Environment) -> [Positionable] { return [] }
 	}
 	
+	/// Specify padding around the target.  Positive insets will increase the distance between adjacent targets.  Negative insets may cause adjacent targets to overlap.
 	struct Padding: Positionable {
 		var target:Positionable
 		var insets:EdgeInsets
@@ -382,6 +417,7 @@ struct Layout {
 		}
 	}
 	
+	/// Replace the normal dimensions of the target
 	struct Sizing: Positionable {
 		var target:Positionable
 		var width:Dimension?
@@ -427,6 +463,7 @@ struct Layout {
 		}
 	}
 	
+	/// Record the measured dimensions of the target
 	struct Measured: Positionable {
 		let target:Positionable
 		let size:Size
@@ -457,6 +494,7 @@ struct Layout {
 		}
 	}
 	
+	/// Impose aspect fit on the target
 	struct Aspect: Positionable {
 		var target:Positionable
 		var position:CGPoint
@@ -517,6 +555,7 @@ struct Layout {
 		}
 	}
 	
+	/// Arrange a group of targets vertically
 	struct Vertical: Positionable {
 		var targets:[Positionable]
 		var alignment:Alignment
@@ -644,6 +683,7 @@ struct Layout {
 		}
 	}
 	
+	/// Arrange a group of targets horizontally
 	struct Horizontal: Positionable {
 		var targets:[Positionable]
 		var alignment:Alignment
@@ -771,6 +811,7 @@ struct Layout {
 		}
 	}
 	
+	/// Arrange a group of targets into vertical columns
 	struct Columns: Positionable {
 		var targets:[Positionable]
 		var columnCount:Int
@@ -922,6 +963,7 @@ struct Layout {
 		}
 	}
 	
+	/// Arrange a group of targets into horizontal rows
 	struct Rows: Positionable {
 		var targets:[Positionable]
 		var rowCount:Int
@@ -1072,6 +1114,8 @@ struct Layout {
 			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
 		}
 	}
+	
+	/// Arrange a group of targets into the same space with the same alignment.
 	struct Overlay: Positionable {
 		var targets:[Positionable]
 		var vertical:Alignment
@@ -1157,6 +1201,7 @@ struct Layout {
 		}
 	}
 	
+	/// Support various layouts along an axis
 	struct Axial {
 		enum Fit {
 			/// Do not fill available space and compress spacing as needed
@@ -1263,28 +1308,109 @@ struct Layout {
 		}
 	}
 	
-	struct Flow {
+	/// Arrange a group of elements in a flow that uses available space in one direction then wraps to continue using available space.
+	struct Flow: Positionable {
 		var targets:[Positionable]
-		var columnTemplate:Vertical
 		var rowTemplate:Horizontal
+		var columnTemplate:Vertical
+		var direction:Direction
 		var axis:Axis
-		
-		var direction:Direction {
-			return axis == .horizontal ? rowTemplate.direction : columnTemplate.direction
-		}
 		
 		var frame:CGRect {
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
 		}
 		
+		init(
+			targets:[Positionable],
+			rowTemplate:Horizontal = Horizontal(targets:[], alignment:.leading, position:.leading),
+			columnTemplate:Vertical = Vertical(targets:[], alignment:.leading, position:.leading),
+			direction:Direction = .positive,
+			axis:Axis = .horizontal)
+		{
+			self.targets = targets
+			self.columnTemplate = columnTemplate
+			self.rowTemplate = rowTemplate
+			self.direction = direction
+			self.axis = axis
+		}
+		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			guard !targets.isEmpty else { return .zero }
+			
 			var result:Layout.Size = .zero
 			
-			for target in targets {
-				let size = target.positionableSize(fitting:limit)
-				
-				result.width.increase(size.width)
-				result.height.increase(size.height)
+			switch axis {
+			case .horizontal:
+				if let width = limit.width, width < Limit.unlimited {
+					var rowSize:Layout.Size = .zero
+					var itemCount = 0
+					
+					for target in targets {
+						let size = target.positionableSize(fitting:limit)
+						var sum = rowSize.width
+						
+						sum.add(size.width)
+						
+						if itemCount > 0 && sum.resolve(width) > width {
+							rowSize.width.add(value:rowTemplate.spacing * Native(itemCount - 1))
+							result.width.increase(rowSize.width)
+							result.height.add(rowSize.height)
+							result.height.add(value:columnTemplate.spacing)
+							rowSize = size
+							itemCount = 1
+						} else {
+							rowSize.height.increase(size.height)
+							rowSize.width = sum
+							itemCount += 1
+						}
+					}
+					
+					rowSize.width.add(value:rowTemplate.spacing * Native(itemCount - 1))
+					result.width.increase(rowSize.width)
+					result.height.add(rowSize.height)
+				} else {
+					var row = rowTemplate
+					
+					row.targets = targets
+					
+					result = row.positionableSize(fitting:limit)
+				}
+			
+			case .vertical:
+				if let height = limit.height, height < Limit.unlimited {
+					var columnSize:Layout.Size = .zero
+					var itemCount = 0
+					
+					for target in targets {
+						let size = target.positionableSize(fitting:limit)
+						var sum = columnSize.height
+						
+						sum.add(size.height)
+						
+						if itemCount > 0 && sum.resolve(height) > height {
+							columnSize.height.add(value:columnTemplate.spacing * Native(itemCount - 1))
+							result.height.increase(columnSize.height)
+							result.width.add(columnSize.width)
+							result.width.add(value:rowTemplate.spacing)
+							columnSize = size
+							itemCount = 1
+						} else {
+							columnSize.width.increase(size.width)
+							columnSize.height = sum
+							itemCount += 1
+						}
+					}
+					
+					columnSize.height.add(value:columnTemplate.spacing * Native(itemCount - 1))
+					result.height.increase(columnSize.height)
+					result.width.add(columnSize.width)
+				} else {
+					var column = columnTemplate
+					
+					column.targets = targets
+					
+					return column.positionableSize(fitting:limit)
+				}
 			}
 			
 			return result
@@ -1307,9 +1433,8 @@ struct Layout {
 			horizontal.primaryIndex = -1
 			
 			switch axis {
-			case .vertical:
+			case .horizontal:
 				var width = Dimension.zero
-				vertical.direction = .positive
 				
 				for element in measured {
 					width.add(element.size.width)
@@ -1326,9 +1451,8 @@ struct Layout {
 				
 				vertical.targets.append(horizontal)
 				vertical.applyPositionableFrame(box, context:context)
-			case .horizontal:
+			case .vertical:
 				var height = Dimension.zero
-				horizontal.direction = .positive
 				
 				for element in measured {
 					height.add(element.size.height)
@@ -1402,6 +1526,16 @@ extension PlatformView: Positionable {
 		return Layout.Environment(isRTL:isRTL)
 	}
 	
+	var positionableScale:CGFloat {
+#if os(macOS)
+		let scale = convertToBacking(CGSize(width:1, height:1)).minimum
+#else
+		let scale = window?.screen.scale ?? contentScaleFactor
+#endif
+		
+		return scale
+	}
+	
 	var positionableContext:Layout.Context {
 #if os(macOS)
 		let isDownPositive = isFlipped
@@ -1409,7 +1543,7 @@ extension PlatformView: Positionable {
 		let isDownPositive = true
 #endif
 		
-		return Layout.Context(bounds:stableBounds, safeBounds:safeBounds, isDownPositive:isDownPositive, environment:positionableEnvironment)
+		return Layout.Context(bounds:stableBounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:positionableScale, environment:positionableEnvironment)
 	}
 	
 	@objc
@@ -1425,10 +1559,8 @@ extension PlatformView: Positionable {
 	
 	@objc
 	func applyPositionableFrame(_ box:CGRect) {
-		let box = box.integral
-		
 #if os(macOS)
-		frame = self.frame(forAlignmentRect:box)
+		self.frame = self.frame(forAlignmentRect:box)
 #else
 		if box.size == bounds.size {
 			center = box.center
@@ -1439,15 +1571,9 @@ extension PlatformView: Positionable {
 	}
 	
 	func applyPositionableFrame(_ box:CGRect, context:Layout.Context) {
-#if os(macOS)
-		var box = box
+		let frame = context.viewFrame(box)
 		
-		if !context.isDownPositive {
-			box.origin.y = context.bounds.height - box.origin.y - box.size.height
-		}
-#endif
-		
-		applyPositionableFrame(box)
+		applyPositionableFrame(frame)
 	}
 	
 	func orderablePositionables(environment:Layout.Environment) -> [Positionable] {

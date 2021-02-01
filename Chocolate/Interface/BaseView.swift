@@ -258,7 +258,7 @@ class BaseScrollingResponderView: PlatformView {
 #endif
 }
 
-class BaseScrollingLayoutView: PlatformScroller, ViewControllerAttachable {
+class BaseScrollingLayoutView: PlatformScrollingView, ViewControllerAttachable {
 #if os(macOS)
 	override var isFlipped:Bool { return true }
 	override var acceptsFirstResponder: Bool { return true }
@@ -389,7 +389,7 @@ class BaseScrollingLayoutView: PlatformScroller, ViewControllerAttachable {
 			bounds = CGRect(origin:.zero, size:padded)
 		}
 		
-		let context = Layout.Context(bounds:bounds, safeBounds:content, isDownPositive:false, environment:positionableEnvironment)
+		let context = Layout.Context(bounds:bounds, safeBounds:content, isDownPositive:false, scale:positionableScale, environment:positionableEnvironment)
 		
 		context.performLayout(layout)
 #endif
@@ -400,7 +400,7 @@ class BaseScrollingLayoutView: PlatformScroller, ViewControllerAttachable {
 		
 #if os(macOS)
 		let limit = bounds.size
-		let inset = PlatformScroller.frameSize(forContentSize:.zero, horizontalScrollerClass:NSScroller.self, verticalScrollerClass:NSScroller.self, borderType:.noBorder, controlSize:verticalScroller?.controlSize ?? .regular, scrollerStyle:scrollerStyle)
+		let inset = PlatformScrollingView.frameSize(forContentSize:.zero, horizontalScrollerClass:NSScroller.self, verticalScrollerClass:NSScroller.self, borderType:.noBorder, controlSize:verticalScroller?.controlSize ?? .regular, scrollerStyle:scrollerStyle)
 		let intrinsicSize = layout.positionableSize(fitting:Layout.Limit(size:limit))
 		let minimum = intrinsicSize.minimum
 		let available = CGSize(

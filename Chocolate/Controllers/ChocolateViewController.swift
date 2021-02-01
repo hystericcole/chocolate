@@ -10,29 +10,78 @@ import Foundation
 import simd
 
 class ChocolateViewController: BaseViewController {
+	typealias Strings = DisplayStrings.Chocolate
+	
 	enum Tag: Int {
 		case zero, red, green, blue, contrast, saturation, colorLabel, colorBox
 	}
 	
 	var isRGB = true
-	var chocolateView:ChocolateView? { return isViewLoaded ? view as? ChocolateView : nil }
+	var content:LazyViewable = Viewable.Spinner()
+	var sliderRed = Viewable.Slider(tag:Tag.red.rawValue, value:0.2, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.red)
+	var sliderGreen = Viewable.Slider(tag:Tag.green.rawValue, value:0.4, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.green)
+	var sliderBlue = Viewable.Slider(tag:Tag.blue.rawValue, value:0.6, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.blue)
+	var sliderContrast = Viewable.Slider(tag:Tag.contrast.rawValue, value:1.0, action:#selector(ChocolateViewController.sliderChanged))
+	var sliderSaturation = Viewable.Slider(tag:Tag.saturation.rawValue, value:0.5, action:#selector(ChocolateViewController.sliderChanged))
+	var primaryLabel = Viewable.Label(string:Style.caption.string(Strings.primary))
+	var deriveLabel = Viewable.Label(string:Style.caption.string(Strings.derived))
+	var colorBox = Viewable.Color(tag:Tag.colorBox.rawValue, color:nil)
+	var colorLabel = Viewable.Label(string:Style.caption.string(" "))
+	var examples:[Example] = (1 ... Example.exampleCount).map { Example(index:$0, descriptions:Example.descriptionCount) }
+	
+	override func prepare() {
+		let minimumSliderWidth = 200.0
+		let colorBoxSize = 40.0
+		
+		let colorPicker = Layout.Horizontal(targets:[
+			Layout.Vertical(targets:[
+				primaryLabel,
+				colorBox.fixed(width:colorBoxSize, height:colorBoxSize)
+			], spacing:2, alignment:.center, position:.center),
+			Layout.Vertical(targets:[
+				sliderRed,
+				sliderGreen,
+				sliderBlue
+			], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth),
+		], spacing:8, position:.stretch)
+		
+		let colorDerivation = Layout.Vertical(targets:[
+			colorLabel,
+			deriveLabel,
+			sliderContrast.minimum(width:minimumSliderWidth),
+			sliderSaturation.minimum(width:minimumSliderWidth)
+		], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth)
+		
+		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
+			targets:examples.map { $0.layout }, 
+			rowTemplate:Layout.Horizontal(targets:[], spacing:0, alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(targets:[], spacing:0, alignment:.fill, position:.stretch),
+			axis:.horizontal
+		), minimum:CGSize(square:200)).ignoringSafeBounds()
+		
+		let controlsLayout = Layout.Vertical(targets:[
+			Layout.EmptySpace(width:0, height:10),
+			colorPicker.padding(horizontal:20, vertical:0),
+			colorDerivation.padding(horizontal:20, vertical:0),
+		], spacing:10, alignment:.fill, position:.start)
+		
+		content = Viewable.Group(content:Layout.Vertical(targets:[controlsLayout, exampleLayout], spacing:8, alignment:.fill, position:.stretch))
+	}
 	
 	override func loadView() {
-		let chocolateView = ChocolateView()
-		
-		view = chocolateView
+		view = content.lazyView
 	}
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		
-		if !isRGB, let chocolateView = chocolateView {
+		if !isRGB {
 			let chocolate = CGColor.chocolate
-			let vector = Double.vector4(chocolateView.sliderRed.value, chocolateView.sliderGreen.value, chocolateView.sliderBlue.value, 1)
+			let vector = Double.vector4(sliderRed.value, sliderGreen.value, sliderBlue.value, 1)
 			
-			chocolateView.sliderRed.value = chocolate.vectorHue(vector)
-			chocolateView.sliderGreen.value = chocolate.saturation(vector)
-			chocolateView.sliderBlue.value = chocolate.luma(vector)
+			sliderRed.value = chocolate.vectorHue(vector)
+			sliderGreen.value = chocolate.saturation(vector)
+			sliderBlue.value = chocolate.luma(vector)
 		}
 		
 		sliderChanged()
@@ -64,37 +113,32 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	func applyColor(rgba:RGBA) {
-		guard let chocolateView = chocolateView else { return }
-		
-		chocolateView.colorBox.color = rgba.cgColor()?.platformColor
+		colorBox.color = rgba.cgColor()?.platformColor
 		
 		let chocolate = CGColor.chocolate
-		let examples = chocolateView.examples
-		let contrast = chocolateView.sliderContrast.value
-		let saturation = chocolateView.sliderSaturation.value
+		let contrast = sliderContrast.value
+		let saturation = sliderSaturation.value
 		let backgrounds = generateBackgrounds(primary:rgba, contrast:contrast, saturation:saturation, count:examples.count)
-		let foregrounds = generateForegrounds(primary:rgba, contrast:contrast, saturation:saturation, count:ChocolateView.Example.descriptionCount)
+		let foregrounds = generateForegrounds(primary:rgba, contrast:contrast, saturation:saturation, count:Example.descriptionCount)
 		
 		for i in examples.indices {
-			chocolateView.examples[i].background.color = backgrounds[i].cgColor()?.platformColor
+			examples[i].background.color = backgrounds[i].cgColor()?.platformColor
 			
 			for j in examples[i].foregrounds.indices {
-				chocolateView.examples[i].foregrounds[j].textColor = foregrounds[j].cgColor()?.platformColor
+				examples[i].foregrounds[j].textColor = foregrounds[j].cgColor()?.platformColor
 			}
 		}
 		
 		let description = String(format:"%.3f◐  %.1f°  %.3fc  %.3f❂", chocolate.contrast(rgba.vector), 360.0 * chocolate.vectorHue(rgba.vector), chocolate.saturation(rgba.vector), chocolate.luma(rgba.vector))
 		
-		chocolateView.colorLabel.attributedText = Style.caption.centered.string(description)
+		colorLabel.attributedText = Style.caption.centered.string(description)
 	}
 	
 	@objc
 	func sliderChanged() {
-		guard let chocolateView = chocolateView else { return }
-		
-		let red = chocolateView.sliderRed.value
-		let green = chocolateView.sliderGreen.value
-		let blue = chocolateView.sliderBlue.value
+		let red = sliderRed.value
+		let green = sliderGreen.value
+		let blue = sliderBlue.value
 		let rgba:RGBA
 		
 		if isRGB {
@@ -107,9 +151,7 @@ class ChocolateViewController: BaseViewController {
 	}
 }
 
-class ChocolateView: BaseScrollingLayoutView {
-	typealias Tag = ChocolateViewController.Tag
-	
+extension ChocolateViewController {
 	struct Example {
 		static let exampleCount = 3
 		static let descriptionCount = 3
@@ -120,8 +162,9 @@ class ChocolateView: BaseScrollingLayoutView {
 		
 		var layout:Positionable {
 			return Layout.Overlay(targets:[
-				background.ignoringSafeBounds().padding(Layout.EdgeInsets(horizontal:-8, vertical:0)),
+				background.ignoringSafeBounds(),
 				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.center, position:.center)
+					.padding(uniform: 8)
 			], vertical:.fill, horizontal:.fill)
 		}
 		
@@ -135,63 +178,5 @@ class ChocolateView: BaseScrollingLayoutView {
 				return Viewable.Label(tag:index * 100 + description, string:string)
 			}
 		}
-	}
-	
-	var sliderRed = Viewable.Slider(tag:Tag.red.rawValue, value:0.2, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.red)
-	var sliderGreen = Viewable.Slider(tag:Tag.green.rawValue, value:0.4, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.green)
-	var sliderBlue = Viewable.Slider(tag:Tag.blue.rawValue, value:0.6, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.blue)
-	var sliderContrast = Viewable.Slider(tag:Tag.contrast.rawValue, value:1.0, action:#selector(ChocolateViewController.sliderChanged))
-	var sliderSaturation = Viewable.Slider(tag:Tag.saturation.rawValue, value:0.5, action:#selector(ChocolateViewController.sliderChanged))
-	var primaryLabel = Viewable.Label(string:Style.caption.string(DisplayStrings.Chocolate.primary))
-	var deriveLabel = Viewable.Label(string:Style.caption.string(DisplayStrings.Chocolate.derived))
-	var colorBox = Viewable.Color(tag:Tag.colorBox.rawValue, color:nil)
-	var colorLabel = Viewable.Label(string:Style.caption.string(" "))
-	var examples:[Example] = (1 ... 3).map { Example(index:$0, descriptions:Example.descriptionCount) }
-	
-	var hierarchy:Positionable?
-	
-	override func invalidateLayout() {
-		super.invalidateLayout()
-		
-		hierarchy = nil
-	}
-	
-	override func makeLayout() -> Positionable {
-		if let existing = hierarchy { return existing }
-		
-		let minimumSliderWidth = 200.0
-		let colorBoxSize = 40.0
-		
-		let colorPicker = Layout.Horizontal(targets:[
-			Layout.Vertical(targets:[
-				primaryLabel,
-				colorBox.fixed(width:colorBoxSize, height:colorBoxSize)
-			], spacing:2, alignment:.center, position:.center),
-			Layout.Vertical(targets:[
-				sliderRed,
-				sliderGreen,
-				sliderBlue
-			], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth),
-		], spacing:8, position:.stretch)
-		
-		let interfaceSliders = Layout.Vertical(targets:[
-			colorLabel,
-			deriveLabel,
-			sliderContrast.minimum(width:minimumSliderWidth),
-			sliderSaturation.minimum(width:minimumSliderWidth)
-		], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth)
-		
-		let exampleLayout = Layout.Vertical(targets:examples.map { $0.layout }, spacing:0, alignment:.fill, position:.start)
-		
-		let layout = Layout.Vertical(targets:[
-			Layout.EmptySpace(width:0, height:10),
-			colorPicker.padding(horizontal:20, vertical:0),
-			interfaceSliders.padding(horizontal:20, vertical:0),
-			exampleLayout
-		], spacing:10, alignment:.fill, position:.start)
-		
-		hierarchy = layout
-		
-		return layout
 	}
 }
