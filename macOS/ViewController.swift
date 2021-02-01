@@ -43,7 +43,9 @@ class ViewController: BaseViewController {
 	}
 	
 	func applyMinimumSize(from viewController:BaseViewController) {
-		if let window = view.window, let layout = (viewController.view as? BaseView)?.makeLayout() {
+		guard let window = view.window else { return }
+		
+		if let layout = (viewController.view as? BaseView)?.makeLayout() {
 			let size = layout.positionableSize(fitting:Layout.Limit(width:nil, height:nil))
 			var minimum = size.minimum
 			
@@ -55,6 +57,8 @@ class ViewController: BaseViewController {
 			}
 			
 			window.contentMinSize = minimum
+		} else {
+			window.contentMinSize = CGSize(width:240, height:480)
 		}
 	}
 }

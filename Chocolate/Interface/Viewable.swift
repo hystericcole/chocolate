@@ -23,17 +23,22 @@ enum Viewable {
 		weak var value:T?
 	}
 	
-	struct Hierarchy: ViewablePositionable {
-		typealias ViewType = ViewableHierarchyView
+	struct Group: ViewablePositionable {
+		typealias ViewType = ViewableGroupView
 		
-		struct Model {
-			var tag:Int
+		class Model {
+			let tag:Int
 			var content:Positionable
+			
+			init(tag:Int = 0, content:Positionable) {
+				self.tag = tag
+				self.content = content
+			}
 		}
 		
-		var reference = Reference<ViewType>()
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } set { model.tag = newValue; reference.value?.tag = newValue } }
+		let reference = Reference<ViewType>()
+		let model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
 		var content:Positionable { get { return reference.value?.content ?? model.content } set { model.content = newValue; reference.value?.content = newValue } }
 		var view:ViewType? { return reference.value }
 		
@@ -41,7 +46,7 @@ enum Viewable {
 			self.model = Model(tag:tag, content:content)
 		}
 		
-		func attachView(_ view:ViewableHierarchyView) {
+		func attachView(_ view:ViewableGroupView) {
 			view.tag = model.tag
 			view.content = model.content
 			
@@ -65,15 +70,21 @@ enum Viewable {
 		typealias ViewType = PlatformView
 #endif
 		
-		struct Model {
-			var tag:Int
+		class Model {
+			let tag:Int
 			var color:PlatformColor?
 			var size:CGSize
+			
+			init(tag:Int = 0, color:PlatformColor? = nil, size:CGSize = Viewable.noIntrinsicSize) {
+				self.tag = tag
+				self.color = color
+				self.size = size
+			}
 		}
 		
-		var reference = Reference<ViewType>()
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } set { model.tag = newValue; reference.value?.tag = newValue } }
+		let reference = Reference<ViewType>()
+		let model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
 		var color:PlatformColor? { get { return view?.backgroundColor ?? model.color } set { model.color = newValue; reference.value?.backgroundColor = newValue } }
 		var size:CGSize { get { return view?.bounds.size ?? model.size } set { model.size = newValue; view?.invalidateIntrinsicContentSize() } }
 		var view:ViewType? { return reference.value }
@@ -104,16 +115,23 @@ enum Viewable {
 	struct Label: ViewablePositionable {
 		typealias ViewType = PlatformLabel
 		
-		struct Model {
-			var tag:Int
+		class Model {
+			let tag:Int
 			var string:NSAttributedString?
 			var intrinsicWidth:CGFloat
 			var maximumLines:Int
+			
+			init(tag:Int = 0, string:NSAttributedString? = nil, intrinsicWidth:CGFloat = 0, maximumLines:Int = 0) {
+				self.tag = tag
+				self.string = string
+				self.intrinsicWidth = intrinsicWidth
+				self.maximumLines = maximumLines
+			}
 		}
 		
-		var reference = Reference<ViewType>()
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } set { model.tag = newValue; reference.value?.tag = newValue } }
+		let reference = Reference<ViewType>()
+		let model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
 		var attributedText:NSAttributedString? { get { return reference.value?.attributedText ?? model.string } set { model.string = newValue; reference.value?.attributedText = newValue } }
 		var intrinsicWidth:CGFloat { get { return reference.value?.preferredMaxLayoutWidth ?? model.intrinsicWidth } set { model.intrinsicWidth = newValue; reference.value?.preferredMaxLayoutWidth = newValue } }
 		var textColor:PlatformColor? { get { return reference.value?.textColor } set { reference.value?.textColor = newValue } }
@@ -154,13 +172,13 @@ enum Viewable {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			guard let string = model.string else { return .zero }
 			
-			var limit = limit.size
-			if model.intrinsicWidth > 0 && model.intrinsicWidth < limit.width { limit.width = intrinsicWidth }
+			var sizeLimit = limit.size
+			if model.intrinsicWidth > 0 && model.intrinsicWidth < sizeLimit.width { sizeLimit.width = intrinsicWidth }
 			
 #if os(macOS)
-			let bounds = string.boundingRect(with:limit, options:.usesLineFragmentOrigin)
+			let bounds = string.boundingRect(with:sizeLimit, options:.usesLineFragmentOrigin)
 #else
-			let bounds = string.boundingRect(with:limit, options:.usesLineFragmentOrigin, context:nil)
+			let bounds = string.boundingRect(with:sizeLimit, options:.usesLineFragmentOrigin, context:nil)
 #endif
 			
 			return Layout.Size(size:bounds.size)
@@ -170,15 +188,21 @@ enum Viewable {
 	struct Image: ViewablePositionable {
 		typealias ViewType = PlatformImageView
 		
-		struct Model {
-			var tag:Int
+		class Model {
+			let tag:Int
 			var image:PlatformImage?
 			var color:PlatformColor?
+			
+			init(tag:Int = 0, image:PlatformImage? = nil, color:PlatformColor? = nil) {
+				self.tag = tag
+				self.image = image
+				self.color = color
+			}
 		}
 		
-		var reference = Reference<ViewType>()
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } set { model.tag = newValue; reference.value?.tag = newValue } }
+		let reference = Reference<ViewType>()
+		let model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
 		var image:PlatformImage? { get { return reference.value?.image ?? model.image } set { model.image = newValue; reference.value?.image = newValue } }
 		var view:ViewType? { return reference.value }
 		
@@ -217,18 +241,27 @@ enum Viewable {
 	struct Slider: ViewablePositionable {
 		typealias ViewType = PlatformSlider
 		
-		struct Model {
-			var tag:Int
+		class Model {
+			let tag:Int
 			var value:Double
 			var range:ClosedRange<Double>
 			weak var target:AnyObject?
 			var action:Selector?
 			var minimumTrackColor:PlatformColor?
+			
+			init(tag:Int = 0, value:Double, range:ClosedRange<Double> = 0 ... 1, target:AnyObject? = nil, action:Selector? = nil, minimumTrackColor:PlatformColor? = nil) {
+				self.tag = tag
+				self.value = value
+				self.range = range
+				self.target = target
+				self.action = action
+				self.minimumTrackColor = minimumTrackColor
+			}
 		}
 		
-		var reference = Reference<ViewType>()
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } set { model.tag = newValue; reference.value?.tag = newValue } }
+		let reference = Reference<ViewType>()
+		let model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
 		var view:ViewType? { return reference.value }
 		
 #if os(macOS)
@@ -292,7 +325,7 @@ enum Viewable {
 			reference.value = view
 		}
 		
-		mutating func applyAction(target:AnyObject?, action:Selector?) {
+		func applyAction(target:AnyObject?, action:Selector?) {
 			model.target = target
 			model.action = action
 			
@@ -326,15 +359,20 @@ enum Viewable {
 	struct Shape: ViewablePositionable {
 		typealias ViewType = ViewableShapeView
 		
-		struct Model {
-			var tag:Int
-			var path:CGPath
+		class Model {
+			let tag:Int
+			var path:CGPath?
+			
+			init(tag:Int = 0, path:CGPath? = nil) {
+				self.tag = tag
+				self.path = path
+			}
 		}
 		
-		var reference = Reference<ViewType>()
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } set { model.tag = newValue; reference.value?.tag = newValue } }
-		var path:CGPath { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; shapeLayer?.path = newValue } }
+		let reference = Reference<ViewType>()
+		let model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var path:CGPath? { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; shapeLayer?.path = newValue } }
 		var view:ViewType? { return reference.value }
 		var shapeLayer:CAShapeLayer? { return reference.value?.shapeLayer }
 		
@@ -406,7 +444,7 @@ class ViewableShapeView: PlatformView {
 
 //	MARK: -
 
-class ViewableHierarchyView: PlatformView {
+class ViewableGroupView: PlatformView {
 #if os(macOS)
 	var _tag = 0
 	override var tag:Int { get { return _tag } set { _tag = newValue } }

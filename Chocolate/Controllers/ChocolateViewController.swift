@@ -148,7 +148,17 @@ class ChocolateView: BaseScrollingLayoutView {
 	var colorLabel = Viewable.Label(string:Style.caption.string(" "))
 	var examples:[Example] = (1 ... 3).map { Example(index:$0, descriptions:Example.descriptionCount) }
 	
+	var hierarchy:Positionable?
+	
+	override func invalidateLayout() {
+		super.invalidateLayout()
+		
+		hierarchy = nil
+	}
+	
 	override func makeLayout() -> Positionable {
+		if let existing = hierarchy { return existing }
+		
 		let minimumSliderWidth = 200.0
 		let colorBoxSize = 40.0
 		
@@ -179,6 +189,8 @@ class ChocolateView: BaseScrollingLayoutView {
 			interfaceSliders.padding(horizontal:20, vertical:0),
 			exampleLayout
 		], spacing:10, alignment:.fill, position:.start)
+		
+		hierarchy = layout
 		
 		return layout
 	}
