@@ -251,6 +251,13 @@ class BaseControl: PlatformControl {
 	func prepare() {}
 }
 
+class BaseScrollingResponderView: PlatformView {
+#if os(macOS)
+	override var isFlipped:Bool { return true }
+	override var acceptsFirstResponder: Bool { return true }
+#endif
+}
+
 class BaseScrollingLayoutView: PlatformScroller, ViewControllerAttachable {
 #if os(macOS)
 	override var isFlipped:Bool { return true }
@@ -311,9 +318,11 @@ class BaseScrollingLayoutView: PlatformScroller, ViewControllerAttachable {
 		if let view = documentView {
 			hierarchyRoot = view
 		} else {
-			hierarchyRoot = PlatformView()
+			hierarchyRoot = BaseScrollingResponderView()
 			
 			documentView = hierarchyRoot
+			
+			hierarchyRoot.nextResponder = self
 		}
 #else
 		let hierarchyRoot = self
@@ -404,7 +413,7 @@ class BaseScrollingLayoutView: PlatformScroller, ViewControllerAttachable {
 		if let view = documentView {
 			view.setFrameSize(content)
 		} else {
-			let view = PlatformView(frame:NSRect(origin:.zero, size:content))
+			let view = BaseScrollingResponderView(frame:NSRect(origin:.zero, size:content))
 			
 			documentView = view
 			PlatformView.orderPositionables([layout], environment:positionableEnvironment, addingToHierarchy:true, hierarchyRoot:view)

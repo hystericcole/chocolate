@@ -427,6 +427,36 @@ struct Layout {
 		}
 	}
 	
+	struct Measured: Positionable {
+		let target:Positionable
+		let size:Size
+		
+		var frame:CGRect {
+			return target.frame
+		}
+		
+		init(target:Positionable, size:Size) {
+			self.target = target
+			self.size = size
+		}
+		
+		init(target:Positionable, limit:Limit) {
+			self.init(target:target, size:target.positionableSize(fitting:limit))
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			return size
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			target.applyPositionableFrame(box, context:context)
+		}
+		
+		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+			return target.orderablePositionables(environment:environment)
+		}
+	}
+	
 	struct Aspect: Positionable {
 		var target:Positionable
 		var position:CGPoint
@@ -1230,6 +1260,99 @@ struct Layout {
 			let minimumAfterOffset = sizeBeforeElement(index, isPositive:!isPositive)
 			
 			return min(max(minimumBeforeOffset, nominal), available - minimumAfterOffset)
+		}
+	}
+	
+	struct Flow {
+		var targets:[Positionable]
+		var columnTemplate:Vertical
+		var rowTemplate:Horizontal
+		var axis:Axis
+		
+		var direction:Direction {
+			return axis == .horizontal ? rowTemplate.direction : columnTemplate.direction
+		}
+		
+		var frame:CGRect {
+			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			var result:Layout.Size = .zero
+			
+			for target in targets {
+				let size = target.positionableSize(fitting:limit)
+				
+				result.width.increase(size.width)
+				result.height.increase(size.height)
+			}
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			let isPositive = direction.isPositive(axis:axis, environment:context.environment)
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
+			var measured = targets.map { Measured(target:$0, limit:limit) }
+			var vertical = columnTemplate
+			var horizontal = rowTemplate
+			
+			if !isPositive {
+				measured = measured.reversed()
+			}
+			
+			vertical.targets.removeAll()
+			horizontal.targets.removeAll()
+			vertical.primaryIndex = -1
+			horizontal.primaryIndex = -1
+			
+			switch axis {
+			case .vertical:
+				var width = Dimension.zero
+				vertical.direction = .positive
+				
+				for element in measured {
+					width.add(element.size.width)
+					
+					if !horizontal.targets.isEmpty && width.resolve(box.size.width.native) > box.size.width.native {
+						vertical.targets.append(horizontal)
+						horizontal.targets.removeAll()
+						width = element.size.width
+					}
+					
+					horizontal.targets.append(element)
+					width.add(value:horizontal.spacing)
+				}
+				
+				vertical.targets.append(horizontal)
+				vertical.applyPositionableFrame(box, context:context)
+			case .horizontal:
+				var height = Dimension.zero
+				horizontal.direction = .positive
+				
+				for element in measured {
+					height.add(element.size.height)
+					
+					if !vertical.targets.isEmpty && height.resolve(box.size.height.native) > box.size.height.native {
+						horizontal.targets.append(vertical)
+						vertical.targets.removeAll()
+						height = element.size.height
+					}
+					
+					vertical.targets.append(element)
+					height.add(value:vertical.spacing)
+				}
+				
+				horizontal.targets.append(vertical)
+				horizontal.applyPositionableFrame(box, context:context)
+			}
+		}
+		
+		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+			let isPositive = direction.isPositive(axis:axis, environment:environment)
+			let ordered = isPositive ? targets.reversed() : targets
+			
+			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
 		}
 	}
 }
