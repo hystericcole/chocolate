@@ -107,7 +107,7 @@ class ChocolateViewController: BaseViewController {
 	}
 }
 
-class ChocolateView: BaseView {
+class ChocolateView: BaseScrollingLayoutView {
 	typealias Tag = ChocolateViewController.Tag
 	
 	struct Example {
@@ -147,10 +147,6 @@ class ChocolateView: BaseView {
 	let colorBox = ColorView(tag:Tag.colorBox.rawValue, color:nil).view
 	let colorLabel = LabelView(tag:Tag.colorLabel.rawValue, string:Style.caption.string(" ")).view
 	let examples:[Example] = (1 ... Example.exampleCount).map { Example(index:$0, descriptions:Example.descriptionCount) }
-
-	override func prepareHierarchy() {
-		PlatformView.orderPositionables([makeLayout()], environment:positionableEnvironment, addingToHierarchy:true, hierarchyRoot:self)
-	}
 	
 	override func makeLayout() -> Positionable {
 		let minimumSliderWidth = 200.0

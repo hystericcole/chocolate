@@ -110,8 +110,17 @@ struct Layout {
 		}
 	}
 	
-	enum Direction {
+	enum Direction: CustomStringConvertible {
 		case positive, negative, natural, reverse
+		
+		var description:String {
+			switch self {
+			case .positive: return "+"
+			case .negative: return "-"
+			case .natural: return "±"
+			case .reverse: return "∓"
+			}
+		}
 		
 		func isPositive(axis:Axis, environment:Environment) -> Bool {
 			switch self {
@@ -123,31 +132,36 @@ struct Layout {
 		}
 	}
 	
-	struct Environment {
+	struct Environment: CustomStringConvertible {
 		static var current:Environment { return Environment(isRTL:false) }
 		
 		let isRTL:Bool
 		
+		var description:String { return isRTL ? "←" : "→" }
+		
 		func adaptiveFractionValue(_ value:Native, axis:Axis) -> Native { return axis == .horizontal && isRTL ? 1.0 - value : value }
 	}
 	
-	struct Context {
+	struct Context: CustomStringConvertible {
 		var bounds:CGRect
 		var safeBounds:CGRect
 		var isDownPositive:Bool
 		var environment:Environment
+		
+		var description:String { return "\(bounds) \(isDownPositive ? "↓+" : "↑+") \(environment)" }
 		
 		func performLayout(_ layout:Positionable) {
 			layout.applyPositionableFrame(safeBounds, context:self)
 		}
 	}
 	
-	struct Limit {
+	struct Limit: CustomStringConvertible {
 		static let unlimited:Native = 0x1p30
 		let width:Native?
 		let height:Native?
 		
 		var size:CGSize { return CGSize(width:width ?? .greatestFiniteMagnitude, height:height ?? .greatestFiniteMagnitude) }
+		var description:String { return "Limit(\(width != nil ? String(width!) : "∞"), \(height != nil ? String(height!) : "∞"))" }
 		
 		init(width:Native? = nil, height:Native? = nil) {
 			self.width = width
@@ -165,7 +179,7 @@ struct Layout {
 		}
 	}
 	
-	struct Dimension {
+	struct Dimension: CustomStringConvertible {
 		static let unbound = Limit.unlimited * 0x1p10
 		static let zero = Dimension(value:0)
 		
@@ -175,6 +189,7 @@ struct Layout {
 		var fraction:Native
 		
 		var isUnbounded:Bool { return minimum <= 0 && constant == 0 && fraction == 0 && maximum >= Limit.unlimited }
+		var description:String { return "\(minimum) <= \(constant) + \(fraction) × bounds <= \(maximum < Limit.unlimited ? String(maximum) : "∞")" }
 		
 		init(constant:Native, range:ClosedRange<Native> = 0 ... Dimension.unbound, fraction:Native = 0) {
 			self.constant = constant
@@ -227,7 +242,7 @@ struct Layout {
 		}
 	}
 	
-	struct Size {
+	struct Size: CustomStringConvertible {
 		static let zero = Size(width:.zero, height:.zero)
 		
 		var width:Dimension
@@ -237,6 +252,7 @@ struct Layout {
 		var minimum:CGSize { return CGSize(width:width.minimum, height:height.minimum) }
 		var maximum:CGSize { return CGSize(width:width.maximum, height:height.maximum) }
 		var data:Data { return withUnsafeBytes(of:self) { Data($0) } }
+		var description:String { return "\(width) by \(height)" }
 		
 		init(width:Dimension, height:Dimension) {
 			self.width = width
@@ -262,11 +278,12 @@ struct Layout {
 		func resolve(_ size:CGSize) -> CGSize { return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native)) }
 	}
 	
-	struct EdgeInsets {
+	struct EdgeInsets: CustomStringConvertible {
 		var minX, maxX, minY, maxY:Native
 		
 		var horizontal:Native { return minX + maxX }
 		var vertical:Native { return minY + maxY }
+		var description:String { return "→\(minX) ↓\(minY) ←\(maxX) ↑\(maxY)" }
 		
 		init(top:Native = 0, bottom:Native = 0, leading:Native = 0, trailing:Native = 0, environment:Environment) { self.minX = environment.isRTL ? trailing : leading; self.maxX = environment.isRTL ? leading : trailing; self.minY = top; self.maxY = bottom }
 		init(minX:Native = 0, maxX:Native = 0, minY:Native = 0, maxY:Native = 0) { self.minX = minX; self.maxX = maxX; self.minY = minY; self.maxY = maxY }
@@ -518,13 +535,32 @@ struct Layout {
 			return result
 		}
 		
-		func applyPositionableFrame(_ box:CGRect, context:Context) {
-			guard !targets.isEmpty else { return }
+		mutating func positionableSize(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoRows rowCount:Int, rowMajor:Bool) -> Layout.Size {
+			var result:Layout.Size = .zero
+			let itemLimit = splittingTargets.count - 1
+			let columnCount = 1 + itemLimit / rowCount
 			
-			let limit = Limit(width:box.size.width.native, height:nil)
-			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
-			let sizes = targets.map { $0.positionableSize(fitting:limit) }
-			let axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, fit:position.fit)
+			for index in 0 ..< columnCount {
+				if rowMajor {
+					targets.removeAll()
+					
+					for row in 0 ..< 1 + (itemLimit - index) / columnCount {
+						targets.append(splittingTargets[row * columnCount + index])
+					}
+				} else {
+					targets = Array(splittingTargets.suffix(from:index * rowCount).prefix(rowCount))
+				}
+				
+				let size = positionableSize(fitting:limit)
+				
+				result.width.add(size.width)
+				result.height.increase(size.height)
+			}
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context, axial:Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.vertical, environment:context.environment)
 			let end = targets.count - 1
 			let spacing = axial.space
@@ -556,6 +592,18 @@ struct Layout {
 				
 				target.applyPositionableFrame(frame, context:context)
 			}
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			guard !targets.isEmpty else { return }
+			
+			let isFloating = self.isFloating
+			let limit = Limit(width:box.size.width.native, height:nil)
+			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
+			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			let axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, fit:position.fit)
+			
+			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
 		
 		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
@@ -614,13 +662,32 @@ struct Layout {
 			return result
 		}
 		
-		func applyPositionableFrame(_ box:CGRect, context:Context) {
-			guard !targets.isEmpty else { return }
+		mutating func positionableSize(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoColumns columnCount:Int, columnMajor:Bool) -> Layout.Size {
+			var result:Layout.Size = .zero
+			let itemLimit = splittingTargets.count - 1
+			let rowCount = 1 + itemLimit / columnCount
 			
-			let limit = Limit(width:nil, height:box.size.height.native)
-			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
-			let sizes = targets.map { $0.positionableSize(fitting:limit) }
-			let axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, fit:position.fit)
+			for index in 0 ..< rowCount {
+				if columnMajor {
+					targets.removeAll()
+					
+					for column in 0 ..< 1 + (itemLimit - index) / rowCount {
+						targets.append(splittingTargets[column * rowCount + index])
+					}
+				} else {
+					targets = Array(splittingTargets.suffix(from:index * columnCount).prefix(columnCount))
+				}
+				
+				let size = positionableSize(fitting:limit)
+				
+				result.width.increase(size.width)
+				result.height.add(size.height)
+			}
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context, axial:Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:context.environment)
 			let end = targets.count - 1
 			let spacing = axial.space
@@ -654,6 +721,18 @@ struct Layout {
 			}
 		}
 		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			guard !targets.isEmpty else { return }
+			
+			let isFloating = self.isFloating
+			let limit = Limit(width:nil, height:box.size.height.native)
+			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
+			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			let axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, fit:position.fit)
+			
+			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
+		}
+		
 		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
@@ -662,6 +741,307 @@ struct Layout {
 		}
 	}
 	
+	struct Columns: Positionable {
+		var targets:[Positionable]
+		var columnCount:Int
+		var rowTemplate:Horizontal
+		var position:Position
+		var primaryIndex:Int
+		var spacing:Native
+		var columnMajor:Bool
+		var direction:Direction
+		
+		var singleColumn:Vertical {
+			return Vertical(targets:targets, spacing:spacing, alignment:rowTemplate.position.alignment, position:position, primary:primaryIndex, direction:direction)
+		}
+		
+		var isFloating:Bool {
+			guard case .float = position, targets.indices.contains(primaryIndex) else { return false }
+			
+			return true
+		}
+		
+		var frame:CGRect {
+			guard !isFloating else { return targets[primaryIndex].frame }
+			
+			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		init(targets:[Positionable], columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+			self.targets = targets
+			self.columnCount = columnCount
+			self.spacing = spacing
+			self.position = position
+			self.rowTemplate = template
+			self.primaryIndex = primary
+			self.columnMajor = false
+			self.direction = direction
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			guard !targets.isEmpty else { return .zero }
+			guard columnCount > 1 else { return singleColumn.positionableSize(fitting:limit) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
+			
+			var row = rowTemplate
+			var result = row.positionableSize(fitting:limit, splittingTargets:targets, intoColumns:columnCount, columnMajor:columnMajor)
+			let rowLimit = (targets.count - 1) / columnCount
+			let spacingSum = spacing * Native(rowLimit)
+			
+			result.height.add(value:spacingSum)
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			guard !targets.isEmpty else { return }
+			guard columnCount > 1 else { return singleColumn.applyPositionableFrame(box, context:context) }
+			
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
+			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			
+			let itemLimit = targets.count - 1
+			let rowCount = 1 + itemLimit / columnCount
+			var rowHeights = Array(repeating:Dimension.zero, count:rowCount)
+			var columnWidths = Array(repeating:Dimension.zero, count:columnCount)
+			
+			if columnMajor {
+				for index in sizes.indices {
+					rowHeights[index % columnCount].increase(sizes[index].height)
+					columnWidths[index / columnCount].increase(sizes[index].width)
+				}
+			} else {
+				for index in sizes.indices {
+					rowHeights[index / columnCount].increase(sizes[index].height)
+					columnWidths[index % columnCount].increase(sizes[index].width)
+				}
+			}
+			
+			var row = rowTemplate
+			let isFloating = self.isFloating
+			let isPositive = direction.isPositive(axis:.vertical, environment:context.environment)
+			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
+			let rowAvailable = box.size.width.native
+			let axial = Axial(rowHeights, available:available, spacing:spacing, fit:position.fit)
+			let rowAxial = Axial(columnWidths, available:rowAvailable, spacing:row.spacing, fit:row.position.fit)
+			let spacing = axial.space
+			let primaryRow:Int
+			var offset = 0.0
+			
+			if !targets.indices.contains(primaryIndex) {
+				row.primaryIndex = -1
+				primaryRow = -1
+			} else if columnMajor {
+				row.primaryIndex = primaryIndex / columnCount
+				primaryRow = primaryIndex % columnCount
+			} else {
+				row.primaryIndex = primaryIndex % columnCount
+				primaryRow = primaryIndex / columnCount
+			}
+			
+			if isFloating {
+				offset = -axial.sizeBeforeElement(primaryRow, isPositive:isPositive)
+			} else if let value = position.value(axis:.horizontal, environment:context.environment) {
+				offset = axial.offset(fraction:value, available:available, index:primaryRow, isPositive:isPositive)
+			}
+			
+			var readyTargets = targets
+			var readySizes = sizes
+			let incompleteRow = readyTargets.count % columnCount
+			let end = rowCount * columnCount - 1
+			
+			if incompleteRow > 0 {
+				let emptyTargets = Array(repeating:EmptySpace(), count:columnCount - incompleteRow)
+				let emptySizes = Array(repeating:Size.zero, count:columnCount - incompleteRow)
+				
+				readyTargets.append(contentsOf:emptyTargets)
+				readySizes.append(contentsOf:emptySizes)
+			}
+			
+			for index in 0 ..< rowCount {
+				let rowIndex = isPositive ? index : end - index
+				let y = offset, height = axial.sizes[rowIndex]
+				var rowSizes:[Size]
+				
+				if columnMajor {
+					row.targets.removeAll()
+					rowSizes = []
+					
+					for column in 0 ..< columnCount {
+						row.targets.append(readyTargets[column * rowCount + rowIndex])
+						rowSizes.append(readySizes[column * rowCount + rowIndex])
+					}
+				} else {
+					row.targets = Array(readyTargets.suffix(from:rowIndex * columnCount).prefix(columnCount))
+					rowSizes = Array(readySizes.suffix(from:rowIndex * columnCount).prefix(columnCount))
+				}
+				
+				offset += height + spacing
+				
+				let rowBox = CGRect(x:box.origin.x, y:box.origin.y + CGFloat(y), width:box.size.width, height:CGFloat(height))
+				
+				row.applyPositionableFrame(rowBox, context:context, axial:rowAxial, sizes:rowSizes, available:rowAvailable, isFloating:isFloating)
+			}
+		}
+		
+		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+			let isPositive = direction.isPositive(axis:.horizontal, environment:environment)
+			let ordered = isPositive ? targets.reversed() : targets
+			
+			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+		}
+	}
+	
+	struct Rows: Positionable {
+		var targets:[Positionable]
+		var rowCount:Int
+		var columnTemplate:Vertical
+		var position:Position
+		var primaryIndex:Int
+		var spacing:Native
+		var rowMajor:Bool
+		var direction:Direction
+		
+		var singleRow:Horizontal {
+			return Horizontal(targets:targets, spacing:spacing, alignment:columnTemplate.position.alignment, position:position, primary:primaryIndex, direction:direction)
+		}
+		
+		var isFloating:Bool {
+			guard case .float = position, targets.indices.contains(primaryIndex) else { return false }
+			
+			return true
+		}
+		
+		var frame:CGRect {
+			guard !isFloating else { return targets[primaryIndex].frame }
+			
+			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		init(targets:[Positionable], rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+			self.targets = targets
+			self.rowCount = rowCount
+			self.spacing = spacing
+			self.position = position
+			self.columnTemplate = template
+			self.primaryIndex = primary
+			self.rowMajor = false
+			self.direction = direction
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			guard !targets.isEmpty else { return .zero }
+			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
+			
+			var column = columnTemplate
+			var result = column.positionableSize(fitting:limit, splittingTargets:targets, intoRows:rowCount, rowMajor:rowMajor)
+			let columnLimit = (targets.count - 1) / rowCount
+			let spacingSum = spacing * Native(columnLimit)
+			
+			result.width.add(value:spacingSum)
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			guard !targets.isEmpty else { return }
+			guard rowCount > 1 else { return singleRow.applyPositionableFrame(box, context:context) }
+			
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
+			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			
+			let itemLimit = targets.count - 1
+			let columnCount = 1 + itemLimit / rowCount
+			var rowHeights = Array(repeating:Dimension.zero, count:rowCount)
+			var columnWidths = Array(repeating:Dimension.zero, count:columnCount)
+			
+			if rowMajor {
+				for index in sizes.indices {
+					rowHeights[index / rowCount].increase(sizes[index].height)
+					columnWidths[index % rowCount].increase(sizes[index].width)
+				}
+			} else {
+				for index in sizes.indices {
+					rowHeights[index % rowCount].increase(sizes[index].height)
+					columnWidths[index / rowCount].increase(sizes[index].width)
+				}
+			}
+			
+			var column = columnTemplate
+			let isFloating = self.isFloating
+			let isPositive = direction.isPositive(axis:.horizontal, environment:context.environment)
+			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
+			let columnAvailable = box.size.height.native
+			let axial = Axial(columnWidths, available:available, spacing:spacing, fit:position.fit)
+			let columnAxial = Axial(rowHeights, available:columnAvailable, spacing:column.spacing, fit:column.position.fit)
+			let spacing = axial.space
+			let primaryColumn:Int
+			var offset = 0.0
+			
+			if !targets.indices.contains(primaryIndex) {
+				column.primaryIndex = -1
+				primaryColumn = -1
+			} else if rowMajor {
+				column.primaryIndex = primaryIndex / rowCount
+				primaryColumn = primaryIndex % rowCount
+			} else {
+				column.primaryIndex = primaryIndex % rowCount
+				primaryColumn = primaryIndex / rowCount
+			}
+			
+			if isFloating {
+				offset = -axial.sizeBeforeElement(primaryColumn, isPositive:isPositive)
+			} else if let value = position.value(axis:.horizontal, environment:context.environment) {
+				offset = axial.offset(fraction:value, available:available, index:primaryColumn, isPositive:isPositive)
+			}
+			
+			var readyTargets = targets
+			var readySizes = sizes
+			let incompleteColumn = readyTargets.count % rowCount
+			let end = rowCount * columnCount - 1
+			
+			if incompleteColumn > 0 {
+				let emptyTargets = Array(repeating:EmptySpace(), count:rowCount - incompleteColumn)
+				let emptySizes = Array(repeating:Size.zero, count:rowCount - incompleteColumn)
+				
+				readyTargets.append(contentsOf:emptyTargets)
+				readySizes.append(contentsOf:emptySizes)
+			}
+			
+			for index in 0 ..< columnCount {
+				let columnIndex = isPositive ? index : end - index
+				let x = offset, width = axial.sizes[columnIndex]
+				var columnSizes:[Size]
+				
+				if rowMajor {
+					column.targets.removeAll()
+					columnSizes = []
+					
+					for row in 0 ..< rowCount {
+						column.targets.append(readyTargets[row * columnCount + columnIndex])
+						columnSizes.append(readySizes[row * columnCount + columnIndex])
+					}
+				} else {
+					column.targets = Array(readyTargets.suffix(from:columnIndex * rowCount).prefix(rowCount))
+					columnSizes = Array(readySizes.suffix(from:columnIndex * rowCount).prefix(rowCount))
+				}
+				
+				offset += width + spacing
+				
+				let columnBox = CGRect(x:box.origin.x + CGFloat(x), y:box.origin.y, width:CGFloat(width), height:box.size.height)
+				
+				column.applyPositionableFrame(columnBox, context:context, axial:columnAxial, sizes:columnSizes, available:columnAvailable, isFloating:isFloating)
+			}
+		}
+		
+		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+			let isPositive = direction.isPositive(axis:.horizontal, environment:environment)
+			let ordered = isPositive ? targets.reversed() : targets
+			
+			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+		}
+	}
 	struct Overlay: Positionable {
 		var targets:[Positionable]
 		var vertical:Alignment
