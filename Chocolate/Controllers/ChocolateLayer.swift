@@ -68,10 +68,10 @@ class ChocolateLayer: CALayer {
 class ChocolateLayerView: BaseView {
 #if os(macOS)
 	override class var layerClass:CALayer.Type { return ChocolateLayer.self }
-	override func prepareContent() { layer?.setNeedsDisplay() }
+	override func prepare() { super.prepare(); layer?.setNeedsDisplay() }
 #else
 	override class var layerClass:AnyClass { return ChocolateLayer.self }
-	override func prepareContent() { layer.setNeedsDisplay() }
+	override func prepare() { super.prepare(); layer.setNeedsDisplay() }
 #endif
 }
 

@@ -29,36 +29,27 @@ class ViewController: BaseViewController {
 		//let viewController = ChocolateLayerViewController()
 		
 		replaceChild(with:viewController)
-		applyMinimumSize(from:viewController)
+		applyMinimumSizeToWindow(from:viewController)
 	}
 	
-	override func viewDidLayout() {
-		super.viewDidLayout()
-		
-		let box = view.stableBounds
-		
-		for child in view.subviews {
-			child.frame = box
-		}
-	}
-	
-	func applyMinimumSize(from viewController:BaseViewController) {
+	func applyMinimumSizeToWindow(from viewController:BaseViewController) {
 		guard let window = view.window else { return }
 		
-		if let layout = (viewController.view as? BaseView)?.makeLayout() {
-			let size = layout.positionableSize(fitting:Layout.Limit(width:nil, height:nil))
-			var minimum = size.minimum
+		let screen = window.screen ?? NSScreen.main
+		let limit = screen?.visibleFrame.size ?? CGSize(square:640)
+		let size = viewController.view.positionableSize(fitting:Layout.Limit(size:limit))
+		var minimum = size.minimum
+		
+		if #available(OSX 11.0, *) {
+			let insets = view.safeAreaInsets
 			
-			if #available(OSX 11.0, *) {
-				let insets = view.safeAreaInsets
-				
-				minimum.width += insets.left + insets.right
-				minimum.height += insets.top + insets.bottom
-			}
-			
-			window.contentMinSize = minimum
-		} else {
-			window.contentMinSize = CGSize(width:240, height:480)
+			minimum.width += insets.left + insets.right
+			minimum.height += insets.top + insets.bottom
 		}
+		
+		minimum.width = min(max(240, ceil(minimum.width)), limit.width)
+		minimum.height = min(max(360, ceil(minimum.height)), limit.height)
+		
+		window.contentMinSize = minimum
 	}
 }
