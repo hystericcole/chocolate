@@ -65,7 +65,7 @@ enum Viewable {
 		
 		func attachView(_ view:ViewableGroupView) {
 			view.tag = model.tag
-			view.prepare()
+			view.prepareViewableGroup()
 			view.content = model.content
 			
 			self.view = view
@@ -77,24 +77,17 @@ enum Viewable {
 	}
 	
 	class Color: ViewablePositionable {
-#if os(macOS)
-		class ViewType: PlatformView {
-			var _tag = 0
-			override var tag:Int { get { return _tag } set { _tag = newValue } }
-		}
-#else
-		typealias ViewType = PlatformView
-#endif
+		typealias ViewType = PlatformTaggableView
 		
 		struct Model {
 			let tag:Int
 			var color:PlatformColor?
-			var size:CGSize
+			var intrinsicSize:CGSize
 			
-			init(tag:Int = 0, color:PlatformColor? = nil, size:CGSize = Viewable.noIntrinsicSize) {
+			init(tag:Int = 0, color:PlatformColor? = nil, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
 				self.tag = tag
 				self.color = color
-				self.size = size
+				self.intrinsicSize = intrinsicSize
 			}
 		}
 		
@@ -102,28 +95,22 @@ enum Viewable {
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
 		var color:PlatformColor? { get { return view?.backgroundColor ?? model.color } set { model.color = newValue; view?.backgroundColor = newValue } }
-		var size:CGSize { get { return view?.bounds.size ?? model.size } set { model.size = newValue; view?.invalidateIntrinsicContentSize() } }
+		var intrinsicSize:CGSize { get { return model.intrinsicSize } set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() } }
 		
-		init(tag:Int = 0, color:PlatformColor?, size:CGSize = Viewable.noIntrinsicSize) {
-			self.model = Model(tag:tag, color:color, size:size)
+		init(tag:Int = 0, color:PlatformColor?, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
+			self.model = Model(tag:tag, color:color, intrinsicSize:intrinsicSize)
 		}
 		
 		func attachView(_ view:ViewType) {
 			view.tag = model.tag
 			view.backgroundColor = model.color
-			
-#if os(macOS)
-			view.wantsLayer = true
-#else
-			view.isUserInteractionEnabled = false
-			view.isOpaque = model.color?.cgColor.alpha ?? 0 < 1
-#endif
+			view.prepareViewableColor(isOpaque:model.color?.cgColor.alpha ?? 0 < 1)
 			
 			self.view = view
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return Layout.Size(intrinsicSize:model.size)
+			return Layout.Size(intrinsicSize:model.intrinsicSize)
 		}
 	}
 	
@@ -162,27 +149,7 @@ enum Viewable {
 		func attachView(_ view:PlatformLabel) {
 			view.tag = model.tag
 			view.attributedText = model.string
-			
-#if os(macOS)
-			view.drawsBackground = false
-			view.refusesFirstResponder = true
-			view.isBezeled = false
-			view.isBordered = false
-			view.isEditable = false
-			view.preferredMaxLayoutWidth = model.intrinsicWidth
-			view.cell?.usesSingleLineMode = model.maximumLines == 1
-			view.cell?.wraps = model.maximumLines == 1 ? false : true
-			view.lineBreakMode = model.maximumLines == 1 ? .byTruncatingMiddle : .byWordWrapping
-			
-			if #available(OSX 10.11, *) {
-				view.maximumNumberOfLines = model.maximumLines
-			}
-#else
-			view.preferredMaxLayoutWidth = model.intrinsicWidth
-			view.numberOfLines = model.maximumLines
-			view.lineBreakMode = model.maximumLines == 1 ? .byTruncatingMiddle : .byWordWrapping
-			view.adjustsFontSizeToFitWidth = model.maximumLines > 0
-#endif
+			view.prepareViewableLabel(intrinsicWidth:model.intrinsicWidth, maximumLines:model.maximumLines)
 			
 			self.view = view
 		}
@@ -191,15 +158,10 @@ enum Viewable {
 			guard let string = model.string else { return .zero }
 			
 			var sizeLimit = limit.size
+			
 			if model.intrinsicWidth > 0 && model.intrinsicWidth < sizeLimit.width { sizeLimit.width = intrinsicWidth }
 			
-#if os(macOS)
-			let bounds = string.boundingRect(with:sizeLimit, options:.usesLineFragmentOrigin)
-#else
-			let bounds = string.boundingRect(with:sizeLimit, options:.usesLineFragmentOrigin, context:nil)
-#endif
-			
-			return Layout.Size(size:bounds.size)
+			return Layout.Size(size:PlatformLabel.sizeMeasuringString(string, with:sizeLimit))
 		}
 	}
 	
@@ -229,19 +191,7 @@ enum Viewable {
 		
 		func attachView(_ view:PlatformImageView) {
 			view.tag = model.tag
-			view.image = model.image
-			
-#if os(macOS)
-			if #available(OSX 10.14, *), let color = model.color {
-				view.contentTintColor = color
-			}
-#else
-			if let color = model.color {
-				view.tintColor = color
-			}
-			
-			view.clipsToBounds = true
-#endif
+			view.prepareViewableImage(image:model.image, color:model.color)
 			
 			self.view = view
 		}
@@ -284,17 +234,10 @@ enum Viewable {
 		var maximum:CGSize { get { return model.maximum } set { model.maximum = newValue } }
 		var content:Positionable { get { return view?.content ?? model.content } set { model.content = newValue; view?.content = newValue } }
 		
-#if os(macOS)
-		var zoom:CGFloat {
-			get { return view?.magnification ?? 1 }
-			set { view?.magnification = newValue }
-		}
-#else
 		var zoom:CGFloat {
 			get { return view?.zoomScale ?? 1 }
 			set { view?.zoomScale = newValue }
 		}
-#endif
 		
 		var zoomRange:ZoomRange {
 			get { if let view = view { model.zoomRange = view.zoomRange }; return model.zoomRange }
@@ -308,18 +251,14 @@ enum Viewable {
 		func attachView(_ view:ViewableScrollingView) {
 			view.tag = model.tag
 			view.zoomRange = model.zoomRange
-			view.prepare()
+			view.prepareViewableScroll()
 			view.content = model.content
 			
 			self.view = view
 		}
 		
-		func flashIndicators() {
-#if os(macOS)
+		func flashScrollers() {
 			view?.flashScrollers()
-#else
-			view?.flashScrollIndicators()
-#endif
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -341,6 +280,7 @@ enum Viewable {
 			weak var target:AnyObject?
 			var action:Selector?
 			var minimumTrackColor:PlatformColor?
+			var intrinsicSize:CGSize
 			
 			init(tag:Int = 0, value:Double, range:ClosedRange<Double> = 0 ... 1, target:AnyObject? = nil, action:Selector? = nil, minimumTrackColor:PlatformColor? = nil) {
 				self.tag = tag
@@ -349,6 +289,7 @@ enum Viewable {
 				self.target = target
 				self.action = action
 				self.minimumTrackColor = minimumTrackColor
+				self.intrinsicSize = PlatformSlider.intrinsicViewableSize
 			}
 		}
 		
@@ -356,27 +297,15 @@ enum Viewable {
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
 		
-#if os(macOS)
 		var value:Double {
 			get { if let slider = view { model.value = slider.doubleValue }; return model.value }
 			set { model.value = newValue; view?.doubleValue = newValue }
 		}
 		
 		var range:ClosedRange<Double> {
-			get { if let slider = view { model.range = slider.minValue ... max(slider.minValue, slider.maxValue) }; return model.range }
-			set { model.range = newValue; view?.minValue = newValue.lowerBound; view?.maxValue = newValue.upperBound }
+			get { if let slider = view { model.range = slider.valueRange }; return model.range }
+			set { model.range = newValue; view?.valueRange = newValue }
 		}
-#else
-		var value:Double {
-			get { if let slider = view { model.value = Double(slider.value) }; return model.value }
-			set { model.value = newValue; view?.value = Float(newValue) }
-		}
-		
-		var range:ClosedRange<Double> {
-			get { if let slider = view { model.range = Double(slider.minimumValue) ... Double(max(slider.minimumValue, slider.maximumValue)) }; return model.range }
-			set { model.range = newValue; view?.minimumValue = Float(newValue.lowerBound); view?.maximumValue = Float(newValue.upperBound) }
-		}
-#endif
 		
 		init(tag:Int = 0, value:Double = 0, range:ClosedRange<Double> = 0 ... 1, target:AnyObject? = nil, action:Selector?, minimumTrackColor:PlatformColor? = nil) {
 			self.model = Model(tag:tag, value:value, range:range, target:target, action:action, minimumTrackColor:minimumTrackColor)
@@ -384,38 +313,9 @@ enum Viewable {
 		
 		func attachView(_ view:PlatformSlider) {
 			view.tag = model.tag
-			
-#if os(macOS)
-			view.sliderType = .linear
-			view.minValue = model.range.lowerBound
-			view.maxValue = model.range.upperBound
+			view.valueRange = model.range
 			view.doubleValue = model.value
-			
-			if #available(OSX 10.12.2, *) {
-				view.trackFillColor = model.minimumTrackColor
-			}
-			
-			if #available(OSX 11.0, *) {
-				view.controlSize = .large
-			} else {
-				view.controlSize = .regular
-			}
-			
-			view.target = model.target
-			view.action = model.action
-			view.isContinuous = true
-#else
-			view.minimumValue = Float(model.range.lowerBound)
-			view.maximumValue = Float(model.range.upperBound)
-			view.value = Float(model.value)
-			view.minimumTrackTintColor = model.minimumTrackColor
-			
-			view.removeTarget(nil, action:nil, for:.valueChanged)
-			
-			if let action = model.action {
-				view.addTarget(model.target, action:action, for:.valueChanged)
-			}
-#endif
+			view.prepareViewableSlider(target:model.target, action:model.action, minimumTrackColor:model.minimumTrackColor)
 			
 			self.view = view
 		}
@@ -424,30 +324,15 @@ enum Viewable {
 			model.target = target
 			model.action = action
 			
-			guard let view = view else { return }
-			
-#if os(macOS)
-			view.target = target
-			view.action = action
-#else
-			view.removeTarget(nil, action:nil, for:view.allControlEvents)
-			
-			if let action = action {
-				view.addTarget(target, action:action, for:.valueChanged)
-			}
-#endif
-		}
-		
-		func intrinsicSize() -> CGSize {
-#if os(macOS)
-			return CGSize(width:-1, height:15)
-#else
-			return CGSize(width:-1, height:33)
-#endif
+			view?.applyVieawbleAction(target:target, action:action)
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:intrinsicSize())
+			guard let view = view else { return Layout.Size(intrinsicSize:model.intrinsicSize) }
+			
+			model.intrinsicSize = view.intrinsicContentSize
+			
+			return view.positionableSize(fitting:limit)
 		}
 	}
 	
@@ -458,49 +343,107 @@ enum Viewable {
 		
 		struct Model {
 			let tag:Int
-			var path:CGPath?
+			var path:CGPath? { didSet { boundingBox = nil } }
 			var style:Style
 			var shadow:Shadow?
+			var boundingBox:CGRect?
 			
 			init(tag:Int = 0, path:CGPath? = nil, style:Style, shadow:Shadow? = nil) {
 				self.tag = tag
 				self.path = path
 				self.style = style
 				self.shadow = shadow
+				self.boundingBox = nil
 			}
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var path:CGPath? { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; shapeLayer?.path = newValue; shapeLayer?.shadowPath = newValue } }
+		var style:Style { get { return shapeLayer?.shapeStyle ?? model.style } set { model.style = newValue; shapeLayer?.shapeStyle = newValue } }
+		var shadow:Shadow? { get { return shapeLayer?.shadow ?? model.shadow } set { model.shadow = newValue; shapeLayer?.shadow = newValue ?? .default } }
+		var shapeLayer:CAShapeLayer? { return view?.shapeLayer }
+		
+		var pathSize:CGSize {
+			let box:CGRect
+			
+			if let existing = model.boundingBox {
+				box = existing
+			} else if let path = path {
+				box = path.boundingBoxOfPath
+				
+				model.boundingBox = box
+			} else {
+				return .zero
+			}
+			
+			return CGSize(width:box.size.width + max(0, box.origin.x), height:box.size.height + max(0, box.origin.y))
 		}
 		
 		init(tag:Int = 0, path:CGPath? = nil, style:Style, shadow:Shadow? = nil) {
 			self.model = Model(tag:tag, path:path, style:style, shadow:shadow)
 		}
 		
-		weak var view:ViewType?
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } }
-		var path:CGPath? { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; shapeLayer?.path = newValue } }
-		var style:Style { get { return shapeLayer?.shapeStyle ?? model.style } set { model.style = newValue; shapeLayer?.shapeStyle = newValue } }
-		var shadow:Shadow? { get { return shapeLayer?.shadow ?? model.shadow } set { model.shadow = newValue; shapeLayer?.shadow = newValue ?? .default } }
-		var shapeLayer:CAShapeLayer? { return view?.shapeLayer }
-		
 		func attachView(_ view:ViewableShapeView) {
 			view.tag = model.tag
+			view.prepareViewableColor(isOpaque:false)
 			
-			if let shape = shapeLayer {
-				shape.path = model.path
-				shape.shapeStyle = model.style
-				shape.shadow = model.shadow ?? .default
+			if let layer = view.shapeLayer {
+				layer.path = model.path
+				layer.shapeStyle = model.style
+				layer.shadow = model.shadow ?? .default
+				layer.shadowPath = model.path
 			}
 			
 			self.view = view
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			guard let path = shapeLayer?.path else { return .zero }
+			return Layout.Size(size:pathSize)
+		}
+	}
+	
+	class Gradient {
+		typealias ViewType = ViewableGradientView
+		typealias Descriptor = CAGradientLayer.Gradient
+		
+		struct Model {
+			let tag:Int
+			var gradient:Descriptor
+			var intrinsicSize:CGSize
 			
-			let box = path.boundingBoxOfPath
-			let size = CGSize(width:box.size.width + max(0, box.origin.x), height:box.size.height + max(0, box.origin.y))
+			init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize) {
+				self.tag = tag
+				self.gradient = gradient
+				self.intrinsicSize = intrinsicSize
+			}
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var descriptor:Descriptor { get { return gradientLayer?.gradient ?? model.gradient } set { model.gradient = newValue; gradientLayer?.gradient = newValue } }
+		var intrinsicSize:CGSize { get { return model.intrinsicSize } set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() } }
+		var gradientLayer:CAGradientLayer? { return view?.gradientLayer }
+		
+		init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
+			self.model = Model(tag:tag, gradient:gradient, intrinsicSize:intrinsicSize)
+		}
+		
+		func attachView(_ view:ViewableGradientView) {
+			view.tag = model.tag
+			view.prepareViewableColor(isOpaque:false)
 			
-			return Layout.Size(size:size)
+			if let layer = view.gradientLayer {
+				layer.gradient = model.gradient
+			}
+			
+			self.view = view
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			return Layout.Size(intrinsicSize:model.intrinsicSize)
 		}
 	}
 	
@@ -510,10 +453,12 @@ enum Viewable {
 		struct Model {
 			var isAnimating:Bool
 			var isHiddenWhenStopped:Bool
+			var intrinsicSize:CGSize
 			
 			init(isAnimating:Bool = true, isHiddenWhenStopped:Bool = true) {
 				self.isAnimating = isAnimating
 				self.isHiddenWhenStopped = isHiddenWhenStopped
+				self.intrinsicSize = Viewable.noIntrinsicSize
 			}
 		}
 		
@@ -524,60 +469,38 @@ enum Viewable {
 #if os(macOS)
 		var isAnimating:Bool {
 			get { return model.isAnimating }
-			set { model.isAnimating = newValue; if newValue { view?.startAnimation(nil) } else { view?.stopAnimation(nil) } }
-		}
-		
-		var isHiddenWhenStopped:Bool {
-			get { return !(view?.isDisplayedWhenStopped ?? !model.isHiddenWhenStopped) }
-			set { model.isHiddenWhenStopped = newValue; view?.isDisplayedWhenStopped = !newValue }
+			set { model.isAnimating = newValue; view?.applyAnimating(newValue) }
 		}
 #else
 		var isAnimating:Bool {
 			get { return view?.isAnimating ?? model.isAnimating }
-			set { model.isAnimating = newValue; if newValue { view?.startAnimating() } else { view?.stopAnimating() } }
-		}
-		
-		var isHiddenWhenStopped:Bool {
-			get { return view?.hidesWhenStopped ?? model.isHiddenWhenStopped }
-			set { model.isHiddenWhenStopped = newValue; view?.hidesWhenStopped = newValue }
+			set { model.isAnimating = newValue; view?.applyAnimating(newValue) }
 		}
 #endif
+		
+		var isHiddenWhenStopped:Bool {
+			get { return view?.isHiddenWhenStopped ?? model.isHiddenWhenStopped }
+			set { model.isHiddenWhenStopped = newValue; view?.isHiddenWhenStopped = newValue }
+		}
 		
 		init(isAnimating:Bool = true, isHiddenWhenStopped:Bool = true) {
 			self.model = Model(isAnimating:isAnimating, isHiddenWhenStopped:isHiddenWhenStopped)
 		}
 		
 		func attachView(_ view:PlatformSpinner) {
-#if os(macOS)
-			view.style = .spinning
-			view.isIndeterminate = true
-			view.isDisplayedWhenStopped = !model.isHiddenWhenStopped
-			view.isBezeled = false
-			
-			if model.isAnimating {
-				view.startAnimation(nil)
-			} else {
-				view.stopAnimation(nil)
-			}
-#else
-			view.hidesWhenStopped = model.isHiddenWhenStopped
-			
-			if model.isAnimating {
-				view.startAnimating()
-			} else {
-				view.stopAnimating()
-			}
-#endif
+			view.isHiddenWhenStopped = model.isHiddenWhenStopped
+			view.prepareViewableSpinner()
+			view.applyAnimating(isAnimating)
 			
 			self.view = view
 		}
 		
-		func intrinsicSize() -> CGSize {
-			return Viewable.noIntrinsicSize
-		}
-		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:intrinsicSize())
+			guard let view = view else { return Layout.Size(intrinsicSize:model.intrinsicSize) }
+			
+			model.intrinsicSize = view.intrinsicContentSize
+			
+			return view.positionableSize(fitting:limit)
 		}
 	}
 	
@@ -611,11 +534,8 @@ extension ViewablePositionable {
 
 //	MARK: -
 
-class ViewableShapeView: PlatformView {
+class ViewableShapeView: PlatformTaggableView {
 #if os(macOS)
-	var _tag = 0
-	override var tag:Int { get { return _tag } set { _tag = newValue } }
-	override var isFlipped:Bool { return true }
 	override func makeBackingLayer() -> CALayer { return CAShapeLayer() }
 #else
 	override class var layerClass: AnyClass { return CAShapeLayer.self }
@@ -634,38 +554,43 @@ class ViewableShapeView: PlatformView {
 
 //	MARK: -
 
-class ViewableGroupView: PlatformView, ViewControllerAttachable {
+class ViewableGradientView: PlatformTaggableView {
 #if os(macOS)
-	var _tag = 0
-	override var tag:Int { get { return _tag } set { _tag = newValue } }
-	override var isFlipped:Bool { return true }
-	override var acceptsFirstResponder: Bool { return true }
+	override func makeBackingLayer() -> CALayer { return CAGradientLayer() }
+#else
+	override class var layerClass: AnyClass { return CAGradientLayer.self }
 #endif
 	
+	var gradientLayer:CAGradientLayer? { return layer as? CAGradientLayer }
+}
+
+//	MARK: -
+
+class ViewableGroupView: PlatformTaggableView, ViewControllerAttachable {
 	var priorSize:CGSize = .zero
 	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
 	
-	func prepare() {
+#if os(macOS)
+	override var acceptsFirstResponder: Bool { return true }
+#endif
+	
+	func prepareViewableGroup() {
 		translatesAutoresizingMaskIntoConstraints = false
 	}
 	
 	func applyContent() {
+		orderPositionables([content], environment:positionableEnvironment, options:.set)
+		
 #if os(macOS)
 		sizeChanged()
 #else
 		invalidateLayout()
 		setNeedsLayout()
 #endif
-		
-		self.orderPositionables([content], environment:positionableEnvironment, options:.set)
 	}
 	
 	func attachViewController(_ controller:PlatformViewController) {
-#if os(macOS)
-		autoresizingMask = [.width, .height]
-#else
-		autoresizingMask = [.flexibleWidth, .flexibleHeight]
-#endif
+		autoresizingMask = .flexibleSize
 	}
 	
 #if os(macOS)
@@ -754,7 +679,7 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 	override var isFlipped:Bool { return true }
 	override var acceptsFirstResponder: Bool { return true }
 	
-	var container: PlatformView {
+	var containerView: PlatformView {
 		if let existing = documentView {
 			return existing
 		}
@@ -768,48 +693,23 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 		return view
 	}
 	
-	var zoomRange:Viewable.Scroll.ZoomRange {
-		get {
-			return minMagnification ... max(minMagnification, maxMagnification)
-		}
-		set {
-			minMagnification = newValue.lowerBound
-			maxMagnification = newValue.upperBound
-			allowsMagnification = newValue.lowerBound < newValue.upperBound
-		}
-	}
-	
 	var alignment:CGPoint {
 		get { return (contentView as? ViewableScrollingClipView)?.alignment ?? .zero }
 		set { (contentView as? ViewableScrollingClipView)?.alignment = newValue }
 	}
 #else
-	var zoomRange:Viewable.Scroll.ZoomRange {
-		get {
-			return minimumZoomScale ... max(minimumZoomScale, maximumZoomScale)
-		}
-		set {
-			minimumZoomScale = newValue.lowerBound
-			maximumZoomScale = newValue.upperBound
-		}
-	}
-	
 	var alignment = CGPoint(x:0.5, y:0.5)
-	let container = ViewableScrollingContainerView()
+	let containerView = ViewableScrollingContainerView()
 #endif
 	
 	var priorSize:CGSize = .zero
 	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
 	
 	func attachViewController(_ controller:PlatformViewController) {
-#if os(macOS)
-		autoresizingMask = [.width, .height]
-#else
-		autoresizingMask = [.flexibleWidth, .flexibleHeight]
-#endif
+		autoresizingMask = .flexibleSize
 	}
 	
-	func prepare() {
+	func prepareViewableScroll() {
 		translatesAutoresizingMaskIntoConstraints = false
 		
 #if os(macOS)
@@ -823,24 +723,26 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 		contentInsetAdjustmentBehavior = .always
 		
 		if delegate == nil {
-			delegate = container
+			delegate = containerView
 		}
 #endif
 	}
 	
 	func applyContent() {
 #if os(macOS)
+		containerView.orderPositionables([content], environment:positionableEnvironment, options:.set)
+		
 		sizeChanged()
 #else
 		invalidateLayout()
 		setNeedsLayout()
 		
-		if container.superview !== self {
-			insertSubview(container, at:0)
+		if containerView.superview !== self {
+			insertSubview(containerView, at:0)
 		}
-#endif
 		
-		container.orderPositionables([content], environment:positionableEnvironment, options:.set)
+		containerView.orderPositionables([content], environment:positionableEnvironment, options:.set)
+#endif
 	}
 	
 	func invalidateLayout() { priorSize = .zero }
@@ -875,19 +777,19 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 		let inset = adjustedContentInset
 		let outer = bounds.size
 		let small = CGSize(width:outer.width - inset.left - inset.right, height:outer.height - inset.top - inset.bottom)
-		let inner = container.bounds.size * scale
-		let center = container.center
+		let inner = containerView.bounds.size * scale
+		let center = containerView.center
 		var aligned = CGPoint(x:inner.width * 0.5, y:inner.height * 0.5)
 		
 		if inner.width < small.width { aligned.x += (small.width - inner.width) * alignment.x }
 		if inner.height < small.height { aligned.y += (small.height - inner.height) * alignment.y }
-		if aligned != center { container.center = aligned }
+		if aligned != center { containerView.center = aligned }
 	}
 #endif
 	
 	func applyLayout() {
 #if os(macOS)
-		container.positionableContext.performLayout(content)
+		containerView.positionableContext.performLayout(content)
 #else
 		let innerBounds, outerBounds:CGRect
 		let size = contentSize
@@ -953,7 +855,7 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 		let size = CGSize(width:max(resolved.width, limit.width), height:max(resolved.height, limit.height))
 		let displaySize = size.display(scale:positionableScale)
 		
-		container.frame = CGRect(origin:.zero, size:displaySize)
+		containerView.frame = CGRect(origin:.zero, size:displaySize)
 		contentSize = displaySize
 #endif
 		

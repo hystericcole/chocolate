@@ -75,11 +75,7 @@ class BaseView: PlatformView, ViewControllerAttachable {
 	}
 	
 	func attachViewController(_ viewController:PlatformViewController) {
-#if os(macOS)
-		autoresizingMask = [.width, .height]
-#else
-		autoresizingMask = [.flexibleWidth, .flexibleHeight]
-#endif
+		autoresizingMask = .flexibleSize
 	}
 	
 #if os(macOS)

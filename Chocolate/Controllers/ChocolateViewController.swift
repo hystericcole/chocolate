@@ -30,42 +30,7 @@ class ChocolateViewController: BaseViewController {
 	var examples:[Example] = (1 ... Example.exampleCount).map { Example(index:$0, descriptions:Example.descriptionCount) }
 	
 	override func prepare() {
-		let minimumSliderWidth = 200.0
-		let colorBoxSize = 40.0
-		
-		let colorPicker = Layout.Horizontal(targets:[
-			Layout.Vertical(targets:[
-				primaryLabel,
-				colorBox.fixed(width:colorBoxSize, height:colorBoxSize)
-			], spacing:2, alignment:.center, position:.center),
-			Layout.Vertical(targets:[
-				sliderRed,
-				sliderGreen,
-				sliderBlue
-			], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth),
-		], spacing:8, position:.stretch)
-		
-		let colorDerivation = Layout.Vertical(targets:[
-			colorLabel,
-			deriveLabel,
-			sliderContrast.minimum(width:minimumSliderWidth),
-			sliderSaturation.minimum(width:minimumSliderWidth)
-		], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth)
-		
-		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
-			targets:examples.map { $0.layout }, 
-			rowTemplate:Layout.Horizontal(targets:[], spacing:0, alignment:.fill, position:.stretch),
-			columnTemplate:Layout.Vertical(targets:[], spacing:0, alignment:.fill, position:.stretch),
-			axis:.horizontal
-		), minimum:CGSize(square:200)).ignoringSafeBounds()
-		
-		let controlsLayout = Layout.Vertical(targets:[
-			Layout.EmptySpace(width:0, height:10),
-			colorPicker.padding(horizontal:20, vertical:0),
-			colorDerivation.padding(horizontal:20, vertical:0),
-		], spacing:10, alignment:.fill, position:.start)
-		
-		content = Viewable.Group(content:Layout.Vertical(targets:[controlsLayout, exampleLayout], spacing:8, alignment:.fill, position:.stretch))
+		prepareLayout()
 	}
 	
 	override func loadView() {
@@ -148,6 +113,45 @@ class ChocolateViewController: BaseViewController {
 		}
 		
 		applyColor(rgba:rgba)
+	}
+	
+	func prepareLayout() {
+		let minimumSliderWidth = 200.0
+		let colorBoxSize = 40.0
+		
+		let colorPicker = Layout.Horizontal(targets:[
+			Layout.Vertical(targets:[
+				primaryLabel,
+				colorBox.fixed(width:colorBoxSize, height:colorBoxSize)
+			], spacing:2, alignment:.center, position:.center),
+			Layout.Vertical(targets:[
+				sliderRed,
+				sliderGreen,
+				sliderBlue
+			], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth),
+		], spacing:8, position:.stretch)
+		
+		let colorDerivation = Layout.Vertical(targets:[
+			colorLabel,
+			deriveLabel,
+			sliderContrast.minimum(width:minimumSliderWidth),
+			sliderSaturation.minimum(width:minimumSliderWidth)
+		], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth)
+		
+		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
+			targets:examples.map { $0.layout }, 
+			rowTemplate:Layout.Horizontal(targets:[], spacing:0, alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(targets:[], spacing:0, alignment:.fill, position:.stretch),
+			axis:.horizontal
+		), minimum:CGSize(square:200)).ignoringSafeBounds()
+		
+		let controlsLayout = Layout.Vertical(targets:[
+			Layout.EmptySpace(width:0, height:10),
+			colorPicker.padding(horizontal:20, vertical:0),
+			colorDerivation.padding(horizontal:20, vertical:0),
+		], spacing:10, alignment:.fill, position:.start)
+		
+		content = Viewable.Group(content:Layout.Vertical(targets:[controlsLayout, exampleLayout], spacing:8, alignment:.fill, position:.stretch))
 	}
 }
 
