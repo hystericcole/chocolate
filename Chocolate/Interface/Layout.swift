@@ -19,6 +19,12 @@ protocol Positionable {
 
 //	MARK: -
 
+protocol PositionableContainer {
+	func orderPositionables(_ unorderable:[Positionable], environment:Layout.Environment, options:Layout.OrderOptions)
+}
+
+//	MARK: -
+
 struct Layout {
 	typealias Native = CGFloat.NativeType
 	
@@ -131,6 +137,15 @@ struct Layout {
 			case .reverse: return axis == .horizontal && environment.isRTL ? true : false
 			}
 		}
+	}
+	
+	struct OrderOptions: OptionSet {
+		let rawValue:Int
+		
+		static let order:OrderOptions = []
+		static let add = OrderOptions(rawValue:1)
+		static let remove = OrderOptions(rawValue:2)
+		static let set:OrderOptions = [.add, .remove]
 	}
 	
 	/// Environment for applying layout
@@ -1579,7 +1594,11 @@ extension PlatformView: Positionable {
 	func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
 		return [self]
 	}
-	
+}
+
+//	MARK: -
+
+extension PlatformView: PositionableContainer {
 	func insertSubviews<S:Sequence>(_ views:S, at index:Int) where S.Element == PlatformView {
 #if os(macOS)
 		var current = subviews
@@ -1678,16 +1697,28 @@ extension PlatformView: Positionable {
 		return (groups, ancestor)
 	}
 	
-	static func orderPositionables(_ targets:[Positionable], environment:Layout.Environment, addingToHierarchy:Bool = false, hierarchyRoot:PlatformView? = nil) {
-		let (groups, ancestor) = siblingGroups(targets.map { $0.orderablePositionables(environment:environment).compactMap { $0 as? PlatformView } }, includeOrphans:addingToHierarchy)
+	static func orderPositionables(_ unorderable:[Positionable], environment:Layout.Environment, options:Layout.OrderOptions = .order, hierarchyRoot:PlatformView? = nil) {
+		let views = unorderable.map { $0.orderablePositionables(environment:environment).compactMap { $0 as? PlatformView } }
+		let (groups, ancestor) = siblingGroups(views, includeOrphans:options.contains(.add))
 		
 		guard let parent = ancestor ?? hierarchyRoot else { return }
 		
 		let siblings = groups.flatMap { $0 }
 		let current = parent.subviews
-		let anchor = current.lastIndex { siblings.contains($0) } ?? current.count
 		
-		parent.insertSubviews(siblings, at:anchor)
+		if parent === hierarchyRoot && options.contains(.remove) {
+			for view in current where !siblings.contains(view) { view.removeFromSuperview() }
+			
+			parent.insertSubviews(siblings, at:parent.subviews.count)
+		} else {
+			let anchor = current.lastIndex { siblings.contains($0) } ?? current.count
+			
+			parent.insertSubviews(siblings, at:anchor)
+		}
+	}
+	
+	func orderPositionables(_ unorderable:[Positionable], environment:Layout.Environment, options:Layout.OrderOptions = .add) {
+		PlatformView.orderPositionables(unorderable, environment:environment, options:options, hierarchyRoot:self)
 	}
 }
 

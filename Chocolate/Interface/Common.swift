@@ -44,6 +44,7 @@ typealias PlatformSwitch = UISwitch
 typealias PlatformLabel = UILabel
 typealias PlatformImageView = UIImageView
 typealias PlatformScrollingView = UIScrollView
+typealias PlatformScrollingDelegate = UIScrollViewDelegate
 typealias PlatformSpinner = UIActivityIndicatorView
 typealias PlatformVisualEffectView = UIVisualEffectView
 #endif

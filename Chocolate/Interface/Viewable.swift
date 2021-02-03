@@ -65,12 +65,10 @@ enum Viewable {
 		
 		func attachView(_ view:ViewableGroupView) {
 			view.tag = model.tag
-			view.content = model.content
 			view.prepare()
+			view.content = model.content
 			
 			self.view = view
-			
-			PlatformView.orderPositionables([model.content], environment:view.positionableEnvironment, hierarchyRoot:view)
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -258,7 +256,8 @@ enum Viewable {
 	}
 	
 	class Scroll: ViewablePositionable {
-		typealias ViewType = ViewableGroupScrollingView
+		typealias ViewType = ViewableScrollingView
+		typealias ZoomRange = ClosedRange<CGFloat>
 		
 		struct Model {
 			static let unbound = CGSize(width:Layout.Dimension.unbound, height:Layout.Dimension.unbound)
@@ -267,12 +266,14 @@ enum Viewable {
 			var content:Positionable
 			var minimum:CGSize
 			var maximum:CGSize
+			var zoomRange:ZoomRange
 			
-			init(tag:Int = 0, content:Positionable, minimum:CGSize, maximum:CGSize) {
+			init(tag:Int = 0, content:Positionable, minimum:CGSize, maximum:CGSize, zoomRange:ZoomRange) {
 				self.tag = tag
 				self.content = content
 				self.minimum = minimum
 				self.maximum = maximum
+				self.zoomRange = zoomRange
 			}
 		}
 		
@@ -283,16 +284,42 @@ enum Viewable {
 		var maximum:CGSize { get { return model.maximum } set { model.maximum = newValue } }
 		var content:Positionable { get { return view?.content ?? model.content } set { model.content = newValue; view?.content = newValue } }
 		
-		init(tag:Int = 0, content:Positionable, minimum:CGSize? = nil, maximum:CGSize? = nil) {
-			self.model = Model(tag:tag, content:content, minimum:minimum ?? .zero, maximum:maximum ?? Model.unbound)
+#if os(macOS)
+		var zoom:CGFloat {
+			get { return view?.magnification ?? 1 }
+			set { view?.magnification = newValue }
+		}
+#else
+		var zoom:CGFloat {
+			get { return view?.zoomScale ?? 1 }
+			set { view?.zoomScale = newValue }
+		}
+#endif
+		
+		var zoomRange:ZoomRange {
+			get { if let view = view { model.zoomRange = view.zoomRange }; return model.zoomRange }
+			set { model.zoomRange = newValue; view?.zoomRange = newValue }
 		}
 		
-		func attachView(_ view:ViewableGroupScrollingView) {
+		init(tag:Int = 0, content:Positionable, minimum:CGSize? = nil, maximum:CGSize? = nil, zoomRange:ZoomRange = 1 ... 1) {
+			self.model = Model(tag:tag, content:content, minimum:minimum ?? .zero, maximum:maximum ?? Model.unbound, zoomRange:zoomRange)
+		}
+		
+		func attachView(_ view:ViewableScrollingView) {
 			view.tag = model.tag
+			view.zoomRange = model.zoomRange
 			view.prepare()
 			view.content = model.content
 			
 			self.view = view
+		}
+		
+		func flashIndicators() {
+#if os(macOS)
+			view?.flashScrollers()
+#else
+			view?.flashScrollIndicators()
+#endif
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -630,7 +657,7 @@ class ViewableGroupView: PlatformView, ViewControllerAttachable {
 		setNeedsLayout()
 #endif
 		
-		PlatformView.orderPositionables([content], environment:positionableEnvironment, addingToHierarchy:true, hierarchyRoot:self)
+		self.orderPositionables([content], environment:positionableEnvironment, options:.set)
 	}
 	
 	func attachViewController(_ controller:PlatformViewController) {
@@ -676,18 +703,63 @@ class ViewableGroupView: PlatformView, ViewControllerAttachable {
 //	MARK: -
 
 #if os(macOS)
-class ViewableGroupScrollingContainerView: PlatformView {
+class ViewableScrollingContainerView: PlatformView {
 	override var isFlipped:Bool { return true }
 	override var acceptsFirstResponder: Bool { return true }
 }
+#else
+class ViewableScrollingContainerView: PlatformView, PlatformScrollingDelegate {
+	func viewForZooming(in scroll:PlatformScrollingView) -> PlatformView? {
+		return self
+	}
+}
 #endif
 
-class ViewableGroupScrollingView: PlatformScrollingView, ViewControllerAttachable {
+//	MARK: -
+
+class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 #if os(macOS)
 	var _tag = 0
 	override var tag:Int { get { return _tag } set { _tag = newValue } }
 	override var isFlipped:Bool { return true }
 	override var acceptsFirstResponder: Bool { return true }
+	
+	var container: PlatformView {
+		if let existing = documentView {
+			return existing
+		}
+		
+		let view = ViewableScrollingContainerView()
+		
+		documentView = view
+		
+		view.nextResponder = self
+		
+		return view
+	}
+	
+	var zoomRange:Viewable.Scroll.ZoomRange {
+		get {
+			return minMagnification ... max(minMagnification, maxMagnification)
+		}
+		set {
+			minMagnification = newValue.lowerBound
+			maxMagnification = newValue.upperBound
+			allowsMagnification = newValue.lowerBound < newValue.upperBound
+		}
+	}
+#else
+	var zoomRange:Viewable.Scroll.ZoomRange {
+		get {
+			return minimumZoomScale ... max(minimumZoomScale, maximumZoomScale)
+		}
+		set {
+			minimumZoomScale = newValue.lowerBound
+			maximumZoomScale = newValue.upperBound
+		}
+	}
+	
+	let container = ViewableScrollingContainerView()
 #endif
 	
 	var priorSize:CGSize = .zero
@@ -710,42 +782,28 @@ class ViewableGroupScrollingView: PlatformScrollingView, ViewControllerAttachabl
 		autohidesScrollers = true
 		hasVerticalScroller = true
 		hasHorizontalScroller = true
-		
-		if documentView == nil {
-			let view = ViewableGroupScrollingContainerView()
-			
-			documentView = view
-			
-			view.nextResponder = self
-		}
 #else
 		contentInsetAdjustmentBehavior = .always
+		
+		if delegate == nil {
+			delegate = container
+		}
 #endif
 	}
 	
 	func applyContent() {
 #if os(macOS)
-		let hierarchyRoot:PlatformView
-		
-		if let view = documentView {
-			hierarchyRoot = view
-		} else {
-			hierarchyRoot = ViewableGroupScrollingContainerView()
-			
-			documentView = hierarchyRoot
-			
-			hierarchyRoot.nextResponder = self
-		}
-		
 		sizeChanged()
 #else
-		let hierarchyRoot = self
-		
 		invalidateLayout()
 		setNeedsLayout()
+		
+		if container.superview !== self {
+			insertSubview(container, at:0)
+		}
 #endif
 		
-		PlatformView.orderPositionables([content], environment:positionableEnvironment, addingToHierarchy:true, hierarchyRoot:hierarchyRoot)
+		container.orderPositionables([content], environment:positionableEnvironment, options:.set)
 	}
 	
 	func invalidateLayout() { priorSize = .zero }
@@ -776,7 +834,7 @@ class ViewableGroupScrollingView: PlatformScrollingView, ViewControllerAttachabl
 	
 	func applyLayout() {
 #if os(macOS)
-		documentView?.positionableContext.performLayout(content)
+		container.positionableContext.performLayout(content)
 #else
 		let innerBounds, outerBounds:CGRect
 		let size = contentSize
@@ -795,7 +853,13 @@ class ViewableGroupScrollingView: PlatformScrollingView, ViewControllerAttachabl
 			outerBounds = CGRect(origin:.zero, size:padded)
 		}
 		
-		let context = Layout.Context(bounds:outerBounds, safeBounds:innerBounds, isDownPositive:false, scale:positionableScale, environment:positionableEnvironment)
+		let context = Layout.Context(
+			bounds:outerBounds,
+			safeBounds:innerBounds,
+			isDownPositive:false,
+			scale:positionableScale,
+			environment:positionableEnvironment
+		)
 		
 		context.performLayout(content)
 #endif
@@ -818,13 +882,12 @@ class ViewableGroupScrollingView: PlatformScrollingView, ViewControllerAttachabl
 		if let view = documentView {
 			view.setFrameSize(displaySize)
 		} else {
-			let view = ViewableGroupScrollingContainerView(frame:CGRect(origin:.zero, size:displaySize))
+			let view = ViewableScrollingContainerView(frame:CGRect(origin:.zero, size:displaySize))
 			let environement = positionableEnvironment
 			
 			documentView = view
 			view.nextResponder = self
-			
-			PlatformView.orderPositionables([content], environment:environement, addingToHierarchy:true, hierarchyRoot:view)
+			view.orderPositionables([content], environment:environement, options:.set)
 		}
 #else
 		let available = bounds.size
@@ -835,6 +898,7 @@ class ViewableGroupScrollingView: PlatformScrollingView, ViewControllerAttachabl
 		let size = CGSize(width:max(resolved.width, limit.width), height:max(resolved.height, limit.height))
 		let displaySize = size.display(scale:positionableScale)
 		
+		container.frame = CGRect(origin:.zero, size:displaySize)
 		contentSize = displaySize
 #endif
 		
