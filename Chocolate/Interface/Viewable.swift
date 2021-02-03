@@ -707,6 +707,36 @@ class ViewableScrollingContainerView: PlatformView {
 	override var isFlipped:Bool { return true }
 	override var acceptsFirstResponder: Bool { return true }
 }
+
+class ViewableScrollingClipView: PlatformClipView {
+	var alignment = CGPoint(x:0.5, y:0.5)
+	
+	override func constrainBoundsRect(_ proposedBounds:NSRect) -> NSRect {
+		var result = super.constrainBoundsRect(proposedBounds)
+		
+		guard let container = documentView else { return result }
+		
+		let scale = result.size.width / bounds.size.width
+		let insets = contentInsets
+		let frame = container.frame
+		let content = CGRect(
+			x:frame.origin.x - insets.left * scale,
+			y:frame.origin.y - (isFlipped ? insets.top : insets.bottom) * scale,
+			width:frame.size.width + (insets.left + insets.right) * scale,
+			height:frame.size.height + (insets.top + insets.bottom) * scale
+		)
+		
+		if result.width > content.size.width {
+			result.origin.x = content.origin.x + (content.size.width - result.size.width) * alignment.x
+		}
+		
+		if result.size.height > content.size.height {
+			result.origin.y = content.origin.y + (content.size.height - result.size.height) * alignment.y
+		}
+		
+		return backingAlignedRect(result, options:.alignAllEdgesNearest)
+	}
+}
 #else
 class ViewableScrollingContainerView: PlatformView, PlatformScrollingDelegate {
 	func viewForZooming(in scroll:PlatformScrollingView) -> PlatformView? {
@@ -748,6 +778,11 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 			allowsMagnification = newValue.lowerBound < newValue.upperBound
 		}
 	}
+	
+	var alignment:CGPoint {
+		get { return (contentView as? ViewableScrollingClipView)?.alignment ?? .zero }
+		set { (contentView as? ViewableScrollingClipView)?.alignment = newValue }
+	}
 #else
 	var zoomRange:Viewable.Scroll.ZoomRange {
 		get {
@@ -759,6 +794,7 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 		}
 	}
 	
+	var alignment = CGPoint(x:0.5, y:0.5)
 	let container = ViewableScrollingContainerView()
 #endif
 	
@@ -777,6 +813,7 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 		translatesAutoresizingMaskIntoConstraints = false
 		
 #if os(macOS)
+		contentView = ViewableScrollingClipView()
 		scrollerStyle = .overlay
 		borderType = .noBorder
 		autohidesScrollers = true
@@ -809,7 +846,7 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 	func invalidateLayout() { priorSize = .zero }
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize: NSSize) {
+	override func resizeSubviews(withOldSize oldSize:NSSize) {
 		super.resizeSubviews(withOldSize:oldSize)
 		
 		let size = bounds.size
@@ -829,6 +866,22 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 			sizeChanged()
 			priorSize = size
 		}
+		
+		alignContent()
+	}
+	
+	func alignContent() {
+		let scale = zoomScale
+		let inset = adjustedContentInset
+		let outer = bounds.size
+		let small = CGSize(width:outer.width - inset.left - inset.right, height:outer.height - inset.top - inset.bottom)
+		let inner = container.bounds.size * scale
+		let center = container.center
+		var aligned = CGPoint(x:inner.width * 0.5, y:inner.height * 0.5)
+		
+		if inner.width < small.width { aligned.x += (small.width - inner.width) * alignment.x }
+		if inner.height < small.height { aligned.y += (small.height - inner.height) * alignment.y }
+		if aligned != center { container.center = aligned }
 	}
 #endif
 	
@@ -889,6 +942,8 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 			view.nextResponder = self
 			view.orderPositionables([content], environment:environement, options:.set)
 		}
+		
+		verticalScrollElasticity = displaySize.height > available.height || !zoomRange.isEmpty ? .allowed : .none
 #else
 		let available = bounds.size
 		let insets = contentInsetAdjustmentBehavior == .always ? adjustedContentInset : safeAreaInsets

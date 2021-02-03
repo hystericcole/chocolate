@@ -23,6 +23,7 @@ typealias PlatformLabel = NSTextField
 typealias PlatformImageView = NSImageView
 typealias PlatformScroller = NSScroller
 typealias PlatformScrollingView = NSScrollView
+typealias PlatformClipView = NSClipView
 typealias PlatformSpinner = NSProgressIndicator
 typealias PlatformVisualEffectView = NSVisualEffectView
 
