@@ -70,7 +70,9 @@ struct Layout {
 		case adaptiveFraction(Native)
 		/// Fill available bounds by stretching elements
 		case stretch
-		/// Fill available bounds by stretching space
+		/// Fill available bounds by making elements a uniform size
+		case uniform
+		/// Fill available bounds by stretching space between elements
 		case distribute
 		/// Position around the primary element
 		case float
@@ -84,7 +86,7 @@ struct Layout {
 		
 		var isFill:Bool {
 			switch self {
-			case .stretch, .distribute: return true
+			case .stretch, .uniform, .distribute: return true
 			default: return false
 			}
 		}
@@ -92,6 +94,7 @@ struct Layout {
 		var fit:Axial.Fit {
 			switch self {
 			case .stretch: return .stretch
+			case .uniform: return .uniform
 			case .distribute: return .distribute
 			default: return .position
 			}
@@ -102,7 +105,7 @@ struct Layout {
 			case .fraction(let value): return .fraction(value)
 			case .adaptiveFraction(let value): return .adaptiveFraction(value)
 			case .float: return .center
-			case .stretch, .distribute: return .fill
+			case .stretch, .uniform, .distribute: return .fill
 			}
 		}
 		
@@ -268,6 +271,13 @@ struct Layout {
 			minimum = max(minimum + dimension.minimum, 0)
 			maximum = min(max(minimum, maximum + dimension.maximum), Dimension.unbound)
 			fraction += dimension.fraction
+		}
+		
+		mutating func multiply(_ scalar:Native) {
+			constant *= scalar
+			minimum *= scalar
+			maximum = min(maximum * scalar, Dimension.unbound)
+			fraction *= scalar
 		}
 		
 		mutating func increase(_ dimension:Dimension) {
@@ -585,6 +595,12 @@ struct Layout {
 			return true
 		}
 		
+		var isUniform:Bool {
+			if case .uniform = position, alignment.isFill { return true }
+			
+			return false
+		}
+		
 		var frame:CGRect {
 			guard !isFloating else { return targets[primaryIndex].frame }
 			
@@ -607,11 +623,22 @@ struct Layout {
 			var result:Layout.Size = .zero
 			let spacingSum = spacing * Native(targets.count - 1)
 			
-			for target in targets {
-				let size = target.positionableSize(fitting: limit)
+			if case .uniform = position {
+				for target in targets {
+					let size = target.positionableSize(fitting: limit)
+					
+					result.height.increase(size.height)
+					result.width.increase(size.width)
+				}
 				
-				result.height.add(size.height)
-				result.width.increase(size.width)
+				result.height.multiply(Native(targets.count))
+			} else {
+				for target in targets {
+					let size = target.positionableSize(fitting: limit)
+					
+					result.height.add(size.height)
+					result.width.increase(size.width)
+				}
 			}
 			
 			result.height.add(value:spacingSum)
@@ -684,7 +711,7 @@ struct Layout {
 			let isFloating = self.isFloating
 			let limit = Limit(width:box.size.width.native, height:nil)
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
-			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
 			let axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, fit:position.fit)
 			
 			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
@@ -713,6 +740,12 @@ struct Layout {
 			return true
 		}
 		
+		var isUniform:Bool {
+			if case .uniform = position, alignment.isFill { return true }
+			
+			return false
+		}
+		
 		var frame:CGRect {
 			guard !isFloating else { return targets[primaryIndex].frame }
 			
@@ -735,11 +768,22 @@ struct Layout {
 			var result:Layout.Size = .zero
 			let spacingSum = spacing * Native(targets.count - 1)
 			
-			for target in targets {
-				let size = target.positionableSize(fitting:limit)
+			if case .uniform = position {
+				for target in targets {
+					let size = target.positionableSize(fitting: limit)
+					
+					result.height.increase(size.height)
+					result.width.increase(size.width)
+				}
 				
-				result.width.add(size.width)
-				result.height.increase(size.height)
+				result.width.multiply(Native(targets.count))
+			} else {
+				for target in targets {
+					let size = target.positionableSize(fitting:limit)
+					
+					result.width.add(size.width)
+					result.height.increase(size.height)
+				}
 			}
 			
 			result.width.add(value:spacingSum)
@@ -812,7 +856,7 @@ struct Layout {
 			let isFloating = self.isFloating
 			let limit = Limit(width:nil, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
-			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
 			let axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, fit:position.fit)
 			
 			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
@@ -1223,6 +1267,8 @@ struct Layout {
 			case position
 			/// Fill available space by expanding or compressing content
 			case stretch
+			/// Fill available space by making all content a uniform size
+			case uniform
 			/// Fill available space by expanding or compressing spacing
 			case distribute
 		}
@@ -1235,10 +1281,22 @@ struct Layout {
 		let sizes:[Native]
 		
 		init(_ dimensions:[Dimension], available:Native, spacing:Native, fit:Fit) {
-			var minimum = 0.0, maximum = 0.0, prefer = 0.0
-			var dimensions = dimensions
 			let spaceCount = Native(dimensions.count - 1)
 			let space = spacing * spaceCount
+			
+			if fit == .uniform {
+				let count = Native(dimensions.count)
+				let uniformSize = max(1, (available - space) / count)
+				
+				self.empty = 0
+				self.space = available < space + count ? max(0, (available - count) / spaceCount) : spacing
+				self.sizes = Array(repeating:uniformSize, count:dimensions.count)
+				
+				return
+			}
+			
+			var minimum = 0.0, maximum = 0.0, prefer = 0.0
+			var dimensions = dimensions
 			
 			for index in dimensions.indices {
 				var dimension = dimensions[index]
@@ -1260,7 +1318,7 @@ struct Layout {
 					let denominator = Native(dimensions.count)
 					
 					self.empty = 0
-					self.space = spacing
+					self.space = fit == .stretch ? 0 : spacing
 					self.sizes = dimensions.map { $0.minimum - reduction / denominator }
 				} else {
 					self.empty = 0
