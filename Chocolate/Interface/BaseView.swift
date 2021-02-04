@@ -36,7 +36,7 @@ extension PlatformView {
 	}
 }
 
-class BaseView: PlatformView, ViewControllerAttachable {
+class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 #if os(macOS)
 	class var layerClass:CALayer.Type { return CALayer.self }
 	
@@ -81,13 +81,7 @@ class BaseView: PlatformView, ViewControllerAttachable {
 #if os(macOS)
 	override func resizeSubviews(withOldSize oldSize: NSSize) {
 		super.resizeSubviews(withOldSize:oldSize)
-		
-		let size = bounds.size
-		
-		if size != priorSize {
-			sizeChanged()
-			priorSize = size
-		}
+		sizeMayHaveChanged(newSize:bounds.size)
 	}
 	
 	override func makeBackingLayer() -> CALayer {
@@ -96,13 +90,7 @@ class BaseView: PlatformView, ViewControllerAttachable {
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		
-		let size = bounds.size
-		
-		if size != priorSize {
-			sizeChanged()
-			priorSize = size
-		}
+		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #endif
 	

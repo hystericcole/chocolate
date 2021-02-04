@@ -103,14 +103,53 @@ enum Viewable {
 		
 		func attachView(_ view:ViewType) {
 			view.tag = model.tag
-			view.backgroundColor = model.color
 			view.prepareViewableColor(isOpaque:model.color?.cgColor.alpha ?? 0 < 1)
+			view.backgroundColor = model.color
 			
 			self.view = view
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			return Layout.Size(intrinsicSize:model.intrinsicSize)
+		}
+	}
+	
+	class Button: ViewablePositionable {
+		typealias ViewType = ViewableButton
+		
+		struct Model {
+			let tag:Int
+			let content:Positionable
+			weak var target:AnyObject?
+			var action:Selector?
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		
+		init(tag:Int = 0, content:Positionable, target:AnyObject? = nil, action:Selector?) {
+			self.model = Model(tag:tag, content:content, target:target, action:action)
+		}
+		
+		func attachView(_ view:ViewableButton) {
+			view.tag = model.tag
+			view.content = model.content
+			view.prepareViewableButton()
+			view.applyVieawbleAction(target:model.target, action:model.action)
+			
+			self.view = view
+		}
+		
+		func applyAction(target:AnyObject?, action:Selector?) {
+			model.target = target
+			model.action = action
+			
+			view?.applyVieawbleAction(target:target, action:action)
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			return model.content.positionableSize(fitting:limit)
 		}
 	}
 	
@@ -202,6 +241,85 @@ enum Viewable {
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:intrinsicSize())
+		}
+	}
+	
+	class Picker: NSObject, ViewablePositionable {
+		typealias ViewType = PlatformPicker
+		
+		struct Model {
+			let tag:Int
+			var select:Int
+			var itemTitles:[NSAttributedString]
+			weak var target:AnyObject?
+			var action:Selector?
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var select:Int { get { return view?.selectionIndex ?? model.select } set { model.select = newValue; view?.selectionIndex = newValue } }
+		var titles:[NSAttributedString] { get { return model.itemTitles } set { applyItems(newValue) } }
+		
+		init(tag:Int = 0, titles:[NSAttributedString], select:Int = 0, target:AnyObject? = nil, action:Selector?) {
+			self.model = Model(tag:tag, select:select, itemTitles:titles, target:target, action:action)
+		}
+		
+		convenience init(tag:Int = 0, titles:[String], attributes:[NSAttributedString.Key:Any]? = nil, select:Int = 0, target:AnyObject? = nil, action:Selector?) {
+			self.init(tag:tag, titles:titles.map { NSAttributedString(string:$0, attributes:attributes) }, select:select, target:target, action:action)
+		}
+		
+		func attachView(_ view:PlatformPicker) {
+			view.tag = model.tag
+			
+#if os(macOS)
+			view.addItems(withTitles:model.itemTitles)
+			view.target = model.target
+			view.action = model.action
+			view.pullsDown = false
+#else
+			view.delegate = self
+			view.dataSource = self
+			view.showsSelectionIndicator = false
+#endif
+			
+			if model.itemTitles.indices.contains(model.select) {
+				view.selectionIndex = model.select
+			}
+			
+			self.view = view
+		}
+		
+		func applyItems(_ items:[NSAttributedString]) {
+			model.itemTitles = items
+			
+			guard let view = view else { return }
+			
+#if os(macOS)
+			view.removeAllItems()
+			view.addItems(withTitles:model.itemTitles)
+#else
+			view.reloadAllComponents()
+#endif
+		}
+		
+		func applyAction(target:AnyObject?, action:Selector?) {
+			model.target = target
+			model.action = action
+			
+			guard let view = view else { return }
+			
+#if os(macOS)
+			view.target = model.target
+			view.action = model.action
+#else
+			view.delegate = self
+			view.dataSource = self
+#endif
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			return view?.positionableSize(fitting:limit) ?? .zero
 		}
 	}
 	
@@ -316,6 +434,8 @@ enum Viewable {
 			view.valueRange = model.range
 			view.doubleValue = model.value
 			view.prepareViewableSlider(target:model.target, action:model.action, minimumTrackColor:model.minimumTrackColor)
+			
+			model.intrinsicSize = view.intrinsicContentSize
 			
 			self.view = view
 		}
@@ -453,13 +573,7 @@ enum Viewable {
 		struct Model {
 			var isAnimating:Bool
 			var isHiddenWhenStopped:Bool
-			var intrinsicSize:CGSize
-			
-			init(isAnimating:Bool = true, isHiddenWhenStopped:Bool = true) {
-				self.isAnimating = isAnimating
-				self.isHiddenWhenStopped = isHiddenWhenStopped
-				self.intrinsicSize = Viewable.noIntrinsicSize
-			}
+			var intrinsicSize:CGSize = Viewable.noIntrinsicSize
 		}
 		
 		weak var view:ViewType?
@@ -492,7 +606,55 @@ enum Viewable {
 			view.prepareViewableSpinner()
 			view.applyAnimating(isAnimating)
 			
+			model.intrinsicSize = view.intrinsicContentSize
+			
 			self.view = view
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			guard let view = view else { return Layout.Size(intrinsicSize:model.intrinsicSize) }
+			
+			model.intrinsicSize = view.intrinsicContentSize
+			
+			return view.positionableSize(fitting:limit)
+		}
+	}
+	
+	class Switch: ViewablePositionable {
+		typealias ViewType = PlatformSwitch
+		
+		struct Model {
+			let tag:Int
+			var isOn:Bool
+			weak var target:AnyObject?
+			var action:Selector?
+			var intrinsicSize:CGSize = Viewable.noIntrinsicSize
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var isOn:Bool { get { return view?.isOn ?? model.isOn } set { model.isOn = newValue; view?.isOn = newValue } }
+		
+		init(tag:Int = 0, isOn:Bool = false, target:AnyObject? = nil, action:Selector?) {
+			self.model = Model(tag:tag, isOn:isOn, target:target, action:action)
+		}
+		
+		func attachView(_ view:PlatformSwitch) {
+			view.tag = model.tag
+			view.isOn = model.isOn
+			view.prepareViewableSwitch(target:model.target, action:model.action)
+			
+			model.intrinsicSize = view.intrinsicContentSize
+			
+			self.view = view
+		}
+		
+		func applyAction(target:AnyObject?, action:Selector?) {
+			model.target = target
+			model.action = action
+			
+			view?.applyVieawbleAction(target:target, action:action)
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -534,6 +696,43 @@ extension ViewablePositionable {
 
 //	MARK: -
 
+#if os(macOS)
+#else
+extension Viewable.Picker: PlatformPickerDelegate, PlatformPickerDataSource {
+	func numberOfComponents(in pickerView:PlatformPicker) -> Int {
+		return 1
+	}
+	
+	func pickerView(_ pickerView:PlatformPicker, numberOfRowsInComponent component:Int) -> Int {
+		return component == 0 ? model.itemTitles.count : 0
+	}
+	
+	func pickerView(_ pickerView:PlatformPicker, rowHeightForComponent component:Int) -> CGFloat {
+		return component == 0 ? (model.itemTitles.first?.size().height ?? 0) * 1.25 : 0
+	}
+	
+	func pickerView(_ pickerView:PlatformPicker, attributedTitleForRow row:Int, forComponent component:Int) -> NSAttributedString? {
+		return component == 0 ? model.itemTitles[row] : nil
+	}
+	
+	func pickerView(_ pickerView:PlatformPicker, widthForComponent component:Int) -> CGFloat {
+		return component == 0 ? pickerView.bounds.size.width : 0
+	}
+	
+	func pickerView(_ pickerView:PlatformPicker, didSelectRow row:Int, inComponent component:Int) {
+		guard component == 0, model.select != row else { return }
+		
+		model.select = row
+		
+		if let action = model.action, let target = model.target ?? pickerView.target(forAction:action, withSender:pickerView), let object = target as? NSObject {
+			object.perform(action, with:pickerView)
+		}
+	}
+}
+#endif
+
+//	MARK: -
+
 class ViewableShapeView: PlatformTaggableView {
 #if os(macOS)
 	override func makeBackingLayer() -> CALayer { return CAShapeLayer() }
@@ -566,7 +765,7 @@ class ViewableGradientView: PlatformTaggableView {
 
 //	MARK: -
 
-class ViewableGroupView: PlatformTaggableView, ViewControllerAttachable {
+class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewControllerAttachable {
 	var priorSize:CGSize = .zero
 	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
 	
@@ -596,24 +795,53 @@ class ViewableGroupView: PlatformTaggableView, ViewControllerAttachable {
 #if os(macOS)
 	override func resizeSubviews(withOldSize oldSize: NSSize) {
 		super.resizeSubviews(withOldSize:oldSize)
-		
-		let size = bounds.size
-		
-		if size != priorSize {
-			sizeChanged()
-			priorSize = size
-		}
+		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
+		sizeMayHaveChanged(newSize:bounds.size)
+	}
+#endif
+	
+	func invalidateLayout() { priorSize = .zero }
+	func sizeChanged() { positionableContext.performLayout(content) }
+	
+	override func positionableSizeFitting(_ size:CGSize) -> Data {
+		return content.positionableSize(fitting:Layout.Limit(size:size)).data
+	}
+}
+
+//	MARK: -
+
+class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
+	var priorSize:CGSize = .zero
+	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
+	
+	override var intrinsicContentSize:CGSize {
+		return content.positionableSize(fitting:Layout.Limit()).resolve(.zero)
+	}
+	
+	func applyContent() {
+		orderPositionables([content], environment:positionableEnvironment, options:.set)
 		
-		let size = bounds.size
-		
-		if size != priorSize {
-			sizeChanged()
-			priorSize = size
-		}
+#if os(macOS)
+		sizeChanged()
+#else
+		invalidateLayout()
+		setNeedsLayout()
+#endif
+	}
+	
+#if os(macOS)
+	override func resizeSubviews(withOldSize oldSize: NSSize) {
+		super.resizeSubviews(withOldSize:oldSize)
+		sizeMayHaveChanged(newSize:bounds.size)
+	}
+#else
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #endif
 	
@@ -672,7 +900,7 @@ class ViewableScrollingContainerView: PlatformView, PlatformScrollingDelegate {
 
 //	MARK: -
 
-class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
+class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, ViewControllerAttachable {
 #if os(macOS)
 	var _tag = 0
 	override var tag:Int { get { return _tag } set { _tag = newValue } }
@@ -748,27 +976,14 @@ class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 	func invalidateLayout() { priorSize = .zero }
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize:NSSize) {
+	override func resizeSubviews(withOldSize oldSize: NSSize) {
 		super.resizeSubviews(withOldSize:oldSize)
-		
-		let size = bounds.size
-		
-		if size != priorSize {
-			sizeChanged()
-			priorSize = size
-		}
+		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		
-		let size = bounds.size
-		
-		if size != priorSize {
-			sizeChanged()
-			priorSize = size
-		}
-		
+		sizeMayHaveChanged(newSize:bounds.size)
 		alignContent()
 	}
 	

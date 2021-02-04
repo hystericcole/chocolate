@@ -193,7 +193,7 @@ struct Layout {
 		let height:Native?
 		
 		var size:CGSize { return CGSize(width:width ?? .greatestFiniteMagnitude, height:height ?? .greatestFiniteMagnitude) }
-		var description:String { return "Limit(\(width != nil ? String(width!) : "∞"), \(height != nil ? String(height!) : "∞"))" }
+		var description:String { return "Limit(\(width?.description ?? "∞"), \(height?.description ?? "∞"))" }
 		
 		init(width:Native? = nil, height:Native? = nil) {
 			self.width = width
@@ -1507,7 +1507,7 @@ extension Positionable {
 		return Layout.Padding(target:self, insets:insets)
 	}
 	
-	func padding(uniform:Layout.Native = 8) -> Positionable {
+	func padding(_ uniform:Layout.Native = 8) -> Positionable {
 		return Layout.Padding(target:self, uniform:uniform)
 	}
 	
@@ -1521,6 +1521,10 @@ extension Positionable {
 	
 	func minimum(width:Layout.Native? = nil, height:Layout.Native? = nil) -> Positionable {
 		return Layout.Sizing(target:self, minimumWidth:width, minimumHeight:height)
+	}
+	
+	func useAvailableSpace() -> Positionable {
+		return Layout.Sizing(target:self, minimumWidth:0, minimumHeight:0)
 	}
 	
 	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {

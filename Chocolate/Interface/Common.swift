@@ -21,6 +21,7 @@ typealias PlatformAutoresizing = NSView.AutoresizingMask
 typealias PlatformButton = NSButton
 typealias PlatformControl = NSControl
 typealias PlatformSlider = NSSlider
+typealias PlatformSwitch = NSButton
 typealias PlatformLabel = NSTextField
 typealias PlatformImageView = NSImageView
 typealias PlatformScroller = NSScroller
@@ -28,11 +29,10 @@ typealias PlatformScrollingView = NSScrollView
 typealias PlatformClipView = NSClipView
 typealias PlatformSpinner = NSProgressIndicator
 typealias PlatformStepper = NSStepper
+typealias PlatformPicker = NSPopUpButton
 typealias PlatformColorWell = NSColorWell
 typealias PlatformVisualEffectView = NSVisualEffectView
 
-@available(macOS 10.15, *)
-typealias PlatformSwitch = NSSwitch
 #else
 import UIKit
 
@@ -54,6 +54,9 @@ typealias PlatformScrollingView = UIScrollView
 typealias PlatformScrollingDelegate = UIScrollViewDelegate
 typealias PlatformSpinner = UIActivityIndicatorView
 typealias PlatformStepper = UIStepper
+typealias PlatformPicker = UIPickerView
+typealias PlatformPickerDelegate = UIPickerViewDelegate
+typealias PlatformPickerDataSource = UIPickerViewDataSource
 typealias PlatformVisualEffectView = UIVisualEffectView
 
 @available(iOS 14.0, *)
@@ -108,6 +111,41 @@ extension PlatformView {
 
 //	MARK: -
 
+extension PlatformControl {
+	func applyVieawbleAction(target:AnyObject?, action:Selector?) {
+		self.target = target
+		self.action = action
+	}
+}
+
+//	MARK: -
+
+class PlatformEmptyButton: PlatformButton {
+	func prepareViewableButton() {
+		isBordered = false
+		isTransparent = true
+	}
+}
+
+//	MARK: -
+
+extension PlatformSwitch {
+	var isOn:Bool {
+		get { return state == .on }
+		set { state = newValue ? .on : .off }
+	}
+	
+	func prepareViewableSwitch(target:AnyObject? = nil, action:Selector?) {
+		title = ""
+		allowsMixedState = false
+		bezelStyle = .rounded
+		setButtonType(.switch)
+		applyVieawbleAction(target:target, action:action)
+	}
+}
+
+//	MARK: -
+
 extension PlatformImageView {
 	func prepareViewableImage(image:PlatformImage?, color:PlatformColor?) {
 		self.image = image
@@ -149,6 +187,31 @@ extension PlatformLabel {
 
 //	MARK: -
 
+extension PlatformPicker {
+	var selectionIndex:Int {
+		get { return indexOfSelectedItem }
+		set { selectItem(at:newValue) }
+	}
+	
+	func addItems(withTitles strings:[NSAttributedString]) {
+		if let menu = cell?.menu {
+			var tag = 1
+			
+			menu.items += strings.map { string in
+				let item = NSMenuItem()
+				item.attributedTitle = string
+				item.tag = tag
+				tag += 1
+				return item
+			}
+		} else {
+			addItems(withTitles:strings.map { $0.string })
+		}
+	}
+}
+
+//	MARK: -
+
 extension PlatformScrollingView {
 	var isAxisLockEnabled:Bool {
 		get { return usesPredominantAxisScrolling }
@@ -182,11 +245,6 @@ extension PlatformSlider {
 	var valueRange:ClosedRange<Double> {
 		get { return minValue ... max(minValue, maxValue) }
 		set { minValue = newValue.lowerBound; maxValue = newValue.upperBound }
-	}
-	
-	func applyVieawbleAction(target:AnyObject?, action:Selector?) {
-		self.target = target
-		self.action = action
 	}
 	
 	func prepareViewableSlider(target:AnyObject?, action:Selector?, minimumTrackColor:PlatformColor?) {
@@ -266,6 +324,21 @@ extension PlatformImageView {
 
 //	MARK: -
 
+class PlatformEmptyButton: PlatformControl {
+	func applyVieawbleAction(target:AnyObject?, action:Selector?) {
+		removeTarget(nil, action:nil, for:.touchUpInside)
+		
+		if let action = action {
+			addTarget(target, action:action, for:.touchUpInside)
+		}
+	}
+	
+	func prepareViewableButton() {
+	}
+}
+
+//	MARK: -
+
 extension PlatformLabel {
 	static func sizeMeasuringString(_ string:NSAttributedString, with size:CGSize) -> CGSize {
 		return string.boundingRect(with:size, options:.usesLineFragmentOrigin, context:nil).size
@@ -276,6 +349,15 @@ extension PlatformLabel {
 		numberOfLines = maximumLines
 		lineBreakMode = maximumLines == 1 ? .byTruncatingMiddle : .byWordWrapping
 		adjustsFontSizeToFitWidth = maximumLines > 0
+	}
+}
+
+//	MARK: -
+
+extension PlatformPicker {
+	var selectionIndex:Int {
+		get { return selectedRow(inComponent:0) }
+		set { selectRow(newValue, inComponent:0, animated:false) }
 	}
 }
 
@@ -320,7 +402,7 @@ extension PlatformSlider {
 	}
 	
 	func applyVieawbleAction(target:AnyObject?, action:Selector?) {
-		removeTarget(nil, action:nil, for:allControlEvents)
+		removeTarget(nil, action:nil, for:.valueChanged)
 		
 		if let action = action {
 			addTarget(target, action:action, for:.valueChanged)
@@ -332,11 +414,7 @@ extension PlatformSlider {
 			minimumTrackTintColor = color
 		}
 		
-		removeTarget(nil, action:nil, for:.valueChanged)
-		
-		if let action = action {
-			addTarget(target, action:action, for:.valueChanged)
-		}
+		applyVieawbleAction(target:target, action:action)
 	}
 }
 
@@ -359,4 +437,36 @@ extension PlatformSpinner {
 	func prepareViewableSpinner() {
 	}
 }
+
+//	MARK: -
+
+extension PlatformSwitch {
+	func prepareViewableSwitch(target:AnyObject? = nil, action:Selector?) {
+		applyVieawbleAction(target:target, action:action)
+	}
+	
+	func applyVieawbleAction(target:AnyObject?, action:Selector?) {
+		removeTarget(nil, action:nil, for:.valueChanged)
+		
+		if let action = action {
+			addTarget(target, action:action, for:.valueChanged)
+		}
+	}
+}
 #endif
+
+//	MARK: -
+
+protocol PlatformSizeChangeView: PlatformView {
+	var priorSize:CGSize { get set }
+	func sizeChanged()
+}
+
+extension PlatformSizeChangeView {
+	func sizeMayHaveChanged(newSize:CGSize) {
+		guard newSize != priorSize else { return }
+		
+		priorSize = newSize
+		sizeChanged()
+	}
+}
