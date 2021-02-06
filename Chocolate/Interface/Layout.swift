@@ -267,6 +267,18 @@ struct Layout {
 			return min(max(minimum, constant + fraction * limit), maximum)
 		}
 		
+		func limit(fitting limit:Native?) -> Native? {
+			if let limit = limit, limit < Limit.unlimited {
+				let resolved = resolve(limit)
+				
+				return min(resolved, limit)
+			} else if maximum < Limit.unlimited {
+				return maximum
+			} else {
+				return limit
+			}
+		}
+		
 		mutating func add(value:Native) {
 			constant += value
 			minimum = max(minimum + value, 0)
@@ -524,6 +536,7 @@ struct Layout {
 				return Layout.Size(width:width, height:height)
 			}
 			
+			let limit = Limit(width:width?.limit(fitting:limit.width) ?? limit.width, height:height?.limit(fitting:limit.height) ?? limit.height)
 			let size = target.positionableSize(fitting:limit)
 			
 			return Layout.Size(width:width ?? size.width, height:height ?? size.height)

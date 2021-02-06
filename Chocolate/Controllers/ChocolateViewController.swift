@@ -121,7 +121,7 @@ class ChocolateViewController: BaseViewController {
 			Layout.Vertical(targets:[
 				primaryLabel,
 				Layout.Sizing(target:colorBox, width:Layout.Dimension(value:colorBoxSize), height:Layout.Dimension(minimum:colorBoxSize, maximum:colorBoxSize * 2))
-			], spacing:2, alignment:.center, position:.stretch),
+			], spacing:2, alignment:.center, position:.stretch, primary:1),
 			Layout.Vertical(targets:[
 				sliderRed,
 				sliderGreen,
@@ -129,7 +129,7 @@ class ChocolateViewController: BaseViewController {
 				Layout.EmptySpace(width:0, height:2),
 				colorLabel
 			], spacing:4, alignment:.fill, position:.end).minimum(width:minimumSliderWidth),
-		], spacing:8, alignment:.fill, position:.stretch)
+		], spacing:8, alignment:.center, position:.stretch)
 		
 		let colorDerivation = Layout.Vertical(targets:[
 			deriveLabel,
