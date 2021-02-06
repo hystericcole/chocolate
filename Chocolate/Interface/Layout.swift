@@ -10,6 +10,7 @@ import Foundation
 
 protocol Positionable {
 	var frame:CGRect { get }
+	var compressionResistance:CGPoint { get }
 	
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size
 	func applyPositionableFrame(_ frame:CGRect, context:Layout.Context)
@@ -363,6 +364,22 @@ struct Layout {
 			return box
 		}
 		
+		func decompress(_ box:CGRect, compressionResistance:CGPoint, anchor:CGPoint = CGPoint(x:0.5, y:0.5)) -> CGRect {
+			var box = box
+			
+			if box.size.width.native < width.minimum && compressionResistance.x > 0 {
+				box.origin.x -= CGFloat(width.minimum - box.size.width.native) * anchor.x
+				box.size.width = CGFloat(width.minimum)
+			}
+			
+			if box.size.height.native < height.minimum && compressionResistance.y > 0 {
+				box.origin.y -= CGFloat(height.minimum - box.size.height.native) * anchor.y
+				box.size.height = CGFloat(height.minimum)
+			}
+			
+			return box
+		}
+		
 		mutating func decreaseRange(minimum:CGSize, maximum:CGSize) {
 			width.decreaseRange(minimum.width.native ... maximum.width.native)
 			height.decreaseRange(minimum.height.native ... maximum.height.native)
@@ -395,6 +412,7 @@ struct Layout {
 		var target:Positionable
 		
 		var frame:CGRect { return target.frame }
+		var compressionResistance:CGPoint { return target.compressionResistance }
 		
 		init(target:Positionable) {
 			self.target = target
@@ -424,6 +442,7 @@ struct Layout {
 		var size:CGSize
 		
 		var frame:CGRect { return .zero }
+		var compressionResistance:CGPoint { return .zero }
 		
 		init(width:Native = 0, height:Native = 0) { self.size = CGSize(width:width, height:height) }
 		init(_ size:CGSize) { self.size = size }
@@ -442,6 +461,7 @@ struct Layout {
 		var insets:EdgeInsets
 		
 		var frame:CGRect { return insets.paddingBox(target.frame) }
+		var compressionResistance:CGPoint { return target.compressionResistance }
 		
 		init(target:Positionable, insets:EdgeInsets) {
 			self.target = target
@@ -482,12 +502,8 @@ struct Layout {
 		var width:Dimension?
 		var height:Dimension?
 		
-		var frame:CGRect {
-			var result = target.frame
-			if let width = width { result.size.width = CGFloat(width.constant) }
-			if let height = height { result.size.height = CGFloat(height.constant) }
-			return result
-		}
+		var frame:CGRect { return target.frame }
+		var compressionResistance:CGPoint { return target.compressionResistance }
 		
 		init(target:Positionable, width:Dimension? = nil, height:Dimension? = nil) {
 			self.target = target
@@ -527,9 +543,8 @@ struct Layout {
 		let target:Positionable
 		let size:Size
 		
-		var frame:CGRect {
-			return target.frame
-		}
+		var frame:CGRect { return target.frame }
+		var compressionResistance:CGPoint { return target.compressionResistance }
 		
 		init(target:Positionable, size:Size) {
 			self.target = target
@@ -559,9 +574,8 @@ struct Layout {
 		var position:CGPoint
 		var ratio:CGSize
 		
-		var frame:CGRect {
-			return target.frame
-		}
+		var frame:CGRect { return target.frame }
+		var compressionResistance:CGPoint { return target.compressionResistance }
 		
 		init(target:Positionable, ratio:Native, position:Native = 0.5) {
 			self.init(target:target, ratio:CGSize(width:ratio, height:1), position:CGPoint(x:position, y:position))
@@ -639,6 +653,10 @@ struct Layout {
 			guard !isFloating else { return targets[primaryIndex].frame }
 			
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return isFloating ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
 		init(targets:[Positionable], spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
@@ -734,8 +752,9 @@ struct Layout {
 				}
 				
 				let frame = CGRect(x:box.origin.x + x, y:box.origin.y + CGFloat(y), width:width, height:CGFloat(height))
+				let decompressed = sizes[index].decompress(frame, compressionResistance:target.compressionResistance)
 				
-				target.applyPositionableFrame(frame, context:context)
+				target.applyPositionableFrame(decompressed, context:context)
 			}
 		}
 		
@@ -784,6 +803,10 @@ struct Layout {
 			guard !isFloating else { return targets[primaryIndex].frame }
 			
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return isFloating ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
 		init(targets:[Positionable], spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
@@ -879,8 +902,9 @@ struct Layout {
 				}
 				
 				let frame = CGRect(x:box.origin.x + CGFloat(x), y:box.origin.y + y, width:CGFloat(width), height:height)
+				let decompressed = sizes[index].decompress(frame, compressionResistance:target.compressionResistance)
 				
-				target.applyPositionableFrame(frame, context:context)
+				target.applyPositionableFrame(decompressed, context:context)
 			}
 		}
 		
@@ -929,6 +953,10 @@ struct Layout {
 			guard !isFloating else { return targets[primaryIndex].frame }
 			
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return isFloating ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
 		init(targets:[Positionable], columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
@@ -1083,6 +1111,10 @@ struct Layout {
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
 		}
 		
+		var compressionResistance:CGPoint {
+			return isFloating ? targets[primaryIndex].compressionResistance : .zero
+		}
+		
 		init(targets:[Positionable], rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
 			self.targets = targets
 			self.rowCount = rowCount
@@ -1219,6 +1251,10 @@ struct Layout {
 			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].frame }
 			
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return targets.indices.contains(primaryIndex) ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
 		init(targets:[Positionable], vertical:Alignment = .fill, horizontal:Alignment = .fill, primary:Int = -1) {
@@ -1426,6 +1462,10 @@ struct Layout {
 		
 		var frame:CGRect {
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return .zero
 		}
 		
 		init(
@@ -1656,6 +1696,15 @@ extension PlatformView: Positionable {
 #endif
 		
 		return Layout.Context(bounds:stableBounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:positionableScale, environment:positionableEnvironment)
+	}
+	
+	var compressionResistance:CGPoint {
+		let maximum = PlatformPriority.required.rawValue
+		
+		return CGPoint(
+			x:CGFloat(contentCompressionResistancePriority(for:.horizontal).rawValue / maximum),
+			y:CGFloat(contentCompressionResistancePriority(for:.vertical).rawValue / maximum)
+		)
 	}
 	
 	@objc

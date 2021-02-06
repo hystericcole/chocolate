@@ -29,7 +29,8 @@ protocol ViewablePositionable: LazyViewable {
 //	MARK: -
 
 extension ViewablePositionable {
-	var frame: CGRect { return view?.frame ?? .zero }
+	var frame:CGRect { return view?.frame ?? .zero }
+	var compressionResistance:CGPoint { return view?.compressionResistance ?? .zero }
 	
 	func lazyView() -> PlatformView { return lazy() }
 	
@@ -1190,6 +1191,7 @@ extension Viewable {
 	struct Rounded: Positionable {
 		var target:Positionable
 		var frame:CGRect { return target.frame }
+		var compressionResistance:CGPoint { return target.compressionResistance }
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size { return target.positionableSize(fitting:limit) }
 		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] { return target.orderablePositionables(environment:environment, attachable:attachable) }
