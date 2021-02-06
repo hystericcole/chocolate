@@ -54,9 +54,9 @@ class ChocolateViewController: BaseViewController {
 		let chocolate = CGColor.chocolate
 		let limit = Double(count - 1)
 		
-		return (1 ... count).map { index in
-			let s = saturation * 0.25 * (1 - 2 * Double(index - 1) / limit)
-			let c = 1.0 - (1.0 - contrast * 0.5) * 0.25 * Double(index) / limit
+		return (0 ..< count).map { index in
+			let s = (saturation - 0.5) * Double(count - index) / limit
+			let c = 0.5 * (1 + contrast - Double(index) / limit)
 			
 			return RGBA(vector:chocolate.contrasting(chocolate.applySaturation(primary.vector, saturation:s), contrast:c))
 		}

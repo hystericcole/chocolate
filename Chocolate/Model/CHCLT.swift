@@ -591,38 +591,3 @@ public struct CHCLTShading {
 		return CGShading(radialSpace:colorSpace, start:start, startRadius:startRadius, end:end, endRadius:endRadius, function:function, extendStart:extendStart, extendEnd:extendEnd)
 	}
 }
-
-//	MARK: -
-
-struct CHCLTPattern {
-	public struct ColorLocation {
-		public let color:CHCLT.Vector4
-		public let location:CGPoint
-	}
-	
-	public let model:CHCLT
-	public let colors:[ColorLocation]
-	
-	public func pattern(bounds:CGRect, matrix:CGAffineTransform = .identity, xStep:CGFloat = 0, yStep:CGFloat = 0, tiling:CGPatternTiling = .noDistortion) -> CGPattern? {
-		let context = UnsafeMutablePointer<CHCLTPattern>.allocate(capacity:1)
-		
-		context.initialize(to:self)
-		
-		let drawPattern:CGPatternDrawPatternCallback = { pointer, context in
-			guard let pattern = pointer?.assumingMemoryBound(to:CHCLTPattern.self).pointee else { return }
-			
-			print(pattern.model)
-		}
-		
-		let release:CGFunctionReleaseInfoCallback = { context in
-			guard let context = context?.assumingMemoryBound(to:CHCLTShading.self) else { return }
-			
-			context.deinitialize(count:1)
-			context.deallocate()
-		}
-		
-		var callbacks = CGPatternCallbacks(version:0, drawPattern:drawPattern, releaseInfo:release)
-		
-		return CGPattern(info:context, bounds:bounds, matrix:matrix, xStep:xStep > 0 ? xStep : bounds.size.width, yStep:yStep > 0 ? yStep : bounds.size.height, tiling:tiling, isColored:true, callbacks:&callbacks)
-	}
-}
