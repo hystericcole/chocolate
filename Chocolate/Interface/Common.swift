@@ -159,12 +159,26 @@ extension PlatformImageView {
 //	MARK: -
 
 extension PlatformLabel {
+	var text:String? { return stringValue }
+	
+	var maximumLines:Int {
+		get {
+			if #available(OSX 10.11, *) {
+				return maximumNumberOfLines
+			} else {
+				return usesSingleLineMode ? 1 : 0
+			}
+		}
+	}
+	
 	var attributedText:NSAttributedString? {
 		get { return attributedStringValue }
 		set { attributedStringValue = newValue ?? NSAttributedString() }
 	}
 	
 	static func sizeMeasuringString(_ string:NSAttributedString, with size:CGSize) -> CGSize {
+		let string = string.withLineBreakMode()
+		
 		return string.boundingRect(with:size, options:.usesLineFragmentOrigin).size
 	}
 	
@@ -340,7 +354,13 @@ class PlatformEmptyButton: PlatformControl {
 //	MARK: -
 
 extension PlatformLabel {
+	var maximumLines: Int {
+		get { return numberOfLines }
+	}
+	
 	static func sizeMeasuringString(_ string:NSAttributedString, with size:CGSize) -> CGSize {
+		let string = string.withLineBreakMode()
+		
 		return string.boundingRect(with:size, options:.usesLineFragmentOrigin, context:nil).size
 	}
 	

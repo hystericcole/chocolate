@@ -13,8 +13,7 @@ protocol Positionable {
 	
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size
 	func applyPositionableFrame(_ frame:CGRect, context:Layout.Context)
-	
-	func orderablePositionables(environment:Layout.Environment) -> [Positionable]
+	func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable]
 }
 
 //	MARK: -
@@ -381,8 +380,8 @@ struct Layout {
 			target.applyPositionableFrame(box, context:context)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
-			return target.orderablePositionables(environment:environment)
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return target.orderablePositionables(environment:environment, attachable:attachable)
 		}
 	}
 	
@@ -399,7 +398,7 @@ struct Layout {
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {}
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] { return [] }
+		func orderablePositionables(environment:Layout.Environment, attachable: Bool) -> [Positionable] { return [] }
 	}
 	
 	/// Specify padding around the target.  Positive insets will increase the distance between adjacent targets.  Negative insets may cause adjacent targets to overlap.
@@ -437,8 +436,8 @@ struct Layout {
 			target.applyPositionableFrame(insets.reducingBox(box), context:context)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
-			return target.orderablePositionables(environment:environment)
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return target.orderablePositionables(environment:environment, attachable:attachable)
 		}
 	}
 	
@@ -483,8 +482,8 @@ struct Layout {
 			target.applyPositionableFrame(box, context:context)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
-			return target.orderablePositionables(environment:environment)
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return target.orderablePositionables(environment:environment, attachable:attachable)
 		}
 	}
 	
@@ -514,8 +513,8 @@ struct Layout {
 			target.applyPositionableFrame(box, context:context)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
-			return target.orderablePositionables(environment:environment)
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return target.orderablePositionables(environment:environment, attachable:attachable)
 		}
 	}
 	
@@ -575,8 +574,8 @@ struct Layout {
 			target.applyPositionableFrame(box, context:context)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
-			return target.orderablePositionables(environment:environment)
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return target.orderablePositionables(environment:environment, attachable:attachable)
 		}
 	}
 	
@@ -717,11 +716,11 @@ struct Layout {
 			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:.vertical, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
 			
-			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+			return ordered.flatMap { $0.orderablePositionables(environment:environment, attachable:attachable) }
 		}
 	}
 	
@@ -862,11 +861,11 @@ struct Layout {
 			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
 			
-			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+			return ordered.flatMap { $0.orderablePositionables(environment:environment, attachable:attachable) }
 		}
 	}
 	
@@ -1014,11 +1013,11 @@ struct Layout {
 			}
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
 			
-			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+			return ordered.flatMap { $0.orderablePositionables(environment:environment, attachable:attachable) }
 		}
 	}
 	
@@ -1166,11 +1165,11 @@ struct Layout {
 			}
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
 			
-			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+			return ordered.flatMap { $0.orderablePositionables(environment:environment, attachable:attachable) }
 		}
 	}
 	
@@ -1187,7 +1186,7 @@ struct Layout {
 			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
 		}
 		
-		init(targets:[Positionable], vertical:Alignment = .center, horizontal:Alignment = .center, primary:Int = -1) {
+		init(targets:[Positionable], vertical:Alignment = .fill, horizontal:Alignment = .fill, primary:Int = -1) {
 			self.targets = targets
 			self.vertical = vertical
 			self.horizontal = horizontal
@@ -1255,8 +1254,8 @@ struct Layout {
 			}
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
-			return targets.flatMap { $0.orderablePositionables(environment:environment) }
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return targets.flatMap { $0.orderablePositionables(environment:environment, attachable:attachable) }
 		}
 	}
 	
@@ -1363,21 +1362,22 @@ struct Layout {
 			if isPositive {
 				return sizes.prefix(index).reduce(0, +) + Native(index) * space
 			} else {
-				return sizes.suffix(from:index + 1).reduce(0, +) + Native(sizes.count - index) * space
+				return sizes.suffix(from:index + 1).reduce(0, +) + Native(sizes.count - 1 - index) * space
 			}
 		}
 		
 		func offset(fraction:Native, available:Native, index:Int, isPositive:Bool) -> Native {
+			guard empty > 0 else { return 0 }
 			guard sizes.indices.contains(index) else { return fraction * empty }
 			
 			let size = sizes[index]
 			let remainder = available - size
 			let nominal = remainder * fraction
 			
-			let minimumBeforeOffset = sizeBeforeElement(index, isPositive:isPositive)
-			let minimumAfterOffset = sizeBeforeElement(index, isPositive:!isPositive)
+			let beforePrimary = sizeBeforeElement(index, isPositive:isPositive)
+			let afterPrimary = sizeBeforeElement(index, isPositive:!isPositive)
 			
-			return min(max(minimumBeforeOffset, nominal), available - minimumAfterOffset)
+			return min(max(beforePrimary, nominal), available - size - afterPrimary) - beforePrimary
 		}
 	}
 	
@@ -1545,11 +1545,11 @@ struct Layout {
 			}
 		}
 		
-		func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:axis, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
 			
-			return ordered.flatMap { $0.orderablePositionables(environment:environment) }
+			return ordered.flatMap { $0.orderablePositionables(environment:environment, attachable:attachable) }
 		}
 	}
 }
@@ -1653,7 +1653,7 @@ extension PlatformView: Positionable {
 		applyPositionableFrame(frame)
 	}
 	
-	func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+	func orderablePositionables(environment:Layout.Environment, attachable: Bool) -> [Positionable] {
 		return [self]
 	}
 }
@@ -1760,7 +1760,7 @@ extension PlatformView: PositionableContainer {
 	}
 	
 	static func orderPositionables(_ unorderable:[Positionable], environment:Layout.Environment, options:Layout.OrderOptions = .order, hierarchyRoot:PlatformView? = nil) {
-		let views = unorderable.map { $0.orderablePositionables(environment:environment).compactMap { $0 as? PlatformView } }
+		let views = unorderable.map { $0.orderablePositionables(environment:environment, attachable:false).compactMap { $0 as? PlatformView } }
 		let (groups, ancestor) = siblingGroups(views, includeOrphans:options.contains(.add))
 		
 		guard let parent = ancestor ?? hierarchyRoot else { return }
@@ -1787,11 +1787,32 @@ extension PlatformView: PositionableContainer {
 //	MARK: -
 
 extension PlatformLabel {
+	static func positionableSize(fitting height:Layout.Native?, stringSize:CGSize, stringLength:Int, maximumLines:Int = 0) -> Layout.Size {
+		var size = Layout.Size(size:stringSize)
+		
+		if maximumLines != 1 && stringLength > 1 {
+			let count = Layout.Native(min(maximumLines > 0 ? maximumLines : 256, stringLength))
+			
+			if let height = height, height < stringSize.height.native * count {
+				let scalar = floor(height / stringSize.height.native)
+				
+				size.width.minimum = stringSize.width.native / scalar
+			} else {
+				size.width.minimum = stringSize.width.native / count
+			}
+		}
+		
+		return size
+	}
+	
 	override func positionableSizeFitting(_ size:CGSize) -> Data {
-		guard size.width.native < Layout.Limit.unlimited || size.height.native < Layout.Limit.unlimited else { return super.positionableSizeFitting(size) }
+		guard let text = text else { return super.positionableSizeFitting(size) }
 		
-		let fits = sizeThatFits(size)
-		
-		return Layout.Size(size:fits).data
+		return PlatformLabel.positionableSize(
+			fitting:size.height.native,
+			stringSize:sizeThatFits(size),
+			stringLength:text.count,
+			maximumLines:maximumLines
+		).data
 	}
 }

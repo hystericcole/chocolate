@@ -17,7 +17,7 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	var isRGB = true
-	var content:LazyViewable = Viewable.Spinner()
+	var group = Viewable.Group(content:Layout.EmptySpace())
 	var sliderRed = Viewable.Slider(tag:Tag.red.rawValue, value:0.2, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.red)
 	var sliderGreen = Viewable.Slider(tag:Tag.green.rawValue, value:0.4, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.green)
 	var sliderBlue = Viewable.Slider(tag:Tag.blue.rawValue, value:0.6, action:#selector(ChocolateViewController.sliderChanged), minimumTrackColor:.blue)
@@ -29,16 +29,14 @@ class ChocolateViewController: BaseViewController {
 	var colorLabel = Viewable.Label(string:Style.caption.string(" "))
 	var examples:[Example] = (1 ... Example.exampleCount).map { Example(index:$0, descriptions:Example.descriptionCount) }
 	
-	override func prepare() {
-		prepareLayout()
-	}
-	
 	override func loadView() {
-		view = content.lazyView
+		view = group.lazyView()
 	}
 	
 	override func viewDidLoad() {
 		super.viewDidLoad()
+		
+		prepareLayout()
 		
 		if !isRGB {
 			let chocolate = CGColor.chocolate
@@ -139,7 +137,7 @@ class ChocolateViewController: BaseViewController {
 		], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth)
 		
 		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
-			targets:examples.map { $0.layout }, 
+			targets:examples.map { $0.lazy() }, 
 			rowTemplate:Layout.Horizontal(targets:[], spacing:0, alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(targets:[], spacing:0, alignment:.fill, position:.stretch),
 			axis:.horizontal
@@ -151,7 +149,10 @@ class ChocolateViewController: BaseViewController {
 			colorDerivation.padding(horizontal:20, vertical:0),
 		], spacing:10, alignment:.fill, position:.start)
 		
-		content = Viewable.Group(content:Layout.Vertical(targets:[controlsLayout, exampleLayout], spacing:8, alignment:.fill, position:.stretch))
+		group.content = Layout.Vertical(targets:[
+			controlsLayout,
+			exampleLayout
+		], spacing:8, alignment:.fill, position:.stretch)
 	}
 }
 
@@ -164,11 +165,11 @@ extension ChocolateViewController {
 		var background:Viewable.Color
 		var foregrounds:[Viewable.Label]
 		
-		var layout:Positionable {
+		func lazy() -> Positionable {
 			return Layout.Overlay(targets:[
 				background.ignoringSafeBounds(),
 				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.center, position:.center)
-					.padding(uniform: 8)
+					.padding(8)
 			], vertical:.fill, horizontal:.fill)
 		}
 		

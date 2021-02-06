@@ -27,7 +27,7 @@ class TestablePositionable: Positionable, CustomStringConvertible {
 		let bounds = CGRect(origin:.zero, size:frame.size)
 		let safeBounds = bounds.insetBy(dx:safeAreaInsets.width, dy:safeAreaInsets.height)
 		
-		return Layout.Context(bounds:bounds, safeBounds:safeBounds, isDownPositive:isDownPositive, environment:positionableEnvironment)
+		return Layout.Context(bounds:bounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:1, environment:positionableEnvironment)
 	}
 	
 	init(tag:Int = 0, size:CGSize = CGSize(width: -1, height: -1), frame:CGRect = .zero) {
@@ -48,7 +48,7 @@ class TestablePositionable: Positionable, CustomStringConvertible {
 		self.frame = frame
 	}
 	
-	func orderablePositionables(environment:Layout.Environment) -> [Positionable] {
+	func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
 		return [self]
 	}
 }
