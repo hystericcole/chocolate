@@ -367,12 +367,12 @@ struct Layout {
 		func decompress(_ box:CGRect, compressionResistance:CGPoint, anchor:CGPoint = CGPoint(x:0.5, y:0.5)) -> CGRect {
 			var box = box
 			
-			if box.size.width.native < width.minimum && compressionResistance.x > 0 {
+			if box.size.width.native < width.minimum && compressionResistance.x > 0.25 {
 				box.origin.x -= CGFloat(width.minimum - box.size.width.native) * anchor.x
 				box.size.width = CGFloat(width.minimum)
 			}
 			
-			if box.size.height.native < height.minimum && compressionResistance.y > 0 {
+			if box.size.height.native < height.minimum && compressionResistance.y > 0.25 {
 				box.origin.y -= CGFloat(height.minimum - box.size.height.native) * anchor.y
 				box.size.height = CGFloat(height.minimum)
 			}
@@ -1892,9 +1892,16 @@ extension PlatformLabel {
 	override func positionableSizeFitting(_ size:CGSize) -> Data {
 		guard let text = text else { return super.positionableSizeFitting(size) }
 		
+#if os(macOS)
+		let insets = alignmentRectInsets
+		let size = CGSize(width:size.width + insets.left + insets.right, height:size.height + insets.top + insets.bottom)
+#endif
+		
+		let fits = sizeThatFits(size)
+		
 		return PlatformLabel.positionableSize(
 			fitting:size.height.native,
-			stringSize:sizeThatFits(size),
+			stringSize:fits,
 			stringLength:text.count,
 			maximumLines:maximumLines
 		).data
