@@ -149,7 +149,7 @@ enum Viewable {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return Layout.Size(intrinsicSize:model.intrinsicSize)
+			return Layout.Size(prefer:model.intrinsicSize, maximum:model.intrinsicSize)
 		}
 	}
 	
@@ -254,16 +254,19 @@ enum Viewable {
 	
 	class Image: ViewablePositionable {
 		typealias ViewType = PlatformImageView
+		typealias ImageOnMainThread = ((PlatformImage?) -> Void) -> Void
 		
 		struct Model {
 			let tag:Int
 			var image:PlatformImage?
 			var color:PlatformColor?
+			var provide:ImageOnMainThread?
 			
-			init(tag:Int = 0, image:PlatformImage? = nil, color:PlatformColor? = nil) {
+			init(tag:Int = 0, image:PlatformImage? = nil, color:PlatformColor? = nil, provide:ImageOnMainThread? = nil) {
 				self.tag = tag
 				self.image = image
 				self.color = color
+				self.provide = provide
 			}
 		}
 		
@@ -272,21 +275,34 @@ enum Viewable {
 		var tag:Int { get { return view?.tag ?? model.tag } }
 		var image:PlatformImage? { get { return view?.image ?? model.image } set { model.image = newValue; view?.image = newValue } }
 		
-		init(tag:Int = 0, image:PlatformImage?, color:PlatformColor? = nil) {
-			self.model = Model(tag:tag, image:image, color:color)
+		init(tag:Int = 0, image:PlatformImage?, color:PlatformColor? = nil, provide:ImageOnMainThread? = nil) {
+			self.model = Model(tag:tag, image:image, color:color, provide:provide)
+		}
+		
+		func load() {
+			model.provide? { [weak self] image in
+				guard let `self` = self else { return }
+				
+				self.model.provide = nil
+				
+				guard let image = image else { return }
+				
+				self.model.image = image
+				self.view?.prepareViewableImage(image:image, color:self.model.color)
+			}
 		}
 		
 		func applyToView(_ view:PlatformImageView) {
 			view.tag = model.tag
 			view.prepareViewableImage(image:model.image, color:model.color)
-		}
-		
-		func intrinsicSize() -> CGSize {
-			return image?.size ?? Viewable.noIntrinsicSize
+			
+			load()
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:intrinsicSize())
+			let imageSize = view?.image?.size ?? model.image?.size ?? .zero
+			
+			return Layout.Size(prefer:imageSize, maximum:imageSize)
 		}
 	}
 	
@@ -492,7 +508,7 @@ enum Viewable {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:model.intrinsicSize)
+			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsic:model.intrinsicSize)
 		}
 	}
 	
@@ -532,19 +548,35 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var path:CGPath? { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; shapeLayer?.path = newValue; shapeLayer?.shadowPath = newValue } }
+		var path:CGPath? { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; applyPath(path) } }
 		var style:Style { get { return shapeLayer?.shapeStyle ?? model.style } set { model.style = newValue; shapeLayer?.shapeStyle = newValue } }
 		var shadow:Shadow? { get { return shapeLayer?.shadow ?? model.shadow } set { model.shadow = newValue; shapeLayer?.shadow = newValue ?? .default } }
 		var shapeLayer:CAShapeLayer? { return view?.shapeLayer }
 		
-		var pathSize:CGSize {
-			let box = model.lazyBoundingBox()
-			
-			return CGSize(width:box.size.width + max(0, box.origin.x), height:box.size.height + max(0, box.origin.y))
-		}
-		
 		init(tag:Int = 0, path:CGPath? = nil, style:Style, shadow:Shadow? = nil) {
 			self.model = Model(tag:tag, path:path, style:style, shadow:shadow)
+		}
+		
+		func pathForSize(_ size:CGSize) -> CGPath? {
+			guard size.minimum > 0, let path = model.path, !path.isEmpty else { return nil }
+			
+			let stroke = model.style.stroke?.alpha ?? 0 > 0 ? model.style.width : 0 
+			let box = model.lazyBoundingBox()
+			let size = CGSize(width:size.width - stroke, height:size.height - stroke)
+			var transform = CGAffineTransform(a:size.width / box.size.width, b:0, c:0, d:size.height / box.size.height, tx:stroke / 2 - box.origin.x, ty:stroke / 2 - box.origin.y)
+			
+			return path.copy(using:&transform) ?? path
+		}
+		
+		func applyPath(_ path:CGPath?) {
+			model.path = path
+			
+			guard let layer = view?.shapeLayer else { return }
+			
+			let path = pathForSize(layer.bounds.size)
+			
+			layer.path = path
+			layer.shadowPath = path
 		}
 		
 		func applyToView(_ view:ViewableShapeView) {
@@ -552,21 +584,44 @@ enum Viewable {
 			view.prepareViewableColor(isOpaque:false)
 			
 			if let layer = view.shapeLayer {
-				layer.path = model.path
+				let path = pathForSize(layer.bounds.size)
+				let hasShadow = model.shadow?.opacity ?? 0 > 0
+				
+				layer.path = path
 				layer.shapeStyle = model.style
 				layer.shadow = model.shadow ?? .default
-				layer.shadowPath = model.path
+				layer.shadowPath = path
+				layer.masksToBounds = !hasShadow
 			}
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return Layout.Size(size:pathSize)
+			return Layout.Size(prefer:model.lazyBoundingBox().size)
+		}
+		
+		func applyPositionableFrame(_ frame:CGRect, context:Layout.Context) {
+			guard let view = view else { return }
+			
+#if os(macOS)
+			//	NSView also sets shadow properties of layer
+			if let layer = view.shapeLayer, let shadow = model.shadow {
+				layer.shadow = shadow
+			}
+#endif
+			
+			if let layer = view.shapeLayer, let path = pathForSize(frame.size) {
+				layer.path = path
+				layer.shadowPath = path
+			}
+			
+			view.applyPositionableFrame(frame, context:context)
 		}
 	}
 	
-	class Gradient {
+	class Gradient: ViewablePositionable {
 		typealias ViewType = ViewableGradientView
 		typealias Descriptor = CAGradientLayer.Gradient
+		typealias Direction = CAGradientLayer.Direction
 		
 		struct Model {
 			let tag:Int
@@ -584,11 +639,17 @@ enum Viewable {
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
 		var descriptor:Descriptor { get { return gradientLayer?.gradient ?? model.gradient } set { model.gradient = newValue; gradientLayer?.gradient = newValue } }
+		var colors:[CGColor] { get { return gradientLayer?.colors as? [CGColor] ?? model.gradient.colors } set { model.gradient.colors = newValue; gradientLayer?.colors = newValue } }
+		var direction:Direction { get { return gradientLayer?.direction ?? model.gradient.direction } set { model.gradient.direction = newValue; gradientLayer?.direction = newValue } }
 		var intrinsicSize:CGSize { get { return model.intrinsicSize } set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() } }
 		var gradientLayer:CAGradientLayer? { return view?.gradientLayer }
 		
 		init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
 			self.model = Model(tag:tag, gradient:gradient, intrinsicSize:intrinsicSize)
+		}
+		
+		convenience init(tag:Int = 0, colors:[PlatformColor], locations:[NSNumber]? = nil, direction:Direction = .maxY, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
+			self.init(tag:tag, gradient:Descriptor(colors:colors.map { $0.cgColor }, locations:locations, direction:direction), intrinsicSize:intrinsicSize)
 		}
 		
 		func applyToView(_ view:ViewableGradientView) {
@@ -601,7 +662,7 @@ enum Viewable {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return Layout.Size(intrinsicSize:model.intrinsicSize)
+			return Layout.Size(prefer:model.intrinsicSize, maximum:model.intrinsicSize)
 		}
 	}
 	
@@ -652,7 +713,7 @@ enum Viewable {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:model.intrinsicSize)
+			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsic:model.intrinsicSize)
 		}
 	}
 	
@@ -696,7 +757,7 @@ enum Viewable {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsicSize:model.intrinsicSize)
+			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsic:model.intrinsicSize)
 		}
 	}
 	
@@ -744,6 +805,7 @@ extension Viewable.Picker: PlatformPickerDelegate, PlatformPickerDataSource {
 
 class ViewableShapeView: PlatformTaggableView {
 #if os(macOS)
+	override var wantsDefaultClipping:Bool { return false }
 	override func makeBackingLayer() -> CALayer { return CAShapeLayer() }
 #else
 	override class var layerClass: AnyClass { return CAShapeLayer.self }
@@ -752,11 +814,12 @@ class ViewableShapeView: PlatformTaggableView {
 	var shapeLayer:CAShapeLayer? { return layer as? CAShapeLayer }
 	
 	override var intrinsicContentSize:CGSize {
-		guard let path = shapeLayer?.path else { return .zero }
+		guard let layer = shapeLayer, let path = layer.path else { return .zero }
 		
-		let box = path.boundingBoxOfPath
+		let inset = layer.strokeColor?.alpha ?? 0 > 0 ? layer.lineWidth * -0.5 : 0
+		let box = path.boundingBoxOfPath.insetBy(dx:inset, dy:inset)
 		
-		return CGSize(width:box.size.width + max(0, box.origin.x), height:box.size.height + max(0, box.origin.y))
+		return box.size
 	}
 }
 

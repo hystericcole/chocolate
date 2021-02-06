@@ -270,6 +270,51 @@ extension CAShapeLayer {
 //	MARK: -
 
 extension CAGradientLayer {
+	enum Direction {
+		case angle(CGFloat)
+		case turn(CGFloat)
+		
+		static let minY = Direction.turn(0.75)
+		static let maxY = Direction.turn(0.25)
+		static let maxX = Direction.turn(0.0)
+		static let minX = Direction.turn(0.5)
+		
+		static let down = maxY
+		static let up = minY
+		static let right = maxX
+		static let left = minX
+		
+		var radians:CGFloat {
+			switch self {
+			case .angle(let value): return value
+			case .turn(let value): return value * 2 * .pi
+			}
+		}
+		
+		var points:(start:CGPoint, end:CGPoint) {
+			let sc:__double2
+			
+			switch self {
+			case .angle(let value): sc = __sincos_stret(value.native)
+			case .turn(let value): sc = __sincospi_stret(value.native * 2)
+			}
+			
+			let (s, c) = (sc.__sinval, sc.__cosval)
+			let (x, y) = s.magnitude < c.magnitude ? (copysign(1, c), s / c.magnitude) : (c / s.magnitude, copysign(1, s))
+			
+			let from = CGPoint(x:0.5 - x / 2, y:0.5 - y / 2)
+			let to = CGPoint(x:0.5 + x / 2, y:0.5 + y / 2)
+			
+			return (start:from, end:to)
+		}
+		
+		init(start:CGPoint, end:CGPoint) {
+			let angle = atan2(end.y - start.y, end.x - start.x)
+			
+			self = .angle(angle)
+		}
+	}
+	
 	struct Gradient {
 		var colors:[CGColor]
 		var locations:[NSNumber]?
@@ -279,6 +324,11 @@ extension CAGradientLayer {
 		var endRadius:CGFloat
 		var type:CAGradientLayerType
 		
+		var direction:Direction {
+			get { return Direction(start:start, end:end) }
+			set { (start, end) = newValue.points }
+		}
+		
 		init(colors:[CGColor], locations:[NSNumber]? = nil, start:CGPoint = CGPoint(x:0.5, y:0), startRadius:CGFloat = 0, end:CGPoint = CGPoint(x:0.5, y:1), endRadius:CGFloat = 0, type:CAGradientLayerType = .axial) {
 			self.colors = colors
 			self.locations = locations
@@ -287,6 +337,12 @@ extension CAGradientLayer {
 			self.end = end
 			self.endRadius = endRadius
 			self.type = type
+		}
+		
+		init(colors:[CGColor], locations:[NSNumber]? = nil, direction:Direction, startRadius:CGFloat = 0, endRadius:CGFloat = 0, type:CAGradientLayerType = .axial) {
+			let (start, end) = direction.points
+			
+			self.init(colors:colors, locations:locations, start:start, startRadius:startRadius, end:end, endRadius:endRadius, type:type)
 		}
 		
 		func applying(_ transform:CGAffineTransform) -> Gradient {
@@ -327,6 +383,11 @@ extension CAGradientLayer {
 			if endPoint != newValue.end { endPoint = newValue.end }
 			if type != newValue.type { type = newValue.type }
 		}
+	}
+	
+	var direction:Direction {
+		get { return Direction(start:startPoint, end:endPoint) }
+		set { (startPoint, endPoint) = newValue.points }
 	}
 }
 

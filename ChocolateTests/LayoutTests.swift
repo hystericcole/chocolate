@@ -41,7 +41,7 @@ class TestablePositionable: Positionable, CustomStringConvertible {
 	}
 	
 	func positionableSize(fitting limit: Layout.Limit) -> Layout.Size {
-		return Layout.Size(intrinsicSize:intrinsicContentSize)
+		return Layout.Size(intrinsic:intrinsicContentSize)
 	}
 	
 	func applyPositionableFrame(_ frame: CGRect, context: Layout.Context) {

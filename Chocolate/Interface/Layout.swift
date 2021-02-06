@@ -240,6 +240,13 @@ struct Layout {
 			fraction = 0
 		}
 		
+		init(minimum:Native = 0, prefer:Native = 0, maximum:Native = Dimension.unbound) {
+			self.constant = max(0, prefer)
+			self.minimum = max(0, minimum)
+			self.maximum = maximum >= 0 ? min(maximum, Dimension.unbound) : Dimension.unbound
+			self.fraction = 0
+		}
+		
 		init?(value:Native?) {
 			guard let value = value else { return nil }
 			
@@ -294,6 +301,7 @@ struct Layout {
 	
 	/// The size requested during layout
 	struct Size: CustomStringConvertible {
+		static let unbound = CGSize(width:Dimension.unbound, height:Dimension.unbound)
 		static let zero = Size(width:.zero, height:.zero)
 		
 		var width:Dimension
@@ -310,14 +318,19 @@ struct Layout {
 			self.height = height
 		}
 		
-		init(size:CGSize) {
+		init(require size:CGSize) {
 			self.width = Dimension(value:size.width.native)
 			self.height = Dimension(value:size.height.native)
 		}
 		
-		init(intrinsicSize size:CGSize) {
+		init(intrinsic size:CGSize) {
 			self.width = size.width < 0 ? Dimension(constant:0) : Dimension(value:size.width.native)
 			self.height = size.height < 0 ? Dimension(constant:0) : Dimension(value:size.height.native)
+		}
+		
+		init(minimum:CGSize = .zero, prefer:CGSize = .zero, maximum:CGSize = Size.unbound) {
+			self.width = Dimension(minimum:minimum.width.native, prefer:prefer.width.native, maximum:maximum.width.native)
+			self.height = Dimension(minimum:minimum.height.native, prefer:prefer.height.native, maximum:maximum.height.native)
 		}
 		
 		init?(data:Data) {
@@ -327,6 +340,28 @@ struct Layout {
 		}
 		
 		func resolve(_ size:CGSize) -> CGSize { return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native)) }
+		
+		func pin(_ box:CGRect, anchor:CGPoint = CGPoint(x:0.5, y:0.5)) -> CGRect {
+			var box = box
+			
+			if box.size.width.native < width.minimum {
+				box.origin.x -= CGFloat(width.minimum - box.size.width.native) * anchor.x
+				box.size.width = CGFloat(width.minimum)
+			} else if box.size.width.native > width.maximum {
+				box.origin.x += CGFloat(box.size.width.native - width.maximum) * anchor.x
+				box.size.width = CGFloat(width.maximum)
+			}
+			
+			if box.size.height.native < height.minimum {
+				box.origin.y -= CGFloat(height.minimum - box.size.height.native) * anchor.y
+				box.size.height = CGFloat(height.minimum)
+			} else if box.size.height.native > height.maximum {
+				box.origin.y += CGFloat(box.size.height.native - height.maximum) * anchor.y
+				box.size.height = CGFloat(height.maximum)
+			}
+			
+			return box
+		}
 		
 		mutating func decreaseRange(minimum:CGSize, maximum:CGSize) {
 			width.decreaseRange(minimum.width.native ... maximum.width.native)
@@ -394,7 +429,7 @@ struct Layout {
 		init(_ size:CGSize) { self.size = size }
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return Layout.Size(intrinsicSize:size)
+			return Layout.Size(prefer:size, maximum:size)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {}
@@ -1627,7 +1662,7 @@ extension PlatformView: Positionable {
 	func positionableSizeFitting(_ size:CGSize) -> Data {
 		let intrinsicSize = intrinsicContentSize
 		
-		return Layout.Size(intrinsicSize:intrinsicSize).data
+		return Layout.Size(intrinsic:intrinsicSize).data
 	}
 	
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -1788,7 +1823,7 @@ extension PlatformView: PositionableContainer {
 
 extension PlatformLabel {
 	static func positionableSize(fitting height:Layout.Native?, stringSize:CGSize, stringLength:Int, maximumLines:Int = 0) -> Layout.Size {
-		var size = Layout.Size(size:stringSize)
+		var size = Layout.Size(require:stringSize)
 		
 		if maximumLines != 1 && stringLength > 1 {
 			let count = Layout.Native(min(maximumLines > 0 ? maximumLines : 256, stringLength))

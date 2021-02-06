@@ -115,22 +115,23 @@ class ChocolateViewController: BaseViewController {
 	
 	func prepareLayout() {
 		let minimumSliderWidth = 200.0
-		let colorBoxSize = 40.0
+		let colorBoxSize = 80.0
 		
 		let colorPicker = Layout.Horizontal(targets:[
 			Layout.Vertical(targets:[
 				primaryLabel,
-				colorBox.fixed(width:colorBoxSize, height:colorBoxSize)
-			], spacing:2, alignment:.center, position:.center),
+				Layout.Sizing(target:colorBox, width:Layout.Dimension(value:colorBoxSize), height:Layout.Dimension(minimum:colorBoxSize, maximum:colorBoxSize * 2))
+			], spacing:2, alignment:.center, position:.stretch),
 			Layout.Vertical(targets:[
 				sliderRed,
 				sliderGreen,
-				sliderBlue
-			], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth),
-		], spacing:8, position:.stretch)
+				sliderBlue,
+				Layout.EmptySpace(width:0, height:2),
+				colorLabel
+			], spacing:4, alignment:.fill, position:.end).minimum(width:minimumSliderWidth),
+		], spacing:8, alignment:.fill, position:.stretch)
 		
 		let colorDerivation = Layout.Vertical(targets:[
-			colorLabel,
 			deriveLabel,
 			sliderContrast.minimum(width:minimumSliderWidth),
 			sliderSaturation.minimum(width:minimumSliderWidth)

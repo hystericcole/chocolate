@@ -29,5 +29,19 @@ class ChocolateTests: XCTestCase {
             // Put the code you want to measure the time of here.
         }
     }
-
+	
+	func testGradientDirection() {
+		let points:[CGPoint] = [CGPoint(x:1, y:0.5), CGPoint(x:1, y:1), CGPoint(x:0.5, y:1), CGPoint(x:0, y:1), CGPoint(x:0, y:0.5), CGPoint(x:0, y:0), CGPoint(x:0.5, y:0), CGPoint(x:1, y:0)]
+		let directions:[CAGradientLayer.Direction] = (0 ..< 8).map { .turn(CGFloat($0) / 8) }
+		
+		for index in 0 ..< 8 {
+			let direction = directions[index]
+			let (start, end) = direction.points
+			let e = points[index]
+			let s = points[(index + 4) % 8]
+			
+			XCTAssertEqual(start, s, "start direction \(index)/8")
+			XCTAssertEqual(end, e, "end direction \(index)/8")
+		}
+	}
 }
