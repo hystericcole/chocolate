@@ -187,6 +187,10 @@ struct Layout {
 		func performLayout(_ layout:Positionable) {
 			layout.applyPositionableFrame(safeBounds, context:self)
 		}
+		
+		func withBounds(_ bounds:CGRect) -> Context {
+			return Context(bounds:bounds, safeBounds:bounds.intersection(safeBounds), isDownPositive:isDownPositive, scale:scale, environment:environment)
+		}
 	}
 	
 	/// The space available during layout
@@ -212,6 +216,23 @@ struct Layout {
 				height = nil
 			}
 		}
+		
+		func fittingRatio(_ ratio:CGSize) -> Limit {
+			let width = self.width ?? Limit.unlimited
+			let height = self.height ?? Limit.unlimited
+			
+			guard width > 0 && height > 0 else { return self }
+			guard width < Limit.unlimited || height < Limit.unlimited else { return self }
+			
+			let ratioWidth = width * ratio.height.native
+			let ratioHeight = height * ratio.width.native
+			
+			if width < Limit.unlimited && ratioWidth < ratioHeight {
+				return Limit(width:width, height:ratioWidth / ratio.width.native)
+			} else {
+				return Limit(width:ratioHeight / ratio.height.native, height:height)
+			}
+		}
 	}
 	
 	/// The space requested during layout in one direction
@@ -225,7 +246,7 @@ struct Layout {
 		var fraction:Native
 		
 		var isUnbounded:Bool { return minimum <= 0 && constant == 0 && fraction == 0 && maximum >= Limit.unlimited }
-		var description:String { return "\(minimum) <= \(constant) + \(fraction) × bounds <= \(maximum < Limit.unlimited ? String(maximum) : "∞")" }
+		var description:String { return "\(minimum) <= \(constant) + \(fraction) × limit <= \(maximum < Limit.unlimited ? String(maximum) : "∞")" }
 		
 		init(constant:Native, range:ClosedRange<Native> = 0 ... Dimension.unbound, fraction:Native = 0) {
 			self.constant = constant
@@ -265,6 +286,14 @@ struct Layout {
 		/// - Returns: Resolved value
 		func resolve(_ limit:Native) -> Native {
 			return min(max(minimum, constant + fraction * limit), maximum)
+		}
+		
+		func resolved(_ limit:Native, maximumWeight:Native = 8) -> Dimension {
+			let a = min(max(0, minimum), limit)
+			let b = min(max(a, maximum), limit * maximumWeight)
+			let c = min(max(a, constant + fraction * limit), b)
+			
+			return Dimension(constant:c, range:a ... b, fraction:0)
 		}
 		
 		func limit(fitting limit:Native?) -> Native? {
@@ -374,6 +403,43 @@ struct Layout {
 			}
 			
 			return box
+		}
+		
+		/// Constrain unbound aspects of each dimension using the bound aspects of the other dimension.
+		/// # Example
+		/// Given a width of `0 < 100 < ∞` and a height of `20 < 150 < ∞`, a new minimum width will be computed.  The constant values are both bound (`> 0`), and the maximum values are both unbound (`>= unlimited`), so neither will be affected.  If either dimension has a fraction, then neither constant will be affected.
+		/// - Parameter ratio: Ratio to apply to unconstrained values
+		/// - Returns: Size with additional constraints
+		func constrainingWithRatio(_ ratio:CGSize) -> Size {
+			var size = self
+			
+			if size.width.minimum <= 0 && size.height.minimum > 0 && ratio.height > 0 {
+				size.width.minimum = size.height.minimum * ratio.width.native / ratio.height.native
+			}
+			
+			if size.height.minimum <= 0 && size.width.minimum > 0 && ratio.width > 0 {
+				size.height.minimum = size.width.minimum * ratio.height.native / ratio.width.native
+			}
+			
+			if size.width.fraction == 0 && size.height.fraction == 0 {
+				if size.width.constant <= 0 && size.height.constant > 0 && ratio.height > 0 {
+					size.width.constant = size.height.constant * ratio.width.native / ratio.height.native
+				}
+				
+				if size.height.constant <= 0 && size.width.constant > 0 && ratio.width > 0 {
+					size.height.constant = size.width.constant * ratio.height.native / ratio.width.native
+				}
+			}
+			
+			if size.width.maximum >= Limit.unlimited && size.height.maximum < Limit.unlimited && ratio.height > 0 {
+				size.width.maximum = size.height.maximum * ratio.width.native / ratio.height.native
+			}
+			
+			if size.height.maximum >= Limit.unlimited && size.width.maximum < Limit.unlimited && ratio.width > 0 {
+				size.height.maximum = size.width.maximum * ratio.height.native / ratio.width.native
+			}
+			
+			return size
 		}
 		
 		func decompress(_ box:CGRect, compressionResistance:CGPoint, anchor:CGPoint = CGPoint(x:0.5, y:0.5)) -> CGRect {
@@ -508,6 +574,30 @@ struct Layout {
 		}
 	}
 	
+	/// Adjust the context bounds used by the target, affecting size resolution
+	struct ViewBox: Positionable {
+		var target:Positionable
+		
+		var frame:CGRect { return target.frame }
+		var compressionResistance:CGPoint { return target.compressionResistance }
+		
+		init(target:Positionable) {
+			self.target = target
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			return target.positionableSize(fitting:limit)
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			target.applyPositionableFrame(box, context:context.withBounds(box))
+		}
+		
+		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+			return target.orderablePositionables(environment:environment, attachable:attachable)
+		}
+	}
+	
 	/// Replace the normal dimensions of the target
 	struct Sizing: Positionable {
 		var target:Positionable
@@ -601,19 +691,9 @@ struct Layout {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			var size = target.positionableSize(fitting:limit)
+			let size = target.positionableSize(fitting:limit)
 			
-			if size.width.isUnbounded && size.height.fraction == 0 && ratio.height > 0 {
-				size.width.constant = size.height.constant * ratio.width.native / ratio.height.native
-				size.width.minimum = size.height.minimum * ratio.width.native / ratio.height.native
-			}
-			
-			if size.height.isUnbounded && size.width.fraction == 0 && ratio.width > 0 {
-				size.height.constant = size.width.constant * ratio.height.native / ratio.width.native
-				size.height.minimum = size.width.minimum * ratio.height.native / ratio.width.native
-			}
-			
-			return size
+			return size.constrainingWithRatio(ratio)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
@@ -986,7 +1066,7 @@ struct Layout {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			guard columnCount > 1 else { return singleColumn.positionableSize(fitting:limit) }
-			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
 			var row = rowTemplate
 			var result = row.positionableSize(fitting:limit, splittingTargets:targets, intoColumns:columnCount, columnMajor:columnMajor)
@@ -1142,7 +1222,7 @@ struct Layout {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit) }
-			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
 			var column = columnTemplate
 			var result = column.positionableSize(fitting:limit, splittingTargets:targets, intoRows:rowCount, rowMajor:rowMajor)
@@ -1382,11 +1462,8 @@ struct Layout {
 			var dimensions = dimensions
 			
 			for index in dimensions.indices {
-				var dimension = dimensions[index]
+				let dimension = dimensions[index].resolved(available)
 				
-				dimension.minimum = min(max(0, dimension.minimum), available)
-				dimension.maximum = min(max(dimension.minimum, dimension.maximum), available * 4)
-				dimension.constant = min(max(dimension.minimum, dimension.constant + dimension.fraction * available), dimension.maximum)
 				dimensions[index] = dimension
 				
 				minimum += dimension.minimum
@@ -1465,7 +1542,7 @@ struct Layout {
 		}
 	}
 	
-	/// Arrange a group of elements in a flow that uses available space in one direction then wraps to continue using available space.
+	/// Arrange a group of elements in a flow that uses available space along an axis then wraps to continue using available space.
 	struct Flow: Positionable {
 		var targets:[Positionable]
 		var rowTemplate:Horizontal
@@ -1681,36 +1758,6 @@ extension Positionable {
 //	MARK: -
 
 extension PlatformView: Positionable {
-	var positionableEnvironment:Layout.Environment {
-#if os(macOS)
-		let isRTL = userInterfaceLayoutDirection == .rightToLeft
-#else
-		let isRTL = effectiveUserInterfaceLayoutDirection == .rightToLeft
-#endif
-		
-		return Layout.Environment(isRTL:isRTL)
-	}
-	
-	var positionableScale:CGFloat {
-#if os(macOS)
-		let scale = convertToBacking(CGSize(width:1, height:1)).minimum
-#else
-		let scale = window?.screen.scale ?? contentScaleFactor
-#endif
-		
-		return scale
-	}
-	
-	var positionableContext:Layout.Context {
-#if os(macOS)
-		let isDownPositive = isFlipped
-#else
-		let isDownPositive = true
-#endif
-		
-		return Layout.Context(bounds:stableBounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:positionableScale, environment:positionableEnvironment)
-	}
-	
 	var compressionResistance:CGPoint {
 		let maximum = PlatformPriority.required.rawValue
 		
@@ -1758,6 +1805,36 @@ extension PlatformView: Positionable {
 //	MARK: -
 
 extension PlatformView: PositionableContainer {
+	var positionableEnvironment:Layout.Environment {
+#if os(macOS)
+		let isRTL = userInterfaceLayoutDirection == .rightToLeft
+#else
+		let isRTL = effectiveUserInterfaceLayoutDirection == .rightToLeft
+#endif
+		
+		return Layout.Environment(isRTL:isRTL)
+	}
+	
+	var positionableScale:CGFloat {
+#if os(macOS)
+		let scale = convertToBacking(CGSize(width:1, height:1)).minimum
+#else
+		let scale = window?.screen.scale ?? contentScaleFactor
+#endif
+		
+		return scale
+	}
+	
+	var positionableContext:Layout.Context {
+#if os(macOS)
+		let isDownPositive = isFlipped
+#else
+		let isDownPositive = true
+#endif
+		
+		return Layout.Context(bounds:stableBounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:positionableScale, environment:positionableEnvironment)
+	}
+	
 	func insertSubviews<S:Sequence>(_ views:S, at index:Int) where S.Element == PlatformView {
 #if os(macOS)
 		var current = subviews

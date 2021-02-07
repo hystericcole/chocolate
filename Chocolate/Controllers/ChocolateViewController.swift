@@ -120,7 +120,7 @@ class ChocolateViewController: BaseViewController {
 		let colorPicker = Layout.Horizontal(targets:[
 			Layout.Vertical(targets:[
 				primaryLabel,
-				Layout.Sizing(target:colorBox, width:Layout.Dimension(value:colorBoxSize), height:Layout.Dimension(minimum:colorBoxSize, maximum:colorBoxSize * 2))
+				colorBox.fixed(width:colorBoxSize, height:colorBoxSize)
 			], spacing:2, alignment:.center, position:.stretch, primary:1),
 			Layout.Vertical(targets:[
 				sliderRed,
@@ -145,13 +145,13 @@ class ChocolateViewController: BaseViewController {
 		), minimum:CGSize(square:200)).ignoringSafeBounds()
 		
 		let controlsLayout = Layout.Vertical(targets:[
-			Layout.EmptySpace(width:0, height:10),
-			colorPicker.padding(horizontal:20, vertical:0),
-			colorDerivation.padding(horizontal:20, vertical:0),
+			colorPicker,
+			colorDerivation,
 		], spacing:10, alignment:.fill, position:.start)
 		
 		group.content = Layout.Vertical(targets:[
-			controlsLayout,
+			Layout.EmptySpace(width:0, height:10),
+			controlsLayout.padding(horizontal:20, vertical:0),
 			exampleLayout
 		], spacing:8, alignment:.fill, position:.stretch)
 	}
