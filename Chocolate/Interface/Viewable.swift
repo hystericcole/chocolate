@@ -247,12 +247,10 @@ enum Viewable {
 					sizeLimit.width = intrinsicWidth
 				}
 				
-				let measured = PlatformLabel.sizeMeasuringString(string, with:sizeLimit)
-				
-				return PlatformLabel.positionableSize(
-					fitting:limit.height,
-					stringSize:measured,
+				return Layout.Size(
+					stringSize:string.boundsWrappingWithSize(sizeLimit).size,
 					stringLength:string.length,
+					maximumHeight:limit.height,
 					maximumLines:maximumLines
 				)
 			}
@@ -835,6 +833,23 @@ extension Viewable.Picker: PlatformPickerDelegate, PlatformPickerDataSource {
 
 //	MARK: -
 
+extension PlatformView {
+	func attachPositionables(_ root:Positionable, environment:Layout.Environment) {
+		let ordered = root.orderablePositionables(environment:environment, attachable:true)
+		let current = subviews
+		
+		for index in 0 ..< min(ordered.count, current.count) {
+			if let viewable = ordered[index] as? LazyViewable {
+				viewable.attachToExistingView(current[index])
+			}
+		}
+		
+		orderPositionables([root], environment:environment, options:.set)
+	}
+}
+
+//	MARK: -
+
 class ViewableShapeView: PlatformTaggableView {
 #if os(macOS)
 	override var wantsDefaultClipping:Bool { return false }
@@ -1205,6 +1220,10 @@ extension Viewable {
 	
 	static func remove(_ target:Positionable, environment:Layout.Environment = .current) {
 		target.orderablePositionables(environment:environment, attachable:false).compactMap { $0 as? PlatformView }.forEach { $0.removeFromSuperview() }
+	}
+	
+	static func detach(_ target:Positionable, prepareForReuse:Bool, environment:Layout.Environment = .current) {
+		target.orderablePositionables(environment:environment, attachable:true).compactMap { $0 as? LazyViewable }.forEach { $0.detachView(prepareForReuse:prepareForReuse) }
 	}
 	
 	static func applyBackground(_ target:Positionable, color:PlatformColor?, environment:Layout.Environment = .current) {

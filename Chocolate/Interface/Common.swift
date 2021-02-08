@@ -178,12 +178,6 @@ extension PlatformLabel {
 		set { attributedStringValue = newValue ?? NSAttributedString() }
 	}
 	
-	static func sizeMeasuringString(_ string:NSAttributedString, with size:CGSize) -> CGSize {
-		let string = string.withLineBreakMode()
-		
-		return string.boundingRect(with:size, options:.usesLineFragmentOrigin).size
-	}
-	
 	func prepareViewableLabel(intrinsicWidth:CGFloat, maximumLines:Int) {
 		drawsBackground = false
 		refusesFirstResponder = true

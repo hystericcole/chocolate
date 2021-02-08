@@ -431,6 +431,22 @@ struct Layout {
 			self = size
 		}
 		
+		init(stringSize:CGSize, stringLength:Int, maximumHeight:Layout.Native?, maximumLines:Int = 0) {
+			self.init(require:stringSize)
+			
+			if maximumLines != 1 && stringLength > 1 {
+				let count = Layout.Native(min(maximumLines > 0 ? maximumLines : 256, stringLength))
+				
+				if let height = maximumHeight, height < stringSize.height.native * count {
+					let scalar = floor(height / stringSize.height.native)
+					
+					width.minimum = stringSize.width.native / scalar
+				} else {
+					width.minimum = stringSize.width.native / count
+				}
+			}
+		}
+		
 		///	Compute the resolved value for both dimensions
 		func resolve(_ size:CGSize) -> CGSize {
 			return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native))
@@ -504,12 +520,12 @@ struct Layout {
 			
 			if box.size.width.native < width.minimum && compressionResistance.x > 0.25 {
 				box.origin.x -= CGFloat(width.minimum - box.size.width.native) * anchor.x
-				box.size.width = CGFloat(width.minimum)
+				box.size.width.native = width.minimum
 			}
 			
 			if box.size.height.native < height.minimum && compressionResistance.y > 0.25 {
 				box.origin.y -= CGFloat(height.minimum - box.size.height.native) * anchor.y
-				box.size.height = CGFloat(height.minimum)
+				box.size.height.native = height.minimum
 			}
 			
 			return box
@@ -2096,24 +2112,6 @@ extension PlatformView: PositionableContainer {
 //	MARK: -
 
 extension PlatformLabel {
-	static func positionableSize(fitting height:Layout.Native?, stringSize:CGSize, stringLength:Int, maximumLines:Int = 0) -> Layout.Size {
-		var size = Layout.Size(require:stringSize)
-		
-		if maximumLines != 1 && stringLength > 1 {
-			let count = Layout.Native(min(maximumLines > 0 ? maximumLines : 256, stringLength))
-			
-			if let height = height, height < stringSize.height.native * count {
-				let scalar = floor(height / stringSize.height.native)
-				
-				size.width.minimum = stringSize.width.native / scalar
-			} else {
-				size.width.minimum = stringSize.width.native / count
-			}
-		}
-		
-		return size
-	}
-	
 	override func positionableSizeFitting(_ size:CGSize) -> Data {
 		guard let text = text else { return super.positionableSizeFitting(size) }
 		
@@ -2124,10 +2122,10 @@ extension PlatformLabel {
 		
 		let fits = sizeThatFits(size)
 		
-		return PlatformLabel.positionableSize(
-			fitting:size.height.native,
+		return Layout.Size(
 			stringSize:fits,
 			stringLength:text.count,
+			maximumHeight:size.height.native,
 			maximumLines:maximumLines
 		).data
 	}

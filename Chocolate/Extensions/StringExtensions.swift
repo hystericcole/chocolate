@@ -42,4 +42,14 @@ extension NSAttributedString {
 		
 		return mutableString
 	}
+	
+#if os(macOS)
+	func boundsWrappingWithSize(_ size:CGSize) -> CGRect {
+		return withLineBreakMode().boundingRect(with:size, options:.usesLineFragmentOrigin)
+	}
+#else
+	func boundsWrappingWithSize(_ size:CGSize) -> CGRect {
+		return withLineBreakMode().boundingRect(with:size, options:.usesLineFragmentOrigin, context: nil)
+	}
+#endif
 }
