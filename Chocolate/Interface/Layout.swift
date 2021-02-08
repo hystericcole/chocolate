@@ -9,11 +9,22 @@ import CoreGraphics
 import Foundation
 
 protocol Positionable {
+	/// The current frame
 	var frame:CGRect { get }
+	
+	/// The compression resistance affects how positionable frames are applied.
 	var compressionResistance:CGPoint { get }
 	
+	/// The requested size of the element.
+	/// 
+	/// Each dimension of the size specifies a minimum, maximum, fraction of available space, and constant.  The final value, once the available space is known, will be computed as `constant + fraction × available`, clamped between minimum and maximum.  The requested size will be provided when possible.
+	/// - Parameter limit: The limit of available space.
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size
+	
+	/// Apply a frame to the element.
 	func applyPositionableFrame(_ frame:CGRect, context:Layout.Context)
+	
+	/// Retrieve elements that can be ordered in a container, or attached to elements in a container.
 	func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable]
 }
 
@@ -32,12 +43,16 @@ struct Layout {
 		case horizontal, vertical
 	}
 	
+	/// Position of a single element along an axis within a container.
 	enum Alignment {
-		/// Position within available bounds
+		/// Position each element within available bounds.  A fraction determines the ratio of empty space around the element.
+		///
+		/// # Example
+		/// Align an element with a size of 240 in a container with a limit of 400.  The unused space is 160, and a fraction of that unused space is before the element.  For a fraction of 0.25, that is 0.25 × (400 - 240) = 40 before the element, with 120 after the element.
 		case fraction(Native)
-		/// Position within available bounds adapting to environment
+		/// Position each element within available bounds, adapting to the environment.
 		case adaptiveFraction(Native)
-		/// Fill available bounds
+		/// Fill available bounds, ignoring the measured size of the element.
 		case fill
 		
 		static let start = Alignment.fraction(0.0)
@@ -63,18 +78,22 @@ struct Layout {
 		}
 	}
 	
+	/// Position of a group of elements along an axis within a container.
 	enum Position {
-		///	Position within available bounds
+		///	Position content within available bounds.
+		///
+		/// # Example
+		/// Position content with a size of 320 in a container with a limit of 400.  The unused space is 80, and a fraction of that unused space is before the content.  For a fraction of 0.25, that is 0.25 × (400 - 320) = 20 before the content, with 60 after the content.
 		case fraction(Native)
-		/// Position within available bounds adapting to environment
+		/// Position content within available bounds, adapting to the environment.
 		case adaptiveFraction(Native)
-		/// Fill available bounds by stretching elements
+		/// Fill available bounds by stretching elements.
 		case stretch
-		/// Fill available bounds by making elements a uniform size
+		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.
 		case uniform
-		/// Fill available bounds by stretching space between elements
+		/// Fill available bounds by stretching space between elements.
 		case distribute
-		/// Position around the primary element
+		/// Position the container around the primary element, with other elements hanging outside the container.
 		case float
 		
 		static let start = Position.fraction(0.0)
@@ -142,12 +161,17 @@ struct Layout {
 		}
 	}
 	
+	/// Options when ordering elements within a container
 	struct OrderOptions: OptionSet {
 		let rawValue:Int
 		
+		/// Only order elements. Do not add or remove elements from the container.
 		static let order:OrderOptions = []
+		/// Add elements to the container while ordering.
 		static let add = OrderOptions(rawValue:1)
+		/// Remove elements from the container that are not being ordered.
 		static let remove = OrderOptions(rawValue:2)
+		/// Replace the contents of the container with the ordered elements.
 		static let set:OrderOptions = [.add, .remove]
 	}
 	
@@ -155,6 +179,7 @@ struct Layout {
 	struct Environment: CustomStringConvertible {
 		static var current:Environment { return Environment(isRTL:false) }
 		
+		/// Is the natural layout direction right to left.
 		let isRTL:Bool
 		
 		var description:String { return isRTL ? "←" : "→" }
@@ -162,12 +187,17 @@ struct Layout {
 		func adaptiveFractionValue(_ value:Native, axis:Axis) -> Native { return axis == .horizontal && isRTL ? 1.0 - value : value }
 	}
 	
-	/// Context for a layout pass
+	/// Context for a layout pass within a container
 	struct Context: CustomStringConvertible {
+		/// The bounds of the container
 		var bounds:CGRect
+		/// The unobstructed bounds of the container
 		var safeBounds:CGRect
+		/// Is the positive direction of the y axis down
 		var isDownPositive:Bool
+		/// The number of device pixels per logical pixel
 		var scale:CGFloat
+		/// The layout environment
 		var environment:Environment
 		
 		var description:String { return "\(bounds) @\(scale)x \(isDownPositive ? "↓+" : "↑+") \(environment)" }
@@ -196,7 +226,9 @@ struct Layout {
 	/// The space available during layout
 	struct Limit: CustomStringConvertible {
 		static let unlimited:Native = 0x1p30
+		/// The available width, or nil for no limit
 		let width:Native?
+		/// The available height, or nil for no limit
 		let height:Native?
 		
 		var size:CGSize { return CGSize(width:width ?? .greatestFiniteMagnitude, height:height ?? .greatestFiniteMagnitude) }
@@ -235,14 +267,23 @@ struct Layout {
 		}
 	}
 	
-	/// The space requested during layout in one direction
+	/// The space requested during layout, in one direction.
+	///
+	/// The final value, once the available space is known, will be computed as constant + fraction × available, clamped between minimum and maximum.
+	/// - To require a size, set minimum and maximum equal to that size.  Constant and fraction will be ignored.
+	/// - To request a range of sizes, set minimum and maximum, with constant set to the preferred value within that range.
+	/// - To request a fraction of available space, set fraction, and optionally minimum and maximum.
 	struct Dimension: CustomStringConvertible {
 		static let unbound = Limit.unlimited * 0x1p10
 		static let zero = Dimension(value:0)
 		
+		/// The preferred value is constant + fraction × limit
 		var constant:Native
+		/// The minimum value for the resolved dimension
 		var minimum:Native
+		/// The maximum value for the resolved dimension
 		var maximum:Native
+		/// The fraction of the current container
 		var fraction:Native
 		
 		var isUnbounded:Bool { return minimum <= 0 && constant == 0 && fraction == 0 && maximum >= Limit.unlimited }
@@ -288,6 +329,11 @@ struct Layout {
 			return min(max(minimum, constant + fraction * limit), maximum)
 		}
 		
+		/// Computes constant + fraction × limit
+		/// - Parameters:
+		///   - limit: Bounds of container
+		///   - maximumWeight: maximum is clamped to multiple of limit
+		/// - Returns: Dimension with fraction of limit added to constant
 		func resolved(_ limit:Native, maximumWeight:Native = 8) -> Dimension {
 			let a = min(max(0, minimum), limit)
 			let b = min(max(a, maximum), limit * maximumWeight)
@@ -360,11 +406,15 @@ struct Layout {
 			self.height = height
 		}
 		
+		/// Initialize with size, treating values as required.
+		/// - Parameter size: The required size
 		init(require size:CGSize) {
 			self.width = Dimension(value:size.width.native)
 			self.height = Dimension(value:size.height.native)
 		}
 		
+		/// Initialize with size, treating negative values as unbounded and positive values as required
+		/// - Parameter size: The intrinsic size
 		init(intrinsic size:CGSize) {
 			self.width = size.width < 0 ? Dimension(constant:0) : Dimension(value:size.width.native)
 			self.height = size.height < 0 ? Dimension(constant:0) : Dimension(value:size.height.native)
@@ -381,8 +431,12 @@ struct Layout {
 			self = size
 		}
 		
-		func resolve(_ size:CGSize) -> CGSize { return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native)) }
+		///	Compute the resolved value for both dimensions
+		func resolve(_ size:CGSize) -> CGSize {
+			return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native))
+		}
 		
+		/// Pin dimensions of box within mininum and maximum of size
 		func pin(_ box:CGRect, anchor:CGPoint = CGPoint(x:0.5, y:0.5)) -> CGRect {
 			var box = box
 			
@@ -442,6 +496,9 @@ struct Layout {
 			return size
 		}
 		
+		/// Increase a box to the minimum dimensions according to compression resistance.
+		///
+		/// When space constraints compress a frame to below the minimum requested size, this method may increase the frame to the minimum size.
 		func decompress(_ box:CGRect, compressionResistance:CGPoint, anchor:CGPoint = CGPoint(x:0.5, y:0.5)) -> CGRect {
 			var box = box
 			
@@ -464,10 +521,13 @@ struct Layout {
 		}
 	}
 	
+	/// Set of amounts to inset or pad the edges of a rectangle
 	struct EdgeInsets: CustomStringConvertible {
 		var minX, maxX, minY, maxY:Native
 		
+		/// Sum of horizontal insets
 		var horizontal:Native { return minX + maxX }
+		/// Sum of vertical insets
 		var vertical:Native { return minY + maxY }
 		var description:String { return "→\(minX) ↓\(minY) ←\(maxX) ↑\(maxY)" }
 		
@@ -485,7 +545,7 @@ struct Layout {
 		static let zero = EdgeInsets(uniform:0)
 	}
 	
-	/// Targets that reach the safe bounds will be extended to the outer bounds
+	/// Targets that reach the safe bounds will be extended to the outer bounds.  Typically used for backgrounds and full screen media.
 	struct IgnoreSafeBounds: Positionable {
 		var target:Positionable
 		
@@ -516,6 +576,7 @@ struct Layout {
 		}
 	}
 	
+	/// Uses space but has no content.
 	struct EmptySpace: Positionable {
 		var size:CGSize
 		
@@ -533,7 +594,7 @@ struct Layout {
 		func orderablePositionables(environment:Layout.Environment, attachable: Bool) -> [Positionable] { return [] }
 	}
 	
-	/// Specify padding around the target.  Positive insets will increase the distance between adjacent targets.  Negative insets may cause adjacent targets to overlap.
+	/// Specify padding around the target.  Positive insets will increase the distance between adjacent targets.  Negative insets may cause adjacent targets to overlap.  Affects both measured size and applied frame.
 	struct Padding: Positionable {
 		var target:Positionable
 		var insets:EdgeInsets
@@ -574,31 +635,9 @@ struct Layout {
 		}
 	}
 	
-	/// Adjust the context bounds used by the target, affecting size resolution
-	struct ViewBox: Positionable {
-		var target:Positionable
-		
-		var frame:CGRect { return target.frame }
-		var compressionResistance:CGPoint { return target.compressionResistance }
-		
-		init(target:Positionable) {
-			self.target = target
-		}
-		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return target.positionableSize(fitting:limit)
-		}
-		
-		func applyPositionableFrame(_ box:CGRect, context:Context) {
-			target.applyPositionableFrame(box, context:context.withBounds(box))
-		}
-		
-		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
-			return target.orderablePositionables(environment:environment, attachable:attachable)
-		}
-	}
-	
-	/// Replace the normal dimensions of the target
+	/// Replace the normal dimensions of the target when being measured.  Does not affect the assigned frame.
+	///
+	/// When both the width and height are specified, the target will not be measured during layout.  This can improve performance with complex targets.  When only one dimension is specified, the limits passed to the target during measurement will be adjusted.
 	struct Sizing: Positionable {
 		var target:Positionable
 		var width:Dimension?
@@ -671,10 +710,13 @@ struct Layout {
 		}
 	}
 	
-	/// Impose aspect fit on the target
+	/// Impose aspect fit on the target.  The assigned frame will be reduced to fit the specified aspect ratio.  The measured size of the target may also be changed.
 	struct Aspect: Positionable {
+		/// The affected target.
 		var target:Positionable
+		/// The position of the reduced frame within the available frame.  Defaults to centered.
 		var position:CGPoint
+		/// The aspect ratio.
 		var ratio:CGSize
 		
 		var frame:CGRect { return target.frame }
@@ -721,21 +763,32 @@ struct Layout {
 		}
 	}
 	
-	/// Arrange a group of targets vertically
+	/// Arrange a group of elements in a vertical stack.
 	struct Vertical: Positionable {
+		/// The elements to arrange.
 		var targets:[Positionable]
+		/// The horizontal alignment of elements.
 		var alignment:Alignment
+		/// The vertical position of the elements within the stack.
 		var position:Position
+		/// Setting a primary element may affect how position is applied.
+		/// - For a filling position, the primary element has no effect.
+		/// - For a fractional position, the primary element is positioned and other elements follow, not exceeding the limits of the container.
+		/// - For the float position, the primary element is measured and positioned ignoring the container, and other elements are positioned outside the container.
 		var primaryIndex:Int
+		/// The spacing between elements.  Use padding to affect spacing around indiviual elements.
 		var spacing:Native
+		/// The display order of the elements, with positive being down.
 		var direction:Direction
 		
+		/// When true, the primary element is measured and positioned independent of other elements, then other elements float around the primary element.
 		var isFloating:Bool {
 			guard case .float = position, targets.indices.contains(primaryIndex) else { return false }
 			
 			return true
 		}
 		
+		/// When true, the alignment and position exclude the need to measure elements when applying a frame.
 		var isUniform:Bool {
 			if case .uniform = position, alignment.isFill { return true }
 			
@@ -816,51 +869,25 @@ struct Layout {
 			return result
 		}
 		
-		func applyPositionableFrame(_ box:CGRect, context:Context, axial:Axial, sizes:[Size], available:Native, isFloating:Bool) {
+		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.vertical, environment:context.environment)
-			let end = targets.count - 1
-			let spacing = axial.space
-			var offset = 0.0
+			let align = alignment.value(axis:.horizontal, environment:context.environment)
+			let offset = axial.offset(isFloating:isFloating, position:position, axis:.vertical, environment:context.environment, available:available, index:primaryIndex, isPositive:isPositive)
 			
-			if isFloating {
-				offset = -axial.sizeBeforeElement(primaryIndex, isPositive:isPositive)
-			} else if let value = position.value(axis:.vertical, environment:context.environment) {
-				offset = axial.offset(fraction:value, available:available, index:primaryIndex, isPositive:isPositive)
-			}
-			
-			for index in targets.indices {
-				let index = isPositive ? index : end - index
-				let target = targets[index]
-				let y = offset, height = axial.sizes[index]
-				let x, width:CGFloat
-				
-				offset += height + spacing
-				
-				if let value = alignment.value(axis:.horizontal, environment:context.environment) {
-					width = min(CGFloat(sizes[index].width.resolve(box.size.width.native)), box.size.width)
-					x = (box.size.width - width) * CGFloat(value)
-				} else {
-					width = box.size.width
-					x = 0
-				}
-				
-				let frame = CGRect(x:box.origin.x + x, y:box.origin.y + CGFloat(y), width:width, height:CGFloat(height))
-				let decompressed = sizes[index].decompress(frame, compressionResistance:target.compressionResistance)
-				
-				target.applyPositionableFrame(decompressed, context:context)
-			}
+			axial.computeFramesVertical(offset:offset, alignment:align, sizes:sizes, bounds:box, isPositive:isPositive)
+			axial.applyFrames(targets:targets, sizes:sizes, context:context)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			
 			let isFloating = self.isFloating
-			let limit = Limit(width:box.size.width.native, height:nil)
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
 			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
-			let axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, fit:position.fit)
+			var axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, fit:position.fit)
 			
-			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
+			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
 		
 		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
@@ -871,21 +898,29 @@ struct Layout {
 		}
 	}
 	
-	/// Arrange a group of targets horizontally
+	/// Arrange a group of elements in a horizontal stack.
 	struct Horizontal: Positionable {
+		/// The elements to arrange.
 		var targets:[Positionable]
+		/// The vertical alignment of elements.
 		var alignment:Alignment
+		/// The horizontal position of the elements within the stack.
 		var position:Position
-		var spacing:Native
+		/// When provided and the position is not filling, the position aligns this element and other elements follow.
 		var primaryIndex:Int
+		/// The spacing between elements.  Use padding to affect spacing around indiviual elements.
+		var spacing:Native
+		/// The display order of the elements, with positive being right.
 		var direction:Direction
 		
+		/// When true, the primary element is measured and positioned independent of other elements, then other elements float around the primary element.
 		var isFloating:Bool {
 			guard case .float = position, targets.indices.contains(primaryIndex) else { return false }
 			
 			return true
 		}
 		
+		/// When true, the alignment and position exclude the need to measure elements when applying a frame.
 		var isUniform:Bool {
 			if case .uniform = position, alignment.isFill { return true }
 			
@@ -966,51 +1001,25 @@ struct Layout {
 			return result
 		}
 		
-		func applyPositionableFrame(_ box:CGRect, context:Context, axial:Axial, sizes:[Size], available:Native, isFloating:Bool) {
+		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:context.environment)
-			let end = targets.count - 1
-			let spacing = axial.space
-			var offset = 0.0
+			let align = alignment.value(axis:.vertical, environment:context.environment)
+			let offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryIndex, isPositive:isPositive)
 			
-			if isFloating {
-				offset = -axial.sizeBeforeElement(primaryIndex, isPositive:isPositive)
-			} else if let value = position.value(axis:.horizontal, environment:context.environment) {
-				offset = axial.offset(fraction:value, available:available, index:primaryIndex, isPositive:isPositive)
-			}
-			
-			for index in targets.indices {
-				let index = isPositive ? index : end - index
-				let target = targets[index]
-				let x = offset, width = axial.sizes[index]
-				let y, height:CGFloat
-				
-				offset += width + spacing
-				
-				if let value = alignment.value(axis:.vertical, environment:context.environment) {
-					height = min(CGFloat(sizes[index].height.resolve(box.size.height.native)), box.size.height)
-					y = (box.size.height - height) * CGFloat(value)
-				} else {
-					height = box.size.height
-					y = 0
-				}
-				
-				let frame = CGRect(x:box.origin.x + CGFloat(x), y:box.origin.y + y, width:CGFloat(width), height:height)
-				let decompressed = sizes[index].decompress(frame, compressionResistance:target.compressionResistance)
-				
-				target.applyPositionableFrame(decompressed, context:context)
-			}
+			axial.computeFramesHorizontal(offset:offset, alignment:align, sizes:sizes, bounds:box, isPositive:isPositive)
+			axial.applyFrames(targets:targets, sizes:sizes, context:context)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			
 			let isFloating = self.isFloating
-			let limit = Limit(width:nil, height:box.size.height.native)
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
 			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
-			let axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, fit:position.fit)
+			var axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, fit:position.fit)
 			
-			applyPositionableFrame(box, context:context, axial:axial, sizes:sizes, available:available, isFloating:isFloating)
+			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
 		
 		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
@@ -1021,25 +1030,40 @@ struct Layout {
 		}
 	}
 	
-	/// Arrange a group of targets into vertical columns
+	/// Arrange a group of elements in vertical columns.
 	struct Columns: Positionable {
+		/// The elements to arrange.
 		var targets:[Positionable]
+		/// The number of columns to create.
 		var columnCount:Int
+		/// The template for each row.  Targets in the template are ignored.
 		var rowTemplate:Horizontal
+		/// The vertical position of rows within the stack.
 		var position:Position
+		/// When specified, affects how position is applied.
 		var primaryIndex:Int
+		/// The spacing between columns.
 		var spacing:Native
+		/// When true elements are ordered along columns, filling each column before wrapping to the next.  When false, elements are ordered across columns, filling each row before wrapping to the next.  The default is false.  
 		var columnMajor:Bool
+		/// The display order of rows, with positive being down.
 		var direction:Direction
 		
 		var singleColumn:Vertical {
 			return Vertical(targets:targets, spacing:spacing, alignment:rowTemplate.position.alignment, position:position, primary:primaryIndex, direction:direction)
 		}
 		
+		/// When true, the primary element is measured and positioned independent of other elements, then other elements float around the primary element.
 		var isFloating:Bool {
 			guard case .float = position, targets.indices.contains(primaryIndex) else { return false }
 			
 			return true
+		}
+		
+		var isUniform:Bool {
+			if case .uniform = position, rowTemplate.isUniform { return true }
+			
+			return false
 		}
 		
 		var frame:CGRect {
@@ -1061,6 +1085,8 @@ struct Layout {
 			self.primaryIndex = primary
 			self.columnMajor = false
 			self.direction = direction
+			
+			rowTemplate.targets.removeAll()
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -1083,7 +1109,7 @@ struct Layout {
 			guard columnCount > 1 else { return singleColumn.applyPositionableFrame(box, context:context) }
 			
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
 			
 			let itemLimit = targets.count - 1
 			let rowCount = 1 + itemLimit / columnCount
@@ -1108,10 +1134,9 @@ struct Layout {
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
 			let rowAvailable = box.size.width.native
 			let axial = Axial(rowHeights, available:available, spacing:spacing, fit:position.fit)
-			let rowAxial = Axial(columnWidths, available:rowAvailable, spacing:row.spacing, fit:row.position.fit)
+			var rowAxial = Axial(columnWidths, available:rowAvailable, spacing:row.spacing, fit:row.position.fit)
 			let spacing = axial.space
 			let primaryRow:Int
-			var offset = 0.0
 			
 			if !targets.indices.contains(primaryIndex) {
 				row.primaryIndex = -1
@@ -1124,12 +1149,7 @@ struct Layout {
 				primaryRow = primaryIndex / columnCount
 			}
 			
-			if isFloating {
-				offset = -axial.sizeBeforeElement(primaryRow, isPositive:isPositive)
-			} else if let value = position.value(axis:.horizontal, environment:context.environment) {
-				offset = axial.offset(fraction:value, available:available, index:primaryRow, isPositive:isPositive)
-			}
-			
+			var offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryRow, isPositive:isPositive)
 			var readyTargets = targets
 			var readySizes = sizes
 			let incompleteRow = readyTargets.count % columnCount
@@ -1145,7 +1165,7 @@ struct Layout {
 			
 			for index in 0 ..< rowCount {
 				let rowIndex = isPositive ? index : end - index
-				let y = offset, height = axial.sizes[rowIndex]
+				let y = offset, height = axial.spans[rowIndex]
 				var rowSizes:[Size]
 				
 				if columnMajor {
@@ -1165,7 +1185,7 @@ struct Layout {
 				
 				let rowBox = CGRect(x:box.origin.x, y:box.origin.y + CGFloat(y), width:box.size.width, height:CGFloat(height))
 				
-				row.applyPositionableFrame(rowBox, context:context, axial:rowAxial, sizes:rowSizes, available:rowAvailable, isFloating:isFloating)
+				row.applyPositionableFrame(rowBox, context:context, axial:&rowAxial, sizes:rowSizes, available:rowAvailable, isFloating:isFloating)
 			}
 		}
 		
@@ -1177,25 +1197,40 @@ struct Layout {
 		}
 	}
 	
-	/// Arrange a group of targets into horizontal rows
+	/// Arrange a group of elements in horizontal rows.
 	struct Rows: Positionable {
+		/// The elements to arrange.
 		var targets:[Positionable]
+		/// The number of rows to create.
 		var rowCount:Int
+		/// The template for each column.  Targets in the template are ignored.
 		var columnTemplate:Vertical
+		/// The horizontal position of columns within the stack.
 		var position:Position
+		/// When specified, affects how position is applied.
 		var primaryIndex:Int
+		/// The spacing between rows.
 		var spacing:Native
+		/// When true elements are ordered along rows, filling each row before wrapping to the next.  When false, elements are ordered across rows, filling each column before wrapping to the next.  The default is false.  
 		var rowMajor:Bool
+		/// The display order of columns, with positive being right.
 		var direction:Direction
 		
 		var singleRow:Horizontal {
 			return Horizontal(targets:targets, spacing:spacing, alignment:columnTemplate.position.alignment, position:position, primary:primaryIndex, direction:direction)
 		}
 		
+		/// When true, the primary element is measured and positioned independent of other elements, then other elements float around the primary element.
 		var isFloating:Bool {
 			guard case .float = position, targets.indices.contains(primaryIndex) else { return false }
 			
 			return true
+		}
+		
+		var isUniform:Bool {
+			if case .uniform = position, columnTemplate.isUniform { return true }
+			
+			return false
 		}
 		
 		var frame:CGRect {
@@ -1239,7 +1274,7 @@ struct Layout {
 			guard rowCount > 1 else { return singleRow.applyPositionableFrame(box, context:context) }
 			
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			let sizes = targets.map { $0.positionableSize(fitting:limit) }
+			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
 			
 			let itemLimit = targets.count - 1
 			let columnCount = 1 + itemLimit / rowCount
@@ -1264,10 +1299,9 @@ struct Layout {
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
 			let columnAvailable = box.size.height.native
 			let axial = Axial(columnWidths, available:available, spacing:spacing, fit:position.fit)
-			let columnAxial = Axial(rowHeights, available:columnAvailable, spacing:column.spacing, fit:column.position.fit)
+			var columnAxial = Axial(rowHeights, available:columnAvailable, spacing:column.spacing, fit:column.position.fit)
 			let spacing = axial.space
 			let primaryColumn:Int
-			var offset = 0.0
 			
 			if !targets.indices.contains(primaryIndex) {
 				column.primaryIndex = -1
@@ -1280,12 +1314,7 @@ struct Layout {
 				primaryColumn = primaryIndex / rowCount
 			}
 			
-			if isFloating {
-				offset = -axial.sizeBeforeElement(primaryColumn, isPositive:isPositive)
-			} else if let value = position.value(axis:.horizontal, environment:context.environment) {
-				offset = axial.offset(fraction:value, available:available, index:primaryColumn, isPositive:isPositive)
-			}
-			
+			var offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryColumn, isPositive:isPositive)
 			var readyTargets = targets
 			var readySizes = sizes
 			let incompleteColumn = readyTargets.count % rowCount
@@ -1301,7 +1330,7 @@ struct Layout {
 			
 			for index in 0 ..< columnCount {
 				let columnIndex = isPositive ? index : end - index
-				let x = offset, width = axial.sizes[columnIndex]
+				let x = offset, width = axial.spans[columnIndex]
 				var columnSizes:[Size]
 				
 				if rowMajor {
@@ -1321,7 +1350,7 @@ struct Layout {
 				
 				let columnBox = CGRect(x:box.origin.x + CGFloat(x), y:box.origin.y, width:CGFloat(width), height:box.size.height)
 				
-				column.applyPositionableFrame(columnBox, context:context, axial:columnAxial, sizes:columnSizes, available:columnAvailable, isFloating:isFloating)
+				column.applyPositionableFrame(columnBox, context:context, axial:&columnAxial, sizes:columnSizes, available:columnAvailable, isFloating:isFloating)
 			}
 		}
 		
@@ -1333,11 +1362,15 @@ struct Layout {
 		}
 	}
 	
-	/// Arrange a group of targets into the same space with the same alignment.
+	/// Arrange a group of elements into the same space with the same alignment.
 	struct Overlay: Positionable {
+		/// The elements to arrange
 		var targets:[Positionable]
+		/// The vertical alignment.  Defaults to fill.
 		var vertical:Alignment
+		/// The horizontal alignment.  Defaults to fill.
 		var horizontal:Alignment
+		/// When specified, the primary element is measured and aligned with the same frame applied to all elements.
 		var primaryIndex:Int
 		
 		var frame:CGRect {
@@ -1441,19 +1474,23 @@ struct Layout {
 		/// Uniform distance between sizes
 		let space:Native
 		/// Computed sizes along axis
-		let sizes:[Native]
+		let spans:[Native]
+		/// Computed frames
+		var frames:[CGRect]
 		
 		init(_ dimensions:[Dimension], available:Native, spacing:Native, fit:Fit) {
-			let spaceCount = Native(dimensions.count - 1)
+			let count = Native(dimensions.count)
+			let spaceCount = count - 1
 			let space = spacing * spaceCount
 			
+			self.frames = []
+			
 			if fit == .uniform {
-				let count = Native(dimensions.count)
 				let uniformSize = max(1, (available - space) / count)
 				
 				self.empty = 0
 				self.space = available < space + count ? max(0, (available - count) / spaceCount) : spacing
-				self.sizes = Array(repeating:uniformSize, count:dimensions.count)
+				self.spans = Array(repeating:uniformSize, count:dimensions.count)
 				
 				return
 			}
@@ -1475,15 +1512,15 @@ struct Layout {
 				if available < minimum || fit == .distribute {
 					let space = fit == .stretch ? 0 : space
 					let reduction = minimum + space - available
-					let denominator = Native(dimensions.count)
+					let denominator = count
 					
 					self.empty = 0
 					self.space = fit == .stretch ? 0 : spacing
-					self.sizes = dimensions.map { $0.minimum - reduction / denominator }
+					self.spans = dimensions.map { $0.minimum - reduction / denominator }
 				} else {
 					self.empty = 0
 					self.space = (available - minimum) / spaceCount
-					self.sizes = dimensions.map { $0.minimum }
+					self.spans = dimensions.map { $0.minimum }
 				}
 			} else if available < prefer + space {
 				let reduction = prefer + space - available
@@ -1491,21 +1528,21 @@ struct Layout {
 				
 				self.empty = 0
 				self.space = spacing
-				self.sizes = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
+				self.spans = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
 			} else if available < maximum + space {
 				let expansion = available - prefer - space
 				let denominator = maximum - prefer
 				
 				self.empty = 0
 				self.space = spacing
-				self.sizes = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
+				self.spans = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
 			} else if fit == .stretch {
 				let expansion = available - maximum - space
-				let denominator = Native(dimensions.count)
+				let denominator = count
 				
 				self.empty = 0
 				self.space = spacing
-				self.sizes = dimensions.map { $0.maximum + expansion / denominator }
+				self.spans = dimensions.map { $0.maximum + expansion / denominator }
 			} else {
 				if fit == .position {
 					self.empty = available - maximum - space
@@ -1515,30 +1552,128 @@ struct Layout {
 					self.space = (available - maximum) / spaceCount
 				}
 				
-				self.sizes = dimensions.map { $0.maximum }
+				self.spans = dimensions.map { $0.maximum }
 			}
 		}
 		
-		func sizeBeforeElement(_ index:Int, isPositive:Bool) -> Native {
+		func sizeBeforeElement(index:Int, isPositive:Bool) -> Native {
 			if isPositive {
-				return sizes.prefix(index).reduce(0, +) + Native(index) * space
+				return spans.prefix(index).reduce(0) { $0 + ($1 < 0 ? 0 : $1 + space) }
 			} else {
-				return sizes.suffix(from:index + 1).reduce(0, +) + Native(sizes.count - 1 - index) * space
+				return spans.suffix(from:index + 1).reduce(0) { $0 + ($1 < 0 ? 0 : $1 + space) }
 			}
 		}
 		
 		func offset(fraction:Native, available:Native, index:Int, isPositive:Bool) -> Native {
 			guard empty > 0 else { return 0 }
-			guard sizes.indices.contains(index) else { return fraction * empty }
+			guard spans.indices.contains(index) else { return fraction * empty }
 			
-			let size = sizes[index]
+			let size = spans[index]
 			let remainder = available - size
 			let nominal = remainder * fraction
 			
-			let beforePrimary = sizeBeforeElement(index, isPositive:isPositive)
-			let afterPrimary = sizeBeforeElement(index, isPositive:!isPositive)
+			let beforePrimary = sizeBeforeElement(index:index, isPositive:isPositive)
+			let afterPrimary = sizeBeforeElement(index:index, isPositive:!isPositive)
 			
 			return min(max(beforePrimary, nominal), available - size - afterPrimary) - beforePrimary
+		}
+		
+		func offset(isFloating:Bool, position:Position, axis:Axis, environment:Environment, available:Native, index:Int, isPositive:Bool) -> Native {
+			if isFloating {
+				return -sizeBeforeElement(index:index, isPositive:isPositive)
+			} else if let fraction = position.value(axis:axis, environment:environment) {
+				return offset(fraction:fraction, available:available, index:index, isPositive:isPositive)
+			} else {
+				return 0
+			}
+		}
+		
+		mutating func computeFramesHorizontal(offset:Native, alignment:Native?, sizes:[Size], bounds:CGRect, isPositive:Bool) {
+			let size = bounds.size.height.native
+			let end = spans.count - 1
+			let spacing = space
+			var frames:[CGRect] = []
+			var offset = offset
+			
+			frames.reserveCapacity(end + 1)
+			
+			for index in spans.indices {
+				let index = isPositive ? index : end - index
+				let width = spans[index]
+				var box = CGRect.zero
+				
+				box.origin.x.native = offset
+				
+				if width < 0 {
+					box.size.width = 0
+				} else {
+					box.size.width.native = width
+					offset += width + spacing
+				}
+				
+				if let value = alignment {
+					let height = min(sizes[index].height.resolve(size), size)
+					
+					box.size.height.native = height
+					box.origin.y.native = (size - height) * value
+				} else {
+					box.size.height.native = size
+					box.origin.y = 0
+				}
+				
+				frames.append(box.offsetBy(dx:bounds.origin.x, dy:bounds.origin.y))
+			}
+			
+			self.frames = frames
+		}
+		
+		mutating func computeFramesVertical(offset:Native, alignment:Native?, sizes:[Size], bounds:CGRect, isPositive:Bool) {
+			let size = bounds.size.width.native
+			let end = spans.count - 1
+			let spacing = space
+			var frames:[CGRect] = []
+			var offset = offset
+			
+			frames.reserveCapacity(end + 1)
+			
+			for index in spans.indices {
+				let index = isPositive ? index : end - index
+				let height = spans[index]
+				var box = CGRect.zero
+				
+				box.origin.y.native = offset
+				
+				if height < 0 {
+					box.size.height = 0
+				} else {
+					box.size.height.native = height
+					offset += height + spacing
+				}
+				
+				if let value = alignment {
+					let width = min(sizes[index].width.resolve(size), size)
+					
+					box.size.width.native = width
+					box.origin.x.native = (size - width) * value
+				} else {
+					box.size.width.native = size
+					box.origin.x = 0
+				}
+				
+				frames.append(box.offsetBy(dx:bounds.origin.x, dy:bounds.origin.y))
+			}
+			
+			self.frames = frames
+		}
+		
+		func applyFrames(targets:[Positionable], sizes:[Size], context:Context) {
+			for index in targets.indices {
+				let frame = frames[index]
+				let target = targets[index]
+				let decompressed = sizes[index].decompress(frame, compressionResistance:target.compressionResistance)
+				
+				target.applyPositionableFrame(decompressed, context:context)
+			}
 		}
 	}
 	

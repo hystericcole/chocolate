@@ -16,6 +16,37 @@ protocol LazyViewable: AnyObject, Positionable {
 
 //	MARK: -
 
+/// A Viewable can create and manage a view.  Most viewables can measure a view without creating it.
+/// # Positionable
+/// Views, Viewables, and Layouts are all Positionabled, and can be mixed and used together.
+/// # View
+/// A viewable can be used to simplify the creation of a view, then discarded, keeping the view.  This would typically be used within another view.
+/// 
+/// ```
+/// let gradient = Viewable.Gradient(colors: [.red, .blue]).lazy()
+/// ```
+/// # Layout
+/// A viewable can be created directly within a layout, if no further interaction is needed.  The view will not be created until the layout is ordered in a container.
+///
+/// ```
+/// Layout.Overlay(targets: [Viewable.Color(color: .green), anotherView])
+/// ```
+/// # View Controller
+/// A viewable can be used to prepare a view for later creation.  This would typically be used in a view controller.  The view will not be created until ordered, usually in `viewDidLoad`.  Using a viewable can simplify attaching targets and delegates to views.
+/// 
+/// ```
+/// let slider = Viewable.Slider(target: self, action: #selector(sliderValueChanged))
+/// ```
+/// Use a Viewable.Group or Viewable.Scroll as the root view of a view controller that only uses Positionable layout.
+/// # Cell
+/// A viewable can be used as the model for a cell.  The viewable can be used to measure the cell before it is created, for most content.  When the cell is created, the viewable is ordered into the cell.  When the cell is reused, one viewable is detached from the views in the cell, and later a similar viewable can be attached to the same views.
+///
+/// ```
+/// let imageView = Viewable.Image(image: ...)
+/// let content = imageView.padded(10)
+/// let height = content.positionableSize(Layout.Limit(size: bounds.size)).height.resolve(bounds.size.height)
+/// cell.contentView.orderPositionables([content], cell.positionableEnvironment)
+/// ```
 protocol ViewablePositionable: LazyViewable {
 	associatedtype ViewType: PlatformView
 	
