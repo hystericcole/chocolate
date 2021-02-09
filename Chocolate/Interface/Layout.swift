@@ -1181,7 +1181,8 @@ struct Layout {
 			
 			for index in 0 ..< rowCount {
 				let rowIndex = isPositive ? index : end - index
-				let y = offset, height = axial.spans[rowIndex]
+				let y = offset
+				var height = axial.spans[rowIndex]
 				var rowSizes:[Size]
 				
 				if columnMajor {
@@ -1197,7 +1198,11 @@ struct Layout {
 					rowSizes = Array(readySizes.suffix(from:rowIndex * columnCount).prefix(columnCount))
 				}
 				
-				offset += height + spacing
+				if height < 0 {
+					height = 0
+				} else {
+					offset += height + spacing
+				}
 				
 				let rowBox = CGRect(x:box.origin.x, y:box.origin.y + CGFloat(y), width:box.size.width, height:CGFloat(height))
 				
@@ -1346,7 +1351,8 @@ struct Layout {
 			
 			for index in 0 ..< columnCount {
 				let columnIndex = isPositive ? index : end - index
-				let x = offset, width = axial.spans[columnIndex]
+				let x = offset
+				var width = axial.spans[columnIndex]
 				var columnSizes:[Size]
 				
 				if rowMajor {
@@ -1362,7 +1368,11 @@ struct Layout {
 					columnSizes = Array(readySizes.suffix(from:columnIndex * rowCount).prefix(rowCount))
 				}
 				
-				offset += width + spacing
+				if width < 0 {
+					width = 0
+				} else {
+					offset += width + spacing
+				}
 				
 				let columnBox = CGRect(x:box.origin.x + CGFloat(x), y:box.origin.y, width:CGFloat(width), height:box.size.height)
 				
@@ -1495,13 +1505,12 @@ struct Layout {
 		var frames:[CGRect]
 		
 		init(_ dimensions:[Dimension], available:Native, spacing:Native, fit:Fit) {
-			let count = Native(dimensions.count)
-			let spaceCount = count - 1
-			let space = spacing * spaceCount
-			
 			self.frames = []
 			
 			if fit == .uniform {
+				let count = Native(dimensions.count)
+				let spaceCount = count - 1
+				let space = spacing * spaceCount
 				let uniformSize = max(1, (available - space) / count)
 				
 				self.empty = 0
@@ -1513,6 +1522,7 @@ struct Layout {
 			
 			var minimum = 0.0, maximum = 0.0, prefer = 0.0
 			var dimensions = dimensions
+			var visibleCount = 0
 			
 			for index in dimensions.indices {
 				let dimension = dimensions[index].resolved(available)
@@ -1522,54 +1532,82 @@ struct Layout {
 				minimum += dimension.minimum
 				maximum += dimension.maximum
 				prefer += dimension.constant
+				
+				if dimension.maximum > 0 { visibleCount += 1 }
 			}
 			
-			if available < minimum + space {
-				if available < minimum || fit == .distribute {
-					let space = fit == .stretch ? 0 : space
-					let reduction = minimum + space - available
-					let denominator = count
+			guard visibleCount > 0 else {
+				self.empty = available
+				self.space = 0
+				self.spans = Array(repeating:-1, count:dimensions.count)
+				
+				return
+			}
+			
+			let emptyWithNoSpacing = -1.0
+			let count = Native(visibleCount)
+			let spaceCount = count - 1
+			let aggregateSpacing = spacing * spaceCount
+			let empty:Native
+			let space:Native
+			var spans:[Native]
+			
+			if available < minimum + aggregateSpacing {
+				if available < minimum || fit == .stretch {
+					let reduceSpacing = fit == .stretch ? aggregateSpacing : 0
+					let reduction = minimum - max(0, available - reduceSpacing)
+					let denominator = minimum
 					
-					self.empty = 0
-					self.space = fit == .stretch ? 0 : spacing
-					self.spans = dimensions.map { $0.minimum - reduction / denominator }
+					empty = 0
+					space = fit == .stretch ? min(spacing, available / spaceCount) : 0
+					spans = dimensions.map { $0.minimum - $0.minimum * reduction / denominator }
 				} else {
-					self.empty = 0
-					self.space = (available - minimum) / spaceCount
-					self.spans = dimensions.map { $0.minimum }
+					empty = 0
+					space = (available - minimum) / spaceCount
+					spans = dimensions.map { $0.minimum }
 				}
-			} else if available < prefer + space {
-				let reduction = prefer + space - available
+			} else if available < prefer + aggregateSpacing {
+				let reduction = prefer + aggregateSpacing - available
 				let denominator = prefer - minimum
 				
-				self.empty = 0
-				self.space = spacing
-				self.spans = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
-			} else if available < maximum + space {
-				let expansion = available - prefer - space
+				empty = 0
+				space = spacing
+				spans = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
+			} else if available < maximum + aggregateSpacing {
+				let expansion = available - prefer - aggregateSpacing
 				let denominator = maximum - prefer
 				
-				self.empty = 0
-				self.space = spacing
-				self.spans = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
+				empty = 0
+				space = spacing
+				spans = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
 			} else if fit == .stretch {
-				let expansion = available - maximum - space
+				let expansion = available - maximum - aggregateSpacing
 				let denominator = count
 				
-				self.empty = 0
-				self.space = spacing
-				self.spans = dimensions.map { $0.maximum + expansion / denominator }
+				empty = 0
+				space = spacing
+				spans = dimensions.map { $0.maximum + expansion / denominator }
 			} else {
 				if fit == .position {
-					self.empty = available - maximum - space
-					self.space = spacing
+					empty = available - maximum - aggregateSpacing
+					space = spacing
 				} else {
-					self.empty = 0
-					self.space = (available - maximum) / spaceCount
+					empty = 0
+					space = (available - maximum) / spaceCount
 				}
 				
-				self.spans = dimensions.map { $0.maximum }
+				spans = dimensions.map { $0.maximum }
 			}
+			
+			if visibleCount < dimensions.count {
+				for index in dimensions.indices where !(dimensions[index].maximum > 0) {
+					spans[index] = emptyWithNoSpacing
+				}
+			}
+			
+			self.empty = empty
+			self.space = space
+			self.spans = spans
 		}
 		
 		func sizeBeforeElement(index:Int, isPositive:Bool) -> Native {
