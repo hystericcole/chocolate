@@ -9,6 +9,10 @@ import QuartzCore
 import Foundation
 
 protocol LazyViewable: AnyObject, Positionable {
+	var existingView:PlatformView? { get }
+	var tag:Int { get }
+	
+	func viewType() -> PlatformView.Type
 	func lazyView() -> PlatformView
 	func attachToExistingView(_ view:PlatformView)
 	func detachView(prepareForReuse:Bool)
@@ -60,10 +64,12 @@ protocol ViewablePositionable: LazyViewable {
 //	MARK: -
 
 extension ViewablePositionable {
+	var existingView:PlatformView? { return view }
 	var frame:CGRect { return view?.frame ?? .zero }
 	var compressionResistance:CGPoint { return view?.compressionResistance ?? .zero }
 	
 	func lazyView() -> PlatformView { return lazy() }
+	func viewType() -> PlatformView.Type { return ViewType.self }
 	
 	func lazy() -> ViewType {
 		if let view = view { return view }
@@ -150,7 +156,7 @@ enum Viewable {
 	}
 	
 	class Color: ViewablePositionable {
-		typealias ViewType = PlatformTaggableView
+		typealias ViewType = ViewableColorView
 		
 		struct Model {
 			let tag:Int
@@ -418,8 +424,6 @@ enum Viewable {
 		typealias ZoomRange = ClosedRange<CGFloat>
 		
 		struct Model {
-			static let unbound = CGSize(width:Layout.Dimension.unbound, height:Layout.Dimension.unbound)
-			
 			let tag:Int
 			var content:Positionable
 			var minimum:CGSize
@@ -453,7 +457,7 @@ enum Viewable {
 		}
 		
 		init(tag:Int = 0, content:Positionable, minimum:CGSize? = nil, maximum:CGSize? = nil, zoomRange:ZoomRange = 1 ... 1) {
-			self.model = Model(tag:tag, content:content, minimum:minimum ?? .zero, maximum:maximum ?? Model.unbound, zoomRange:zoomRange)
+			self.model = Model(tag:tag, content:content, minimum:minimum ?? .zero, maximum:maximum ?? Layout.Size.unbound, zoomRange:zoomRange)
 		}
 		
 		func applyToView(_ view:ViewableScrollingView) {
@@ -791,6 +795,76 @@ enum Viewable {
 		}
 	}
 	
+	class SimpleTable: NSObject, ViewablePositionable {
+		typealias ViewType = ViewableTableView
+		
+		struct Model {
+			let tag:Int
+			var cells:[Positionable]
+			var minimum:CGSize
+			var maximum:CGSize
+			weak var target:AnyObject?
+			var action:Selector?
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var cells:[Positionable] { get { return model.cells } set { model.cells = newValue; view?.reloadData() } }
+		
+#if os(macOS)
+		var selectionIndex:Int {
+			get { return view?.tableView.selectedRow ?? -1 }
+			set { view?.tableView.selectRowIndexes(IndexSet(integer:newValue), byExtendingSelection:false) }
+		}
+#else
+		var selectionIndex:Int {
+			get { return view?.indexPathForSelectedRow?.row ?? -1 }
+			set { view?.selectRow(at: newValue < 0 ? nil : IndexPath(row:newValue, section:0), animated:false, scrollPosition:.middle) }
+		}
+#endif
+		
+		init(tag:Int = 0, cells:[Positionable], target:AnyObject? = nil, action:Selector? = nil, minimum:CGSize? = nil, maximum:CGSize? = nil) {
+			self.model = Model(tag:tag, cells:cells, minimum:minimum ?? .zero, maximum:maximum ?? Layout.Size.unbound, target:target, action:action)
+		}
+		
+		func applyToView(_ view:ViewableTableView) {
+			view.tag = model.tag
+			view.prepareViewableTable()
+			view.registerCell(ViewableTableCell.self)
+			view.delegate = self
+			view.dataSource = self
+		}
+		
+		func rowHeight(tableView:PlatformTableView, row:Int) -> CGFloat {
+			let limit = tableView.bounds.size
+			let size = model.cells[row].positionableSize(fitting:Layout.Limit(size:limit))
+			
+			return CGFloat(size.height.resolve(limit.height.native))
+		}
+		
+		func rowSelected(tableView:PlatformTableView, row:Int) {
+			if let target = model.target, let action = model.action {
+				_ = target.perform(action, with:self)
+			}
+		}
+		
+		func rowPrepareCell(_ cell:ViewableTableCell, row:Int) -> PlatformTableViewCell {
+			cell.prepareViewableCell()
+			cell.content = model.cells[row]
+			
+			return cell
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			var size = Layout.Vertical(targets:model.cells, spacing:0).positionableSize(fitting:limit)
+			
+			size.decreaseRange(minimum:model.minimum, maximum:model.maximum)
+			
+			return size
+		}
+	}
+	
 	static let noIntrinsicSize = CGSize(width:-1, height:-1)
 }
 
@@ -833,19 +907,142 @@ extension Viewable.Picker: PlatformPickerDelegate, PlatformPickerDataSource {
 
 //	MARK: -
 
+extension Viewable.SimpleTable: PlatformTableDelegate, PlatformTableDataSource {
+#if os(macOS)
+	func numberOfRows(in tableView:PlatformTableView) -> Int {
+		return model.cells.count
+	}
+	
+	func tableView(_ tableView:PlatformTableView, heightOfRow row:Int) -> CGFloat {
+		return rowHeight(tableView:tableView, row:row)
+	}
+	
+	func tableView(_ tableView:PlatformTableView, viewFor tableColumn:PlatformTableColumn?, row:Int) -> PlatformView? {
+		return rowPrepareCell(ViewableTableCell.dequeue(tableView:tableView, row:row), row:row)
+	}
+	
+	func tableViewSelectionDidChange(_ notification:Notification) {
+		guard let tableView = notification.object as? PlatformTableView else { return }
+		
+		rowSelected(tableView:tableView, row:tableView.selectedRow)
+	}
+#else
+	func tableView(_ tableView:PlatformTableView, numberOfRowsInSection section:Int) -> Int {
+		return section == 0 ? model.cells.count : 0
+	}
+	
+	func tableView(_ tableView:PlatformTableView, cellForRowAt indexPath:IndexPath) -> PlatformTableViewCell {
+		return rowPrepareCell(ViewableTableCell.dequeue(tableView:tableView, indexPath:indexPath), row:indexPath.row)
+	}
+	
+	func tableView(_ tableView:PlatformTableView, heightForRowAt indexPath:IndexPath) -> CGFloat {
+		return rowHeight(tableView:tableView, row:indexPath.row)
+	}
+	
+	func tableView(_ tableView:PlatformTableView, didSelectRowAt indexPath:IndexPath) {
+		rowSelected(tableView:tableView, row:indexPath.row)
+	}
+#endif
+}
+
+//	MARK: -
+
 extension PlatformView {
 	func attachPositionables(_ root:Positionable, environment:Layout.Environment) {
 		let ordered = root.orderablePositionables(environment:environment, attachable:true)
 		let current = subviews
 		
-		for index in 0 ..< min(ordered.count, current.count) {
-			if let viewable = ordered[index] as? LazyViewable {
-				viewable.attachToExistingView(current[index])
+		var attached:Set<PlatformView> = []
+		var anyViews:[PlatformView] = []
+		var anyViewables:[LazyViewable] = []
+		var viewablesByType:[ObjectIdentifier:[LazyViewable]] = [:]
+		var viewableTypes:[ObjectIdentifier:PlatformView.Type] = [:]
+		var viewsByType:[ObjectIdentifier:[PlatformView]] = [:]
+		
+		for item in ordered {
+			guard let viewable = item as? LazyViewable else { continue }
+			
+			if let view = viewable.existingView, view.superview === self {
+				attached.insert(view)
+				continue
+			}
+			
+			let viewType = viewable.viewType()
+			let typeKey = ObjectIdentifier(viewType)
+			
+			if viewType === PlatformView.self {
+				anyViewables.append(viewable)
+			} else if viewablesByType[typeKey]?.append(viewable) == nil {
+				viewablesByType[typeKey] = [viewable]
+				viewableTypes[typeKey] = viewType
+			}
+		}
+		
+		for view in current where !attached.contains(view) {
+			var isKnown = false
+			
+			for (typeKey, viewType) in viewableTypes {
+				if view.isKind(of:viewType) {
+					if viewsByType[typeKey]?.append(view) == nil {
+						viewsByType[typeKey] = [view]
+					}
+					
+					isKnown = true
+					break
+				}
+			}
+			
+			if !isKnown {
+				anyViews.append(view)
+			}
+		}
+		
+		if !anyViewables.isEmpty {
+			let viewType = PlatformView.self
+			let typeKey = ObjectIdentifier(viewType)
+			
+			viewableTypes[typeKey] = viewType
+			viewablesByType[typeKey] = anyViewables
+			viewsByType[typeKey] = anyViews
+		}
+		
+		for (typeKey, _) in viewableTypes {
+			guard var views = viewsByType[typeKey], var viewables = viewablesByType[typeKey] else { continue }
+			
+			for index in viewables.indices.reversed() {
+				let viewable = viewables[index]
+				let tag = viewable.tag
+				
+				if tag != 0, let match = views.lastIndex(where: { $0.tag == tag }) {
+					let view = views[match]
+					
+					viewable.attachToExistingView(view)
+					
+					if viewable.existingView != nil {
+						viewables.remove(at:index)
+						views.remove(at:match)
+						attached.insert(view)
+						break
+					}
+				}
+			}
+			
+			for index in 0 ..< min(viewables.count, views.count) {
+				viewables[index].attachToExistingView(views[index])
+				
+				if let view = viewables[index].existingView {
+					attached.insert(view)
+				}
 			}
 		}
 		
 		orderPositionables([root], environment:environment, options:.set)
 	}
+}
+
+//	MARK: -
+
+class ViewableColorView: PlatformTaggableView {
 }
 
 //	MARK: -
@@ -1064,7 +1261,10 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 		translatesAutoresizingMaskIntoConstraints = false
 		
 #if os(macOS)
+		let save = documentView
+		
 		contentView = ViewableScrollingClipView()
+		documentView = save
 		scrollerStyle = .overlay
 		borderType = .noBorder
 		autohidesScrollers = true
@@ -1205,6 +1405,185 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 	override func positionableSizeFitting(_ size:CGSize) -> Data {
 		return content.positionableSize(fitting:Layout.Limit(size:size)).data
 	}
+}
+
+//	MARK: -
+
+#if os(macOS)
+class ViewableTableView: ViewableScrollingView {
+	var tableView: PlatformTableView {
+		if let existing = documentView as? PlatformTableView {
+			return existing
+		}
+		
+		let view = PlatformTableView()
+		
+		documentView = view
+		
+		view.nextResponder = self
+		
+		return view
+	}
+	
+	var dataSource: PlatformTableDataSource? {
+		get { return tableView.dataSource }
+		set { tableView.dataSource = newValue }
+	}
+	
+	var delegate: PlatformTableDelegate? {
+		get { return tableView.delegate }
+		set { tableView.delegate = newValue }
+	}
+	
+	override var containerView: PlatformView {
+		return tableView
+	}
+	
+	override func sizeChanged() {
+		
+	}
+	
+	func reloadData() {
+		tableView.reloadData()
+	}
+	
+	func prepareViewableTable() {
+		prepareViewableScroll()
+		
+		let table = tableView
+		
+		table.verticalMotionCanBeginDrag = true
+		table.allowsEmptySelection = true
+		table.allowsMultipleSelection = false
+		table.allowsColumnReordering = false
+		table.allowsColumnResizing = false
+		table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+		table.rowSizeStyle = .custom
+		table.selectionHighlightStyle = .none
+		table.gridStyleMask = []
+		table.headerView = nil
+		
+		hasHorizontalScroller = false
+	}
+	
+	func registerCell(_ type:ViewableTableCell.Type) {
+		let table = tableView
+		
+		if table.tableColumns.isEmpty {
+			let column = PlatformTableColumn(identifier:.init(type.reuseIdentifier))
+			
+			table.addTableColumn(column)
+		}
+	}
+}
+#else
+class ViewableTableView: PlatformTableView {
+	func prepareViewableTable() {
+		allowsSelection = true
+		allowsMultipleSelection = false
+		separatorStyle = .singleLine
+		separatorInset = .zero
+	}
+	
+	func registerCell(_ type:ViewableTableCell.Type) {
+		register(type, forCellReuseIdentifier:type.reuseIdentifier)
+	}
+}
+#endif
+
+//	MARK: -
+
+class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
+	class var reuseIdentifier:String { return String(describing:self) }
+	
+	var priorSize:CGSize = .zero
+	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
+	
+#if os(macOS)
+	override var isFlipped:Bool { return true }
+	
+	class func dequeue(tableView:PlatformTableView, row:Int) -> ViewableTableCell {
+		if let existing = tableView.makeView(withIdentifier:.init(rawValue:reuseIdentifier), owner:nil) as? Self {
+			return existing
+		} else {
+			let cell = Self.init()
+			
+			cell.identifier = .init(rawValue:reuseIdentifier)
+			
+			return cell
+		}
+	}
+#else
+	class func dequeue(tableView:PlatformTableView, indexPath:IndexPath) -> ViewableTableCell {
+		return tableView.dequeueReusableCell(withIdentifier:reuseIdentifier, for:indexPath) as! ViewableTableCell
+	}
+#endif
+	
+	func prepareViewableCell() {
+		translatesAutoresizingMaskIntoConstraints = false
+	}
+	
+	func applyContent() {
+#if os(macOS)
+		attachPositionables(content, environment:positionableEnvironment)
+		
+		if priorSize.minimum > 0 {
+			sizeChanged()
+		}
+#else
+		contentView.attachPositionables(content, environment:positionableEnvironment)
+		
+		invalidateLayout()
+		setNeedsLayout()
+#endif
+	}
+	
+	override func prepareForReuse() {
+		super.prepareForReuse()
+		
+		Viewable.detach(content, prepareForReuse:true, environment:positionableEnvironment)
+	}
+	
+#if os(macOS)
+	override func resizeSubviews(withOldSize oldSize:NSSize) {
+		super.resizeSubviews(withOldSize:oldSize)
+		sizeMayHaveChanged(newSize:bounds.size)
+	}
+#else
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		sizeMayHaveChanged(newSize:bounds.size)
+	}
+#endif
+	
+	func invalidateLayout() { priorSize = .zero }
+	func sizeChanged() { positionableContext.performLayout(content) }
+	
+	override func positionableSizeFitting(_ size:CGSize) -> Data {
+		return content.positionableSize(fitting:Layout.Limit(size:size)).data
+	}
+}
+
+//	MARK: -
+
+extension ViewablePositionable where ViewType: ViewableTableCell {
+#if os(macOS)
+	func lazyTableCell(tableView:PlatformTableView, row:Int) -> PlatformTableViewCell {
+		let cell = ViewType.dequeue(tableView:tableView, row:row)
+		
+		attachToExistingView(cell)
+		
+		return cell
+	}
+#else
+	func lazyTableCell(tableView:PlatformTableView, indexPath:IndexPath) -> PlatformTableViewCell {
+		let cell = ViewType.dequeue(tableView:tableView, indexPath:indexPath)
+		
+		attachToExistingView(cell)
+		
+		return cell
+	}
+#endif
 }
 
 //	MARK: -

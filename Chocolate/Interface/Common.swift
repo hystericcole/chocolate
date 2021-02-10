@@ -31,6 +31,11 @@ typealias PlatformClipView = NSClipView
 typealias PlatformSpinner = NSProgressIndicator
 typealias PlatformStepper = NSStepper
 typealias PlatformPicker = NSPopUpButton
+typealias PlatformTableView = NSTableView
+typealias PlatformTableColumn = NSTableColumn
+typealias PlatformTableViewCell = NSTableCellView
+typealias PlatformTableDelegate = NSTableViewDelegate
+typealias PlatformTableDataSource = NSTableViewDataSource
 typealias PlatformColorWell = NSColorWell
 typealias PlatformVisualEffectView = NSVisualEffectView
 
@@ -59,6 +64,10 @@ typealias PlatformStepper = UIStepper
 typealias PlatformPicker = UIPickerView
 typealias PlatformPickerDelegate = UIPickerViewDelegate
 typealias PlatformPickerDataSource = UIPickerViewDataSource
+typealias PlatformTableView = UITableView
+typealias PlatformTableViewCell = UITableViewCell
+typealias PlatformTableDelegate = UITableViewDelegate
+typealias PlatformTableDataSource = UITableViewDataSource
 typealias PlatformVisualEffectView = UIVisualEffectView
 
 @available(iOS 14.0, *)
