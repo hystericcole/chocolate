@@ -81,6 +81,15 @@ extension NSAttributedString {
 		return mutableString
 	}
 	
+	func withText(_ text:String) -> NSMutableAttributedString {
+		let range = NSRange(location:0, length:length)
+		let mutable = NSMutableAttributedString(attributedString:self)
+		
+		mutable.replaceCharacters(in:range, with:text)
+		
+		return mutable
+	}
+	
 #if os(macOS)
 	func boundsWrappingWithSize(_ size:CGSize) -> CGRect {
 		return withLineBreakMode().boundingRect(with:size, options:.usesLineFragmentOrigin)

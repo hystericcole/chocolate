@@ -234,10 +234,10 @@ enum Viewable {
 		struct Model {
 			let tag:Int
 			var string:NSAttributedString?
-			var intrinsicWidth:CGFloat
 			var maximumLines:Int
+			var intrinsicWidth:CGFloat
 			
-			init(tag:Int = 0, string:NSAttributedString? = nil, intrinsicWidth:CGFloat = 0, maximumLines:Int = 0) {
+			init(tag:Int = 0, string:NSAttributedString? = nil, maximumLines:Int = 0, intrinsicWidth:CGFloat = 0) {
 				self.tag = tag
 				self.string = string
 				self.intrinsicWidth = intrinsicWidth
@@ -268,19 +268,24 @@ enum Viewable {
 		var attributedText:NSAttributedString? { get { return view?.attributedText ?? model.string } set { model.string = newValue; view?.attributedText = newValue } }
 		var intrinsicWidth:CGFloat { get { return view?.preferredMaxLayoutWidth ?? model.intrinsicWidth } set { model.intrinsicWidth = newValue; view?.preferredMaxLayoutWidth = newValue } }
 		var textColor:PlatformColor? { get { return view?.textColor } set { view?.textColor = newValue } }
+		var text:String? { get { return attributedText?.string } set { applyText(newValue) } }
 		
-		init(tag:Int = 0, string:NSAttributedString?, intrinsicWidth:CGFloat = 0, maximumLines:Int = 0) {
-			self.model = Model(tag:tag, string:string, intrinsicWidth:intrinsicWidth, maximumLines:maximumLines)
-		}
-		
-		convenience init(tag:Int = 0, text:String, attributes:[NSAttributedString.Key:Any]? = nil, intrinsicWidth:CGFloat = 0, maximumLines:Int = 0) {
-			self.init(tag:tag, string:NSAttributedString(string:text, attributes:attributes), intrinsicWidth:intrinsicWidth, maximumLines:maximumLines)
+		init(tag:Int = 0, string:NSAttributedString?, maximumLines:Int = 0, intrinsicWidth:CGFloat = 0) {
+			self.model = Model(tag:tag, string:string, maximumLines:maximumLines, intrinsicWidth:intrinsicWidth)
 		}
 		
 		func applyToView(_ view:PlatformLabel) {
 			view.tag = model.tag
 			view.attributedText = model.string
 			view.prepareViewableLabel(intrinsicWidth:model.intrinsicWidth, maximumLines:model.maximumLines)
+		}
+		
+		func applyText(_ text:String?) {
+			if let string = model.string {
+				attributedText = string.withText(text ?? "")
+			} else if let text = text {
+				attributedText = NSAttributedString(string:text)
+			}
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {

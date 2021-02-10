@@ -97,6 +97,7 @@ class PlatformTaggableView: PlatformView {
 	func prepareViewableColor(isOpaque:Bool) {
 		wantsLayer = true
 		layer?.isOpaque = isOpaque
+		compressionResistance = .zero
 	}
 }
 

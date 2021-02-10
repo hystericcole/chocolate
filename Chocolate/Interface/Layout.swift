@@ -435,14 +435,18 @@ struct Layout {
 			self.init(require:stringSize)
 			
 			if maximumLines != 1 && stringLength > 1 {
-				let count = Layout.Native(min(maximumLines > 0 ? maximumLines : 256, stringLength))
+				var scalar = stringLength
 				
-				if let height = maximumHeight, height < stringSize.height.native * count {
-					let scalar = floor(height / stringSize.height.native)
-					
-					width.minimum = stringSize.width.native / scalar
-				} else {
-					width.minimum = stringSize.width.native / count
+				if maximumLines > 0 {
+					scalar = min(maximumLines, scalar)
+				}
+				
+				if stringSize.height > 0, let height = maximumHeight, height > 0 {
+					scalar = min(Int(floor(height / stringSize.height.native)), scalar)
+				}
+				
+				if scalar > 1 {
+					width.minimum = stringSize.width.native / Layout.Native(scalar)
 				}
 			}
 		}
@@ -1092,14 +1096,14 @@ struct Layout {
 			return isFloating ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
-		init(targets:[Positionable], columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+		init(targets:[Positionable], columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false) {
 			self.targets = targets
 			self.columnCount = columnCount
 			self.spacing = spacing
 			self.position = position
 			self.rowTemplate = template
 			self.primaryIndex = primary
-			self.columnMajor = false
+			self.columnMajor = major
 			self.direction = direction
 			
 			rowTemplate.targets.removeAll()
@@ -1134,8 +1138,8 @@ struct Layout {
 			
 			if columnMajor {
 				for index in sizes.indices {
-					rowHeights[index % columnCount].increase(sizes[index].height)
-					columnWidths[index / columnCount].increase(sizes[index].width)
+					rowHeights[index % rowCount].increase(sizes[index].height)
+					columnWidths[index / rowCount].increase(sizes[index].width)
 				}
 			} else {
 				for index in sizes.indices {
@@ -1264,14 +1268,14 @@ struct Layout {
 			return isFloating ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
-		init(targets:[Positionable], rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+		init(targets:[Positionable], rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false) {
 			self.targets = targets
 			self.rowCount = rowCount
 			self.spacing = spacing
 			self.position = position
 			self.columnTemplate = template
 			self.primaryIndex = primary
-			self.rowMajor = false
+			self.rowMajor = major
 			self.direction = direction
 		}
 		
@@ -1304,8 +1308,8 @@ struct Layout {
 			
 			if rowMajor {
 				for index in sizes.indices {
-					rowHeights[index / rowCount].increase(sizes[index].height)
-					columnWidths[index % rowCount].increase(sizes[index].width)
+					rowHeights[index / columnCount].increase(sizes[index].height)
+					columnWidths[index % columnCount].increase(sizes[index].width)
 				}
 			} else {
 				for index in sizes.indices {
@@ -1948,12 +1952,20 @@ extension Positionable {
 
 extension PlatformView: Positionable {
 	var compressionResistance:CGPoint {
-		let maximum = PlatformPriority.required.rawValue
-		
-		return CGPoint(
-			x:CGFloat(contentCompressionResistancePriority(for:.horizontal).rawValue / maximum),
-			y:CGFloat(contentCompressionResistancePriority(for:.vertical).rawValue / maximum)
-		)
+		get {
+			let maximum = PlatformPriority.required.rawValue
+			
+			return CGPoint(
+				x:CGFloat(contentCompressionResistancePriority(for:.horizontal).rawValue / maximum),
+				y:CGFloat(contentCompressionResistancePriority(for:.vertical).rawValue / maximum)
+			)
+		}
+		set {
+			let maximum = PlatformPriority.required.rawValue
+			
+			setContentCompressionResistancePriority(PlatformPriority(max(Float(min(1, newValue.x)) * maximum, 1)), for:.horizontal)
+			setContentCompressionResistancePriority(PlatformPriority(max(Float(min(1, newValue.y)) * maximum, 1)), for:.vertical)
+		}
 	}
 	
 	@objc

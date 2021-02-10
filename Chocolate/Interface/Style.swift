@@ -150,4 +150,62 @@ struct Style {
 	func string(_ text:String) -> NSAttributedString {
 		return NSAttributedString(string:text, attributes:attributes)
 	}
+	
+	func label(_ text:String, maximumLines:Int = 0, intrinsicWidth:CGFloat = 0) -> Style.Label {
+		return Style.Label(text:text, style:self, maximumLines:maximumLines, intrinsicWidth:intrinsicWidth)
+	}
+}
+
+extension Style {
+	class Label: ViewablePositionable {
+		typealias ViewType = PlatformLabel
+		
+		struct Model {
+			let tag:Int
+			var text:String?
+			var style:Style
+			var maximumLines:Int
+			var intrinsicWidth:CGFloat
+			var string:NSAttributedString? { guard let text = text else { return nil }; return style.string(text) }
+			
+			func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+				guard let string = string else { return .zero }
+				
+				var sizeLimit = limit.size
+				
+				if intrinsicWidth > 0 && intrinsicWidth < sizeLimit.width {
+					sizeLimit.width = intrinsicWidth
+				}
+				
+				return Layout.Size(
+					stringSize:string.boundsWrappingWithSize(sizeLimit).size,
+					stringLength:string.length,
+					maximumHeight:limit.height,
+					maximumLines:maximumLines
+				)
+			}
+		}
+		
+		weak var view:ViewType?
+		var model:Model
+		var tag:Int { get { return view?.tag ?? model.tag } }
+		var text:String? { get { return view?.text ?? model.text } set { model.text = newValue; view?.attributedText = model.string } }
+		var style:Style { get { return model.style } set { model.style = newValue; view?.attributedText = model.string } }
+		var intrinsicWidth:CGFloat { get { return view?.preferredMaxLayoutWidth ?? model.intrinsicWidth } set { model.intrinsicWidth = newValue; view?.preferredMaxLayoutWidth = newValue } }
+		var textColor:PlatformColor? { get { return view?.textColor } set { view?.textColor = newValue } }
+		
+		init(tag:Int = 0, text:String?, style:Style, maximumLines:Int = 0, intrinsicWidth:CGFloat = 0) {
+			self.model = Model(tag:tag, text:text, style:style, maximumLines:maximumLines, intrinsicWidth:intrinsicWidth)
+		}
+		
+		func applyToView(_ view:PlatformLabel) {
+			view.tag = model.tag
+			view.attributedText = model.string
+			view.prepareViewableLabel(intrinsicWidth:model.intrinsicWidth, maximumLines:model.maximumLines)
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			return view?.positionableSize(fitting: limit) ?? model.positionableSize(fitting: limit)
+		}
+	}
 }
