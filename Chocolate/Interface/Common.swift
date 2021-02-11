@@ -38,6 +38,14 @@ typealias PlatformTableDelegate = NSTableViewDelegate
 typealias PlatformTableDataSource = NSTableViewDataSource
 typealias PlatformColorWell = NSColorWell
 typealias PlatformVisualEffectView = NSVisualEffectView
+typealias PlatformGestureRecognizer = NSGestureRecognizer
+typealias PlatformPanGestureRecognizer = NSPanGestureRecognizer
+typealias PlatformTapGestureRecognizer = NSClickGestureRecognizer
+typealias PlatformPressGestureRecognizer = NSPressGestureRecognizer
+typealias PlatformRotationGestureRecognizer = NSRotationGestureRecognizer
+typealias PlatformMagnificationGestureRecognizer = NSMagnificationGestureRecognizer
+typealias PlatformGestureRecognizerDelegate = NSGestureRecognizerDelegate
+typealias PlatformGestureRecognizerState = NSGestureRecognizer.State
 
 #else
 import UIKit
@@ -69,6 +77,14 @@ typealias PlatformTableViewCell = UITableViewCell
 typealias PlatformTableDelegate = UITableViewDelegate
 typealias PlatformTableDataSource = UITableViewDataSource
 typealias PlatformVisualEffectView = UIVisualEffectView
+typealias PlatformGestureRecognizer = UIGestureRecognizer
+typealias PlatformPanGestureRecognizer = UIPanGestureRecognizer
+typealias PlatformTapGestureRecognizer = UITapGestureRecognizer
+typealias PlatformPressGestureRecognizer = UILongPressGestureRecognizer
+typealias PlatformRotationGestureRecognizer = UIRotationGestureRecognizer
+typealias PlatformMagnificationGestureRecognizer = UIPinchGestureRecognizer
+typealias PlatformGestureRecognizerDelegate = UIGestureRecognizerDelegate
+typealias PlatformGestureRecognizerState = UIGestureRecognizer.State
 
 @available(iOS 14.0, *)
 typealias PlatformColorWell = UIColorWell
@@ -494,5 +510,109 @@ extension PlatformSizeChangeView {
 		
 		priorSize = newSize
 		sizeChanged()
+	}
+}
+
+//	MARK: -
+
+enum Common {
+	struct Recognizer {
+		enum Gesture {
+		case pan(Bool)
+		case tap(Bool, Int)
+		case press(Bool, TimeInterval?, CGFloat?)
+		case rotation
+		case magnification
+		}
+		
+		let gesture:Gesture
+		let action:Selector
+		weak var target:AnyObject?
+		
+		var recognizer: PlatformGestureRecognizer {
+			switch gesture {
+			case .pan(let two):
+				let recognizer = PlatformPanGestureRecognizer(target:target, action:action)
+				
+				if two {
+#if os(macOS)
+					recognizer.buttonMask = 2
+#else
+					recognizer.minimumNumberOfTouches = 2
+#endif
+				}
+				
+				return recognizer
+			
+			case .tap(let two, let times):
+				let recognizer = PlatformTapGestureRecognizer(target:target, action:action)
+				
+				if two {
+#if os(macOS)
+					recognizer.buttonMask = 2
+#else
+					recognizer.numberOfTouchesRequired = 2
+#endif
+				}
+				
+				if times > 1 {
+#if os(macOS)
+					recognizer.numberOfClicksRequired = times
+#else
+					recognizer.numberOfTapsRequired = times
+#endif
+				}
+				
+				return recognizer
+			
+			case .press(let two, let duration, let movement):
+				let recognizer = PlatformPressGestureRecognizer(target:target, action:action)
+				
+				if let duration = duration {
+					recognizer.minimumPressDuration = duration
+				}
+				
+				if let movement = movement {
+					recognizer.allowableMovement = movement
+				}
+				
+				if two {
+#if os(macOS)
+					recognizer.buttonMask = 2
+#else
+					recognizer.numberOfTouchesRequired = 2
+#endif
+				}
+				
+				return recognizer
+			
+			case .rotation:
+				let recognizer = PlatformRotationGestureRecognizer(target:target, action:action)
+				
+				return recognizer
+			
+			case .magnification:
+				let recognizer = PlatformMagnificationGestureRecognizer(target:target, action:action)
+				
+				return recognizer
+			}
+		}
+		
+		init(_ gesture:Gesture, target:AnyObject?, action:Selector) {
+			self.gesture = gesture
+			self.target = target
+			self.action = action
+		}
+		
+		static func attachRecognizers(_ recognizers:[Recognizer], to view:PlatformView) {
+			for recognizer in recognizers where recognizer.target != nil {
+				view.addGestureRecognizer(recognizer.recognizer)
+			}
+			
+#if os(macOS)
+#else
+			view.isUserInteractionEnabled = true
+#endif
+		}
 	}
 }

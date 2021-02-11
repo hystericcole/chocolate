@@ -96,8 +96,12 @@ extension ViewablePositionable {
 		view?.applyPositionableFrame(frame, context:context)
 	}
 	
-	func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
-		return attachable ? [self] : lazy().orderablePositionables(environment:environment, attachable:attachable)
+	func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
+		switch order {
+		case .attach: return [self]
+		case .create: return lazy().orderablePositionables(environment:environment, order:order)
+		case .existing: return view?.orderablePositionables(environment:environment, order:order) ?? [self]
+		}
 	}
 }
 
@@ -117,6 +121,8 @@ extension Positionable {
 	@discardableResult
 	func remove() -> Positionable { Viewable.remove(self); return self }
 	func rounded() -> Positionable { return Viewable.Rounded(target:self) }
+	func recognize(_ gesture:Common.Recognizer.Gesture, target:AnyObject, action:Selector) -> Positionable { return recognize(Common.Recognizer(gesture, target:target, action:action)) }
+	func recognize(_ recognizers:Common.Recognizer...) -> Positionable { return Viewable.AttachRecognizers(target:self, recognizers:recognizers) }
 }
 
 //	MARK: -
@@ -954,7 +960,7 @@ extension Viewable.SimpleTable: PlatformTableDelegate, PlatformTableDataSource {
 
 extension PlatformView {
 	func attachPositionables(_ root:Positionable, environment:Layout.Environment) {
-		let ordered = root.orderablePositionables(environment:environment, attachable:true)
+		let ordered = root.orderablePositionables(environment:environment, order:.attach)
 		let current = subviews
 		
 		var attached:Set<PlatformView> = []
@@ -1595,44 +1601,57 @@ extension ViewablePositionable where ViewType: ViewableTableCell {
 
 extension Viewable {
 	static func hide(_ target:Positionable, isHidden:Bool = true, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:false).compactMap { $0 as? PlatformView }.forEach { $0.isHidden = isHidden }
+		target.orderablePositionables(environment:environment, order:.existing).compactMap { $0 as? PlatformView }.forEach { $0.isHidden = isHidden }
 	}
 	
 	static func fade(_ target:Positionable, opacity:CGFloat, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:false).compactMap { $0 as? PlatformView }.forEach { $0.alpha = opacity }
+		target.orderablePositionables(environment:environment, order:.existing).compactMap { $0 as? PlatformView }.forEach { $0.alpha = opacity }
 	}
 	
 	static func remove(_ target:Positionable, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:false).compactMap { $0 as? PlatformView }.forEach { $0.removeFromSuperview() }
+		target.orderablePositionables(environment:environment, order:.existing).compactMap { $0 as? PlatformView }.forEach { $0.removeFromSuperview() }
 	}
 	
 	static func detach(_ target:Positionable, prepareForReuse:Bool, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:true).compactMap { $0 as? LazyViewable }.forEach { $0.detachView(prepareForReuse:prepareForReuse) }
+		target.orderablePositionables(environment:environment, order:.attach).compactMap { $0 as? LazyViewable }.forEach { $0.detachView(prepareForReuse:prepareForReuse) }
 	}
 	
 	static func applyBackground(_ target:Positionable, color:PlatformColor?, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:false).compactMap { $0 as? PlatformView }.forEach { $0.backgroundColor = color }
+		target.orderablePositionables(environment:environment, order:.existing).compactMap { $0 as? PlatformView }.forEach { $0.backgroundColor = color }
 	}
 	
 	static func applyBorder(_ target:Positionable, border:CALayer.Border, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:false).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.border = border }
+		target.orderablePositionables(environment:environment, order:.existing).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.border = border }
 	}
 	
 	static func applyShadow(_ target:Positionable, shadow:CALayer.Shadow, environment:Layout.Environment = .current) {
-		target.orderablePositionables(environment:environment, attachable:false).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.shadow = shadow }
+		target.orderablePositionables(environment:environment, order:.existing).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.shadow = shadow }
 	}
 	
-	struct Rounded: Positionable {
+	struct Rounded: PositionableWithTarget {
 		var target:Positionable
-		var frame:CGRect { return target.frame }
-		var compressionResistance:CGPoint { return target.compressionResistance }
-		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size { return target.positionableSize(fitting:limit) }
-		func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] { return target.orderablePositionables(environment:environment, attachable:attachable) }
 		
 		func applyPositionableFrame(_ frame:CGRect, context: Layout.Context) {
 			target.applyPositionableFrame(frame, context:context)
-			target.orderablePositionables(environment:context.environment, attachable:false).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.cornerRadius = $0.bounds.size.minimum / 2 }
+			target.orderablePositionables(environment:context.environment, order:.existing).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.cornerRadius = $0.bounds.size.minimum / 2 }
+		}
+	}
+	
+	struct AttachRecognizers: PositionableWithTarget {
+		var target:Positionable
+		var recognizers:[Common.Recognizer]
+		
+		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
+			let viewables = order == .create && !recognizers.isEmpty ? target.orderablePositionables(environment:environment, order:.attach).compactMap { $0 as? LazyViewable }.filter { $0.existingView == nil } : []
+			let result = target.orderablePositionables(environment:environment, order:order)
+			
+			for viewable in viewables {
+				if let view = viewable.existingView {
+					Common.Recognizer.attachRecognizers(recognizers, to:view)
+				}
+			}
+			
+			return result
 		}
 	}
 }
