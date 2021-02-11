@@ -12,7 +12,7 @@ protocol Positionable {
 	/// The current frame
 	var frame:CGRect { get }
 	
-	/// The compression resistance affects how positionable frames are applied.
+	/// The compression resistance affects how positionable frames are applied.  Values range from 0, no resistance, to 1, require resistance.
 	var compressionResistance:CGPoint { get }
 	
 	/// The requested size of the element.
@@ -22,9 +22,17 @@ protocol Positionable {
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size
 	
 	/// Apply a frame to the element.
+	///	# Layout
+	/// During typical layout, a container will get the requested size of each element, fit the sizes within available space, then apply frames to elements.  The applied frames may exceed the minimum or maximum requested size depending on available space and layout options.  When containers are nested, each container will get the size of contained elements twice, once when requesting a size for itself and again when applying a frame to itself.  Deeply nested containers will request the size of elements several times during a single layout, with a more accurate limit at each pass.
 	func applyPositionableFrame(_ frame:CGRect, context:Layout.Context)
 	
 	/// Retrieve elements that can be ordered in a container, or attached to elements in a container.
+	/// # Order create
+	/// A container is adding elements to the hierarchy.  Viewables should create views as needed.
+	/// # Order attach
+	/// A container is being reused and attempting to attach Viewables to existing views.  Viewables should return self.
+	/// # Order existing
+	/// A modifier is affecting views in the hierarchy.  Viewables should return existing views but not create views. 
 	func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable]
 }
 
@@ -101,15 +109,17 @@ struct Layout {
 		/// # Example
 		/// Position content with a size of 320 in a container with a limit of 400.  The unused space is 80, and a fraction of that unused space is before the content.  For a fraction of 0.25, that is 0.25 × (400 - 320) = 20 before the content, with 60 after the content.
 		case fraction(Native)
-		/// Position content within available bounds, adapting to the environment.
+		/// Position content within available bounds, adapting to the environment.  Equivalent to gravityAreas in a stack view.
 		case adaptiveFraction(Native)
-		/// Fill available bounds by stretching elements.
+		/// Fill available bounds by stretching elements.  Equivalent to fill or fillProportionally in a stack view.
 		case stretch
-		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.
+		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.  Equivalent to fillEqually in a stackView.
 		case uniform
-		/// Fill available bounds by stretching space between elements.
+		/// Fill available bounds by aligning each element within a uniform space.  Equivalent to equalCentering in a stack view, when value is 0.5.
+		case uniformAlign(Native)
+		/// Fill available bounds by stretching space between elements.  Equivalent to equalSpacing in a stack view.
 		case distribute
-		/// Position the container around the primary element, with other elements hanging outside the container.
+		/// Position the container around the primary element, with other elements hanging outside the container.  Equivalent to constraining one arranged view of a stack view.
 		case float
 		
 		static let start = Position.fraction(0.0)
@@ -121,7 +131,7 @@ struct Layout {
 		
 		var isFill:Bool {
 			switch self {
-			case .stretch, .uniform, .distribute: return true
+			case .stretch, .uniform, .uniformAlign, .distribute: return true
 			default: return false
 			}
 		}
@@ -129,7 +139,7 @@ struct Layout {
 		var fit:Axial.Fit {
 			switch self {
 			case .stretch: return .stretch
-			case .uniform: return .uniform
+			case .uniform, .uniformAlign: return .uniform
 			case .distribute: return .distribute
 			default: return .position
 			}
@@ -139,6 +149,7 @@ struct Layout {
 			switch self {
 			case .fraction(let value): return .fraction(value)
 			case .adaptiveFraction(let value): return .adaptiveFraction(value)
+			case .uniformAlign(let value): return .adaptiveFraction(value)
 			case .float: return .center
 			case .stretch, .uniform, .distribute: return .fill
 			}
@@ -149,6 +160,13 @@ struct Layout {
 			case .fraction(let value): return value
 			case .adaptiveFraction(let value): return environment.adaptiveFractionValue(value, axis:axis)
 			case .float: return 0.5
+			default: return nil
+			}
+		}
+		
+		func alignValue(axis:Axis, environment:Environment) -> Native? {
+			switch self {
+			case .uniformAlign(let value): return environment.adaptiveFractionValue(value, axis:axis)
 			default: return nil
 			}
 		}
@@ -765,7 +783,7 @@ struct Layout {
 		/// Setting a primary element may affect how position is applied.
 		/// - For a filling position, the primary element has no effect.
 		/// - For a fractional position, the primary element is positioned and other elements follow, not exceeding the limits of the container.
-		/// - For the float position, the primary element is measured and positioned ignoring the container, and other elements are positioned outside the container.
+		/// - For the float position, the container is measured and positioned as the primary element, and other elements are positioned outside the container.
 		var primaryIndex:Int
 		/// The spacing between elements.  Use padding to affect spacing around indiviual elements.
 		var spacing:Native
@@ -809,63 +827,16 @@ struct Layout {
 			guard !targets.isEmpty else { return .zero }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
 			
-			var result:Layout.Size = .zero
-			let spacingSum = spacing * Native(targets.count - 1)
-			
-			if case .uniform = position {
-				for target in targets {
-					let size = target.positionableSize(fitting: limit)
-					
-					result.height.increase(size.height)
-					result.width.increase(size.width)
-				}
-				
-				result.height.multiply(Native(targets.count))
-			} else {
-				for target in targets {
-					let size = target.positionableSize(fitting: limit)
-					
-					result.height.add(size.height)
-					result.width.increase(size.width)
-				}
-			}
-			
-			result.height.add(value:spacingSum)
-			
-			return result
-		}
-		
-		mutating func positionableSize(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoRows rowCount:Int, rowMajor:Bool) -> Layout.Size {
-			var result:Layout.Size = .zero
-			let itemLimit = splittingTargets.count - 1
-			let columnCount = 1 + itemLimit / rowCount
-			
-			for index in 0 ..< columnCount {
-				if rowMajor {
-					targets.removeAll()
-					
-					for row in 0 ..< 1 + (itemLimit - index) / columnCount {
-						targets.append(splittingTargets[row * columnCount + index])
-					}
-				} else {
-					targets = Array(splittingTargets.suffix(from:index * rowCount).prefix(rowCount))
-				}
-				
-				let size = positionableSize(fitting:limit)
-				
-				result.width.add(size.width)
-				result.height.increase(size.height)
-			}
-			
-			return result
+			return Axial.sizeVertical(targets:targets, limit:limit, spacing:spacing, position:position)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.vertical, environment:context.environment)
 			let align = alignment.value(axis:.horizontal, environment:context.environment)
 			let offset = axial.offset(isFloating:isFloating, position:position, axis:.vertical, environment:context.environment, available:available, index:primaryIndex, isPositive:isPositive)
+			let uniformAlign = position.alignValue(axis:.vertical, environment:context.environment)
 			
-			axial.computeFramesVertical(offset:offset, alignment:align, sizes:sizes, bounds:box, isPositive:isPositive)
+			axial.computeFramesVertical(offset:offset, alignment:align, uniformAlign:uniformAlign, sizes:sizes, bounds:box, isPositive:isPositive)
 			axial.applyFrames(targets:targets, sizes:sizes, context:context)
 		}
 		
@@ -941,63 +912,16 @@ struct Layout {
 			guard !targets.isEmpty else { return .zero }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
-			var result:Layout.Size = .zero
-			let spacingSum = spacing * Native(targets.count - 1)
-			
-			if case .uniform = position {
-				for target in targets {
-					let size = target.positionableSize(fitting: limit)
-					
-					result.height.increase(size.height)
-					result.width.increase(size.width)
-				}
-				
-				result.width.multiply(Native(targets.count))
-			} else {
-				for target in targets {
-					let size = target.positionableSize(fitting:limit)
-					
-					result.width.add(size.width)
-					result.height.increase(size.height)
-				}
-			}
-			
-			result.width.add(value:spacingSum)
-			
-			return result
-		}
-		
-		mutating func positionableSize(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoColumns columnCount:Int, columnMajor:Bool) -> Layout.Size {
-			var result:Layout.Size = .zero
-			let itemLimit = splittingTargets.count - 1
-			let rowCount = 1 + itemLimit / columnCount
-			
-			for index in 0 ..< rowCount {
-				if columnMajor {
-					targets.removeAll()
-					
-					for column in 0 ..< 1 + (itemLimit - index) / rowCount {
-						targets.append(splittingTargets[column * rowCount + index])
-					}
-				} else {
-					targets = Array(splittingTargets.suffix(from:index * columnCount).prefix(columnCount))
-				}
-				
-				let size = positionableSize(fitting:limit)
-				
-				result.width.increase(size.width)
-				result.height.add(size.height)
-			}
-			
-			return result
+			return Axial.sizeHorizontal(targets:targets, limit:limit, spacing:spacing, position:position)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:context.environment)
 			let align = alignment.value(axis:.vertical, environment:context.environment)
 			let offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryIndex, isPositive:isPositive)
+			let uniformAlign = position.alignValue(axis:.horizontal, environment:context.environment)
 			
-			axial.computeFramesHorizontal(offset:offset, alignment:align, sizes:sizes, bounds:box, isPositive:isPositive)
+			axial.computeFramesHorizontal(offset:offset, alignment:align, uniformAlign:uniformAlign, sizes:sizes, bounds:box, isPositive:isPositive)
 			axial.applyFrames(targets:targets, sizes:sizes, context:context)
 		}
 		
@@ -1085,14 +1009,7 @@ struct Layout {
 			guard columnCount > 1 else { return singleColumn.positionableSize(fitting:limit) }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
-			var row = rowTemplate
-			var result = row.positionableSize(fitting:limit, splittingTargets:targets, intoColumns:columnCount, columnMajor:columnMajor)
-			let rowLimit = (targets.count - 1) / columnCount
-			let spacingSum = spacing * Native(rowLimit)
-			
-			result.height.add(value:spacingSum)
-			
-			return result
+			return Axial.sizeColumns(fitting:limit, splittingTargets:targets, intoColumns:columnCount, columnMajor:columnMajor, columnSpacing:spacing, rowSpacing:rowTemplate.spacing, rowPosition:rowTemplate.position)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
@@ -1255,14 +1172,7 @@ struct Layout {
 			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit) }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
-			var column = columnTemplate
-			var result = column.positionableSize(fitting:limit, splittingTargets:targets, intoRows:rowCount, rowMajor:rowMajor)
-			let columnLimit = (targets.count - 1) / rowCount
-			let spacingSum = spacing * Native(columnLimit)
-			
-			result.width.add(value:spacingSum)
-			
-			return result
+			return Axial.sizeRows(fitting:limit, splittingTargets:targets, intoRows:rowCount, rowMajor:rowMajor, rowSpacing:spacing, columnSpacing:columnTemplate.spacing, columnPosition:columnTemplate.position)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
@@ -1585,6 +1495,136 @@ struct Layout {
 			self.spans = spans
 		}
 		
+		static func sizeHorizontal(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
+			var result:Layout.Size = .zero
+			var spaceCount = -1
+			
+			switch position {
+			case .uniform, .uniformAlign:
+				for target in targets {
+					let size = target.positionableSize(fitting:limit)
+					
+					result.height.increase(size.height)
+					result.width.increase(size.width)
+				}
+				
+				spaceCount += targets.count
+				result.width.multiply(Native(targets.count))
+			default:
+				for target in targets {
+					let size = target.positionableSize(fitting:limit)
+					
+					result.width.add(size.width)
+					result.height.increase(size.height)
+					if size.width.maximum > 0 { spaceCount += 1 }
+				}
+			}
+			
+			if spaceCount > 0 {
+				result.width.add(value:spacing * Native(spaceCount))
+			}
+			
+			return result
+		}
+		
+		static func sizeVertical(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
+			var result:Layout.Size = .zero
+			var spaceCount = -1
+			
+			switch position {
+			case .uniform, .uniformAlign:
+				for target in targets {
+					let size = target.positionableSize(fitting: limit)
+					
+					result.height.increase(size.height)
+					result.width.increase(size.width)
+				}
+				
+				spaceCount += targets.count
+				result.height.multiply(Native(targets.count))
+			default:
+				for target in targets {
+					let size = target.positionableSize(fitting: limit)
+					
+					result.height.add(size.height)
+					result.width.increase(size.width)
+					if size.height.maximum > 0 { spaceCount += 1 }
+				}
+			}
+			
+			if spaceCount > 0 {
+				result.height.add(value:spacing * Native(spaceCount))
+			}
+			
+			return result
+		}
+		
+		static func sizeRows(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoRows rowCount:Int, rowMajor:Bool, rowSpacing:Native, columnSpacing:Native, columnPosition:Position) -> Layout.Size {
+			var result:Layout.Size = .zero
+			let itemLimit = splittingTargets.count - 1
+			let columnCount = 1 + itemLimit / rowCount
+			var spaceCount = -1
+			
+			for index in 0 ..< columnCount {
+				var targets:[Positionable]
+				
+				if rowMajor {
+					targets = []
+					
+					for row in 0 ..< 1 + (itemLimit - index) / columnCount {
+						targets.append(splittingTargets[row * columnCount + index])
+					}
+				} else {
+					targets = Array(splittingTargets.suffix(from:index * rowCount).prefix(rowCount))
+				}
+				
+				let size = sizeVertical(targets:targets, limit:limit, spacing:columnSpacing, position:columnPosition)
+				
+				result.width.add(size.width)
+				result.height.increase(size.height)
+				if size.width.maximum > 0 { spaceCount += 1 }
+			}
+			
+			if spaceCount > 0 {
+				result.width.add(value:rowSpacing * Native(spaceCount))
+			}
+			
+			return result
+		}
+		
+		static func sizeColumns(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoColumns columnCount:Int, columnMajor:Bool, columnSpacing:Native, rowSpacing:Native, rowPosition:Position) -> Layout.Size {
+			var result:Layout.Size = .zero
+			let itemLimit = splittingTargets.count - 1
+			let rowCount = 1 + itemLimit / columnCount
+			var spaceCount = -1
+			
+			for index in 0 ..< rowCount {
+				var targets:[Positionable]
+				
+				if columnMajor {
+					targets = []
+					
+					for column in 0 ..< 1 + (itemLimit - index) / rowCount {
+						targets.append(splittingTargets[column * rowCount + index])
+					}
+				} else {
+					targets = Array(splittingTargets.suffix(from:index * columnCount).prefix(columnCount))
+				}
+				
+				let size = sizeHorizontal(targets:targets, limit:limit, spacing:rowSpacing, position:rowPosition)
+				
+				result.width.increase(size.width)
+				result.height.add(size.height)
+				if size.height.maximum > 0 { spaceCount += 1 }
+			}
+			
+			if spaceCount > 0 {
+				result.height.add(value:columnSpacing * Native(spaceCount))
+			}
+			
+			return result
+		}
+		
 		func sizeBeforeElement(index:Int, isPositive:Bool) -> Native {
 			if isPositive {
 				return spans.prefix(index).reduce(0) { $0 + ($1 < 0 ? 0 : $1 + space) }
@@ -1617,7 +1657,7 @@ struct Layout {
 			}
 		}
 		
-		mutating func computeFramesHorizontal(offset:Native, alignment:Native?, sizes:[Size], bounds:CGRect, isPositive:Bool) {
+		mutating func computeFramesHorizontal(offset:Native, alignment:Native?, uniformAlign:Native?, sizes:[Size], bounds:CGRect, isPositive:Bool) {
 			let size = bounds.size.height.native
 			let end = spans.count - 1
 			let spacing = space
@@ -1650,13 +1690,22 @@ struct Layout {
 					box.origin.y = 0
 				}
 				
+				if let value = uniformAlign {
+					let inner = sizes[index].width.resolve(bounds.size.width.native)
+					
+					if inner < box.size.width.native {
+						box.origin.x.native += (width - inner) * value
+						box.size.width.native = inner
+					}
+				}
+				
 				frames.append(box.offsetBy(dx:bounds.origin.x, dy:bounds.origin.y))
 			}
 			
 			self.frames = frames
 		}
 		
-		mutating func computeFramesVertical(offset:Native, alignment:Native?, sizes:[Size], bounds:CGRect, isPositive:Bool) {
+		mutating func computeFramesVertical(offset:Native, alignment:Native?, uniformAlign:Native?, sizes:[Size], bounds:CGRect, isPositive:Bool) {
 			let size = bounds.size.width.native
 			let end = spans.count - 1
 			let spacing = space
@@ -1687,6 +1736,15 @@ struct Layout {
 				} else {
 					box.size.width.native = size
 					box.origin.x = 0
+				}
+				
+				if let value = uniformAlign {
+					let inner = sizes[index].height.resolve(bounds.size.height.native)
+					
+					if inner < box.size.height.native {
+						box.origin.y.native += (height - inner) * value
+						box.size.height.native = inner
+					}
 				}
 				
 				frames.append(box.offsetBy(dx:bounds.origin.x, dy:bounds.origin.y))
