@@ -41,6 +41,7 @@ extension Double {
 	
 	static func vector2(_ x:Double, _ y:Double) -> Vector2 { return simd_make_double2(x, y) }
 	static func vector3(_ x:Double, _ y:Double, _ z:Double) -> Vector3 { return simd_make_double3(x, y, z) }
+	static func vector3(_ xyz:Vector4) -> Vector3 { return simd_make_double3(xyz) }
 	static func vector4(_ x:Double, _ y:Double, _ z:Double, _ w:Double) -> Vector4 { return simd_make_double4(x, y, z, w) }
 	static func vector4(_ xyz:Vector3, _ w:Double = 0) -> Vector4 { return simd_make_double4(xyz, w) }
 	static func vector8(_ lower:Vector4, _ upper:Vector4) -> simd_double8 { return simd_make_double8(lower, upper) }
@@ -54,6 +55,7 @@ extension Float {
 	
 	static func vector2(_ x:Float, _ y:Float) -> Vector2 { return simd_make_float2(x, y) }
 	static func vector3(_ x:Float, _ y:Float, _ z:Float) -> Vector3 { return simd_make_float3(x, y, z) }
+	static func vector3(_ xyz:Vector4) -> Vector3 { return simd_make_float3(xyz) }
 	static func vector4(_ x:Float, _ y:Float, _ z:Float, _ w:Float) -> Vector4 { return simd_make_float4(x, y, z, w) }
 	static func vector4(_ xyz:Vector3, _ w:Float = 0) -> Vector4 { return simd_make_float4(xyz, w) }
 	static func vector8(_ lower:Vector4, _ upper:Vector4) -> Vector8 { return simd_make_float8(lower, upper) }
@@ -65,9 +67,24 @@ extension CGFloat {
 	typealias Vector4 = SIMD4<NativeType>
 	typealias Vector8 = SIMD8<NativeType>
 	
-	static func vector2(_ x:CGFloat, _ y:CGFloat) -> Vector2 { return CGFloat.NativeType.vector2(x.native, y.native) }
-	static func vector3(_ x:CGFloat, _ y:CGFloat, _ z:CGFloat) -> Vector3 { return CGFloat.NativeType.vector3(x.native, y.native, z.native) }
-	static func vector4(_ x:CGFloat, _ y:CGFloat, _ z:CGFloat, _ w:CGFloat) -> Vector4 { return CGFloat.NativeType.vector4(x.native, y.native, z.native, w.native) }
-	static func vector4(_ xyz:Vector3, _ w:CGFloat) -> Vector4 { return CGFloat.NativeType.vector4(xyz, w.native) }
+	static func vector2(_ x:CGFloat, _ y:CGFloat) -> Vector2 { return NativeType.vector2(x.native, y.native) }
+	static func vector3(_ x:CGFloat, _ y:CGFloat, _ z:CGFloat) -> Vector3 { return NativeType.vector3(x.native, y.native, z.native) }
+	static func vector3(_ xyz:Vector4) -> Vector3 { return NativeType.vector3(xyz) }
+	static func vector4(_ x:CGFloat, _ y:CGFloat, _ z:CGFloat, _ w:CGFloat) -> Vector4 { return NativeType.vector4(x.native, y.native, z.native, w.native) }
+	static func vector4(_ xyz:Vector3, _ w:CGFloat) -> Vector4 { return NativeType.vector4(xyz, w.native) }
 	static func vector8(_ lower:Vector4, _ upper:Vector4) -> Vector8 { return NativeType.vector8(lower, upper) }
+}
+
+extension SIMD4 where Scalar == Double {
+	var xyz:SIMD3<Scalar> {
+		get { return simd_make_double3(self) }
+		set { self = simd_make_double4(newValue, w) }
+	}
+}
+
+extension SIMD4 where Scalar == Float {
+	var xyz:SIMD3<Scalar> {
+		get { return simd_make_float3(self) }
+		set { self = simd_make_float4(newValue, w) }
+	}
 }
