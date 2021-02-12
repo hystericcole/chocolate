@@ -156,6 +156,14 @@ enum Viewable {
 			view.content = model.content
 		}
 		
+		func attachToExistingView(_ view: PlatformView) {
+			guard let view = view as? ViewType else { return }
+			
+			view.attachPositionables(content, environment:view.positionableEnvironment)
+			applyToView(view)
+			attachToView(view)
+		}
+		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			return model.content.positionableSize(fitting:limit)
 		}

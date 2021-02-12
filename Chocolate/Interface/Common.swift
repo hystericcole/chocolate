@@ -358,6 +358,12 @@ extension PlatformImageView {
 		
 		clipsToBounds = true
 	}
+	
+	func alignImage(_ alignment:CGPoint = CGPoint(x:0.5, y:0)) {
+		guard let imageSize = image?.size else { return }
+		
+		layer.alignContents(size:imageSize, alignment:alignment)
+	}
 }
 
 //	MARK: -
@@ -518,6 +524,78 @@ extension PlatformSizeChangeView {
 //	MARK: -
 
 enum Common {
+	struct Interface {
+		static var scale:CGFloat {
+#if os(macOS)
+			return NSScreen.main?.backingScaleFactor ?? 1
+#else
+			return UIScreen.main.scale
+#endif
+		}
+		
+		enum Idiom {
+			case unspecified, phone, pad, mac, car, tv
+			
+			static var current:Idiom {
+#if os(macOS)
+				return .mac
+#else
+				switch UIDevice.current.userInterfaceIdiom {
+				case .carPlay: return .car
+				case .mac: return .mac
+				case .pad: return .pad
+				case .phone: return .phone
+				case .tv: return .tv
+				default: return .unspecified
+				}
+#endif
+			}
+		}
+		
+		enum Style {
+			case unspecified, dark, light
+			
+			var isDark:Bool {
+				switch self {
+				case .dark: return true
+				default: return false
+				}
+			}
+			
+			static var current:Style {
+#if os(macOS)
+				let appearance:NSAppearance?
+				
+				if #available(OSX 11.0, *) {
+					appearance = NSAppearance.currentDrawing()
+				} else {
+					appearance = NSAppearance.current
+				}
+				
+				let isDark = appearance?.name.rawValue.range(of:"Dark", options:.caseInsensitive) != nil
+				
+				return isDark ? .dark : .light
+#else
+				let traits = UIScreen.main.traitCollection
+				
+				switch traits.userInterfaceStyle {
+				case .light: return .light
+				case .dark: return .dark
+				default: return .unspecified
+				}
+#endif
+			}
+		}
+		
+		var scale:CGFloat
+		var idiom:Idiom
+		var style:Style
+		
+		static var current:Interface {
+			return Interface(scale:Interface.scale, idiom:.current, style:.current)
+		}
+	}
+	
 	struct Recognizer {
 		enum Gesture {
 		case pan(Bool)

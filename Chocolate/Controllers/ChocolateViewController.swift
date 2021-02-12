@@ -12,14 +12,36 @@ import simd
 class ChocolateViewController: BaseViewController {
 	typealias Strings = DisplayStrings.Chocolate
 	
+	enum Changed {
+		case rgb, hcl
+	}
+	
+	enum ColorSpace: Int {
+		case y601, y709, sRGB
+		
+		var chocolate:CHCLTPower {
+			switch self {
+			case .y601: return CHCLTPower.y601
+			case .y709: return CHCLTPower.y709
+			case .sRGB: return CHCLTPower.sRGB
+			}
+		}
+		
+		static var titles:[String] = ["y601", "y709", "sRGB"]
+	}
+	
+	var changed:Changed = .rgb
+	var chocolate = CHCLTPower.y709
 	let group = Viewable.Group(content:Layout.EmptySpace())
-	let sliderRed = Viewable.Slider(value:0.2, action:#selector(ChocolateViewController.colorChanged), minimumTrackColor:.red)
-	let sliderGreen = Viewable.Slider(value:0.4, action:#selector(ChocolateViewController.colorChanged), minimumTrackColor:.green)
-	let sliderBlue = Viewable.Slider(value:0.6, action:#selector(ChocolateViewController.colorChanged), minimumTrackColor:.blue)
-	let sliderHue = Viewable.Slider(value:0.0, action:#selector(ChocolateViewController.chocolateChanged))
-	let sliderChroma = Viewable.Slider(value:0.0, action:#selector(ChocolateViewController.chocolateChanged))
-	let sliderLuma = Viewable.Slider(value:0.0, action:#selector(ChocolateViewController.chocolateChanged))
-	let sliderContrast = Viewable.Slider(value:1.0, action:#selector(ChocolateViewController.deriveChanged))
+	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:1, action:#selector(colorSpaceChanged))
+	let sliderRed = Viewable.Slider(value:0.2, action:#selector(colorChanged), minimumTrackColor:.red)
+	let sliderGreen = Viewable.Slider(value:0.4, action:#selector(colorChanged), minimumTrackColor:.green)
+	let sliderBlue = Viewable.Slider(value:0.6, action:#selector(colorChanged), minimumTrackColor:.blue)
+	let sliderHue = Viewable.Slider(value:0.0, action:#selector(chocolateChanged))
+	let sliderChroma = Viewable.Slider(value:0.0, action:#selector(chocolateChanged))
+	let sliderLuma = Viewable.Slider(value:0.0, action:#selector(chocolateChanged))
+	let sliderContrast = Viewable.Slider(value:1.0, action:#selector(deriveChanged))
+	let sliderSaturation = Viewable.Slider(value:0.5, action:#selector(deriveChanged))
 	let stringRed = Style.small.label("")
 	let stringGreen = Style.small.label("")
 	let stringBlue = Style.small.label("")
@@ -27,7 +49,6 @@ class ChocolateViewController: BaseViewController {
 	let stringChroma = Style.small.label("")
 	let stringLuma = Style.small.label("")
 	let stringContrast = Style.medium.label("")
-	let sliderSaturation = Viewable.Slider(value:0.5, action:#selector(ChocolateViewController.deriveChanged))
 	let stringPrimary = Style.caption.label(Strings.primary)
 	let stringDerived = Style.caption.label(Strings.derived)
 	let colorBox = Viewable.Color(color:nil)
@@ -45,11 +66,10 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	func generateBackgrounds(primary:RGBA, contrast:Double, saturation:Double, count:Int) -> [RGBA] {
-		let chocolate = CGColor.chocolate
 		let limit = Double(count - 1)
 		
 		return (0 ..< count).map { index in
-			let s = (saturation - 0.5) * Double(count - index) / limit
+			let s = 2 * (saturation - 0.5) * Double(count - index) / limit
 			let c = 0.5 * (1 + contrast - Double(index) / limit)
 			
 			return RGBA(vector:chocolate.contrasting(chocolate.applySaturation(primary.vector, saturation:s), contrast:c))
@@ -57,7 +77,6 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	func generateForegrounds(primary:RGBA, contrast:Double, saturation:Double, count:Int) -> [RGBA] {
-		let chocolate = CGColor.chocolate
 		let limit = Double(count - 1)
 		
 		return (0 ..< count).map { index in
@@ -72,7 +91,6 @@ class ChocolateViewController: BaseViewController {
 	func applyColor(rgba:RGBA) {
 		colorBox.color = rgba.cgColor()?.platformColor
 		
-		let chocolate = CGColor.chocolate
 		let contrast = sliderContrast.value
 		let saturation = sliderSaturation.value
 		let backgrounds = generateBackgrounds(primary:rgba, contrast:contrast, saturation:saturation, count:examples.count)
@@ -116,12 +134,13 @@ class ChocolateViewController: BaseViewController {
 		let hue = sliderHue.value
 		let chroma = sliderChroma.value
 		let luma = sliderLuma.value
-		let rgba = RGBA(vector:CGColor.chocolate.color(hue:hue, saturation:chroma, luma:luma, alpha: 1))
+		let rgba = RGBA(vector:chocolate.color(hue:hue, saturation:chroma, luma:luma, alpha: 1))
 		
 		sliderRed.value = rgba.r
 		sliderGreen.value = rgba.g
 		sliderBlue.value = rgba.b
 		
+		changed = .hcl
 		applyColor(rgba:rgba)
 	}
 	
@@ -132,11 +151,24 @@ class ChocolateViewController: BaseViewController {
 		let blue = sliderBlue.value
 		let rgba = RGBA(red, green, blue, 1)
 		
-		sliderHue.value = CGColor.chocolate.vectorHue(rgba.vector)
-		sliderChroma.value = CGColor.chocolate.saturation(rgba.vector)
-		sliderLuma.value = CGColor.chocolate.luma(rgba.vector)
+		sliderHue.value = chocolate.vectorHue(rgba.vector)
+		sliderChroma.value = chocolate.saturation(rgba.vector)
+		sliderLuma.value = chocolate.luma(rgba.vector)
 		
+		changed = .rgb
 		applyColor(rgba:rgba)
+	}
+	
+	@objc
+	func colorSpaceChanged() {
+		guard let space = ColorSpace(rawValue:spacePicker.select) else { return }
+		
+		chocolate = space.chocolate
+		
+		switch changed {
+		case .rgb: colorChanged()
+		case .hcl: chocolateChanged()
+		}
 	}
 	
 	func prepareLayout() {
@@ -145,7 +177,8 @@ class ChocolateViewController: BaseViewController {
 		
 		let colorPicker = Layout.Horizontal(targets:[
 			Layout.Vertical(targets:[
-				stringPrimary,
+				spacePicker.fixed(width:colorBoxSize, height:40).padding(horizontal:-10, vertical:0),
+				//stringPrimary,
 				colorBox.fixed(width:colorBoxSize, height:colorBoxSize),
 				stringContrast
 			], spacing:2, alignment:.center, position:.stretch, primary:1),

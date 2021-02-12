@@ -518,9 +518,10 @@ public struct CHCLTPower: CHCLT {
 	}
 	
 	public static let y240 = CHCLTPower(Linear.vector3(0.212, 0.701, 0.087), exponent:0.5)			//	39:129:16
-	public static let y601 = CHCLTPower(Linear.vector3(0.299, 0.587, 0.114), exponent:0.45)		//	34:67:13	SDTV
+	public static let y601 = CHCLTPower(Linear.vector3(0.299, 0.587, 0.114), exponent:0.45)			//	34:67:13	SDTV
 	public static let y709 = CHCLTPower(Linear.vector3(0.2126, 0.7152, 0.0722), exponent:0.45)		//	53:178:18	HDTV
-	public static let y2020 = CHCLTPower(Linear.vector3(0.2627, 0.6780, 0.0593), exponent:0.45)	//	31:80:7		UHDTV
+	public static let y2020 = CHCLTPower(Linear.vector3(0.2627, 0.6780, 0.0593), exponent:0.45)		//	31:80:7		UHDTV
+	public static let sRGB = CHCLTPower(Linear.vector3(0.21263901, 0.71516867, 0.07219232), exponent:5 / 12)	//	53:178:18	HDTV
 }
 
 //	MARK: -

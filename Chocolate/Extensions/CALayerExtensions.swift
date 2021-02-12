@@ -97,6 +97,26 @@ extension CALayer {
 		
 		if cornerRadius != radius { cornerRadius = radius }
 	}
+	
+	public func alignContents(size:CGSize, alignment:CGPoint) {
+		let viewSize = bounds.size
+		let ratioWidth = size.width * viewSize.height
+		let ratioHeight = size.height * viewSize.width
+		var unit:CGSize
+		
+		guard ratioWidth > 0 && ratioHeight > 0 else { return }
+		
+		if ratioWidth > ratioHeight {
+			unit = CGSize(width:ratioHeight / ratioWidth, height:1)
+		} else {
+			unit = CGSize(width:1, height:ratioWidth / ratioHeight)
+		}
+		
+		let origin = CGPoint(x:alignment.x * (1 - unit.width), y:alignment.y * (1 - unit.height))
+		
+		contentsGravity = .resizeAspectFill
+		contentsRect = CGRect(origin:origin, size:unit)
+	}
 }
 
 // MARK: -

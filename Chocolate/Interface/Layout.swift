@@ -30,7 +30,7 @@ protocol Positionable {
 	/// # Order create
 	/// A container is adding elements to the hierarchy.  Viewables should create views as needed.
 	/// # Order attach
-	/// A container is being reused and attempting to attach Viewables to existing views.  Viewables should return self.
+	/// A container is being reused and attempting to reform attachments.  Viewables should return self.
 	/// # Order existing
 	/// A modifier is affecting views in the hierarchy.  Viewables should return existing views but not create views. 
 	func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable]
