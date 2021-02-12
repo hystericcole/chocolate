@@ -493,7 +493,7 @@ enum Viewable {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			var size = model.content.positionableSize(fitting:limit)
 			
-			size.decreaseRange(minimum:model.minimum, maximum:model.maximum)
+			size.minimize(minimum:model.minimum, maximum:model.maximum)
 			
 			return size
 		}
@@ -878,7 +878,7 @@ enum Viewable {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			var size = Layout.Vertical(targets:model.cells, spacing:0).positionableSize(fitting:limit)
 			
-			size.decreaseRange(minimum:model.minimum, maximum:model.maximum)
+			size.minimize(minimum:model.minimum, maximum:model.maximum)
 			
 			return size
 		}

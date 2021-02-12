@@ -299,6 +299,13 @@ struct Layout {
 				return Limit(width:ratioHeight / ratio.height.native, height:height)
 			}
 		}
+		
+		func minimize(width: Native, height: Native) -> Limit {
+			let width = min(width, self.width ?? Limit.unlimited)
+			let height = min(height, self.height ?? Limit.unlimited)
+			
+			return Limit(width: width < Limit.unlimited ? width : nil, height: height < Limit.unlimited ? height : nil)
+		}
 	}
 	
 	/// The space requested during layout, in one direction.
@@ -415,8 +422,13 @@ struct Layout {
 			fraction = max(fraction, dimension.fraction)
 		}
 		
-		mutating func decreaseRange(_ range:ClosedRange<Double>) {
+		mutating func minimize(_ range:ClosedRange<Double>) {
 			minimum = min(minimum, range.lowerBound)
+			maximum = min(maximum, range.upperBound)
+		}
+		
+		mutating func intersect(_ range:ClosedRange<Double>) {
+			minimum = max(minimum, range.lowerBound)
 			maximum = min(maximum, range.upperBound)
 		}
 	}
@@ -569,9 +581,9 @@ struct Layout {
 			return box
 		}
 		
-		mutating func decreaseRange(minimum:CGSize, maximum:CGSize) {
-			width.decreaseRange(minimum.width.native ... maximum.width.native)
-			height.decreaseRange(minimum.height.native ... maximum.height.native)
+		mutating func minimize(minimum:CGSize, maximum:CGSize) {
+			width.minimize(minimum.width.native ... maximum.width.native)
+			height.minimize(minimum.height.native ... maximum.height.native)
 		}
 	}
 	
@@ -681,18 +693,14 @@ struct Layout {
 		var width:Dimension?
 		var height:Dimension?
 		
-		init(target:Positionable, width:Dimension? = nil, height:Dimension? = nil) {
+		init(target:Positionable, width:Dimension?, height:Dimension?) {
 			self.target = target
 			self.width = width
 			self.height = height
 		}
 		
-		init(target:Positionable, width:Native? = nil, height:Native? = nil) {
+		init(target:Positionable, width:Native?, height:Native?) {
 			self.init(target:target, width:Dimension(value:width), height:Dimension(value:height))
-		}
-		
-		init(target:Positionable, minimumWidth:Native? = nil, minimumHeight:Native? = nil) {
-			self.init(target:target, width:Dimension(minimum:minimumWidth), height:Dimension(minimum:minimumHeight))
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -704,6 +712,32 @@ struct Layout {
 			let size = target.positionableSize(fitting:limit)
 			
 			return Layout.Size(width:width ?? size.width, height:height ?? size.height)
+		}
+	}
+	
+	struct Limiting: PositionableWithTarget {
+		var target:Positionable
+		var width:ClosedRange<Native>
+		var height:ClosedRange<Native>
+		
+		init(target:Positionable, width:ClosedRange<Native>, height:ClosedRange<Native>) {
+			self.target = target
+			self.width = width
+			self.height = height
+		}
+		
+		init(target:Positionable, minimumWidth:Native = 0, minimumHeight:Native = 0) {
+			self.init(target:target, width:minimumWidth ... Dimension.unbound, height:minimumHeight ... Dimension.unbound)
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			let limit = limit.minimize(width:width.upperBound, height:height.upperBound)
+			var size = target.positionableSize(fitting:limit)
+			
+			size.width.intersect(width)
+			size.height.intersect(height)
+			
+			return size
 		}
 	}
 	
@@ -1964,12 +1998,12 @@ extension Positionable {
 		return Layout.Sizing(target:self, width:width, height:height)
 	}
 	
-	func minimum(width:Layout.Native? = nil, height:Layout.Native? = nil) -> Positionable {
-		return Layout.Sizing(target:self, minimumWidth:width, minimumHeight:height)
+	func minimum(width:Layout.Native = 0, height:Layout.Native = 0) -> Positionable {
+		return Layout.Limiting(target:self, minimumWidth:width, minimumHeight:height)
 	}
 	
 	func useAvailableSpace() -> Positionable {
-		return Layout.Sizing(target:self, minimumWidth:0, minimumHeight:0)
+		return Layout.Sizing(target:self, width:Layout.Dimension(minimum:0), height:Layout.Dimension(minimum:0))
 	}
 	
 	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {
