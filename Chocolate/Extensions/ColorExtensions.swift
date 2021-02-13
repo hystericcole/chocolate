@@ -14,8 +14,8 @@ import Cocoa
 typealias SystemColor = NSColor
 
 extension NSColor {
-	var rgba:RGBA? {
-		return RGBA(color:cgColor)
+	var rgba:DisplayRGB? {
+		return DisplayRGB(cgColor)
 	}
 }
 #else
@@ -24,39 +24,41 @@ import UIKit
 typealias SystemColor = UIColor
 
 extension UIColor {
-	var rgba:RGBA? {
-		return RGBA(color:cgColor)
+	var rgba:DisplayRGB? {
+		return DisplayRGB(cgColor)
 	}
 }
 #endif
 
 extension CGColor {
-	var rgba:RGBA? {
-		return RGBA(color:self)
+	var rgba:DisplayRGB? {
+		return DisplayRGB(self)
 	}
 	
-	static func from(rgba:RGBA?, colorSpace:CGColorSpace?) -> CGColor? {
-		return rgba?.cgColor(colorSpace:colorSpace)
+	static func from(rgba:DisplayRGB?, colorSpace:CGColorSpace?) -> CGColor? {
+		return rgba?.color(colorSpace:colorSpace)
 	}
 }
 
 extension CGColor {
 	static var chocolate = CHCLTPower.y709
 	
+	var displayRGB:DisplayRGB? { return DisplayRGB(self) }
+	
 	var chocolateHue:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.vectorHue(color.vector) }
 	var chocolateSaturation:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.saturation(color.vector) }
 	var chocolateLuma:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.luma(color.vector) }
 	var chocolateContrast:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.contrast(color.vector) }
 	
-	func chocolateTransform(transform:(CHCLT.Vector4) -> CHCLT.Vector4) -> CGColor? { guard let color = rgba else { return nil }; return RGBA(vector:transform(color.vector)).cgColor(colorSpace:colorSpace) }
-	func chocolateHue(_ hue:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.color(hue:hue, saturation:CGColor.chocolate.saturation($0), luma:CGColor.chocolate.luma($0), alpha:$0.w) } ?? self }
-	func chocolateShiftHue(_ hue:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.shiftVectorHue($0, by:hue) } ?? self }
-	func chocolateSaturation(_ saturation:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.applySaturation($0, saturation:saturation) } ?? self }
-	func chocolateScaleSaturation(_ scalar:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.scaleSaturation($0, by:scalar) } ?? self }
-	func chocolateLuma(_ luma:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.applyLuma($0, luma:luma) } ?? self }
-	func chocolateScaleLuma(_ scalar:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.scaleLuma($0, by:scalar) } ?? self }
-	func chocolateContrasting(_ contrast:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.contrasting($0, contrast:contrast) } ?? self }
-	func chocolateScaleContrast(_ scalar:Double) -> CGColor { return chocolateTransform { CGColor.chocolate.scaleContrast($0, by:scalar) } ?? self }
+	func chocolateTransform(transform:(DisplayRGB?) -> DisplayRGB?) -> CGColor? { return transform(displayRGB)?.color(colorSpace:colorSpace) }
+	func chocolateHueShifted(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(CGColor.chocolate, by:value) } ?? self }
+	func chocolateHue(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(CGColor.chocolate, by:($0?.vectorHue(CGColor.chocolate) ?? 0) - value) } ?? self }
+	func chocolateScaleChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleChroma(CGColor.chocolate, by:value) } ?? self }
+	func chocolateChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyChroma(CGColor.chocolate, value:value) } ?? self }
+	func chocolateScaleLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleLuma(CGColor.chocolate, by:value) } ?? self }
+	func chocolateLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyLuma(CGColor.chocolate, value:value) } ?? self }
+	func chocolateScaleContrast(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleContrast(CGColor.chocolate, by:value) } ?? self }
+	func chocolateContrasting(_ value:Double) -> CGColor { return chocolateTransform { $0?.contrasting(CGColor.chocolate, value:value) } ?? self }
 }
 
 extension SystemColor {

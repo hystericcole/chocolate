@@ -7,8 +7,271 @@
 
 import CoreGraphics
 import Foundation
+import simd
 
-public struct RGBA: CustomStringConvertible {
+public struct DisplayRGB {
+	public typealias Scalar = CHCL.Scalar
+	public typealias Vector4 = CHCL.Vector4
+	
+	public let vector:Vector4
+	public var cg:CGColor? { return color() }
+	public var clamped:DisplayRGB { return DisplayRGB(simd_min(simd_max(.zero, vector), .one)) }
+	public var inverted:DisplayRGB { return DisplayRGB(Scalar.vector4(1 - vector.xyz, vector.w)) }
+	
+	public var red:Scalar { return vector.x }
+	public var green:Scalar { return vector.y }
+	public var blue:Scalar { return vector.z }
+	public var alpha:Scalar { return vector.w }
+	
+	public var integer:(red:UInt, green:UInt, blue:UInt, alpha:UInt) {
+		var scaled = vector * 255
+		
+		scaled.round(.toNearestOrAwayFromZero)
+		
+		let integer = simd_uint(scaled)
+		
+		return (UInt(integer.x), UInt(integer.y), UInt(integer.z), UInt(integer.w))
+	}
+	
+	public var description:String {
+		return String(format:"RGBA(%.3g, %.3g, %.3g, %.3g)", red, green, blue, alpha)
+	}
+	
+	public init(_ rgba:Vector4) {
+		vector = rgba
+	}
+	
+	public init(_ red:Scalar, _ green:Scalar, _ blue:Scalar, _ alpha:Scalar = 1) {
+		vector = Scalar.vector4(red, green, blue, alpha)
+	}
+	
+	public init(gray:Scalar, _ alpha:Scalar = 1) {
+		vector = Scalar.vector4(gray, gray, gray, alpha)
+	}
+	
+	public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luma:Scalar, alpha:Scalar = 1) {
+		let linear = CHCL.LinearRGB.init(chclt, hue:hue, luminance:luma).applyChroma(chclt, value:chroma)
+		
+		vector = Scalar.vector4(chclt.display(simd_max(linear.vector, .zero)), alpha)
+	}
+	
+	public init(hexagonal hue:Scalar, saturation:Scalar, brightness:Scalar, alpha:Scalar = 1) {
+		guard brightness > 0 && saturation > 0 else { self.init(gray:brightness, alpha); return }
+		
+		let hue1 = Scalar.vector3(hue, hue - 1/3, hue - 2/3)
+		let hue2 = hue1 - hue1.rounded(.down) - 0.5
+		let hue3 = simd_abs(hue2) * 6.0 - 1.0
+		let hue4 = simd_clamp(hue3, .zero, .one)
+		let c = saturation * brightness
+		let m = brightness - c
+		
+		self.init(Scalar.vector4(hue4 * c + m, alpha))
+	}
+	
+	public init?(_ color:CGColor?) {
+		guard
+			let color = color,
+			color.numberOfComponents == 4,
+			color.colorSpace?.model ?? .rgb == .rgb,
+			let components = color.components
+		else { return nil }
+		
+		self.init(components[0].native, components[1].native, components[2].native, components[3].native)
+	}
+	
+	public func color(colorSpace:CGColorSpace? = nil) -> CGColor? {
+		let space:CGColorSpace
+		
+		if let colorSpace = colorSpace, colorSpace.model == .rgb {
+			space = colorSpace
+		} else {
+			space = CGColorSpaceCreateDeviceRGB()
+		}
+		
+		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), CGFloat(vector.w)]
+		
+		return CGColor(colorSpace:space, components:&components)
+	}
+	
+	public func web(allowFormat:Int = 0) -> String {
+		let (r, g, b, a) = integer
+		let format:String
+		let scalar:UInt
+		
+		let allowCompact = allowFormat & 0x1A != 0
+		let allowRegular = allowFormat & 0x144 != 0
+		let isCompact = r % 17 == 0 && g % 17 == 0 && b % 17 == 0 && a % 17 == 0
+		let isGray = r == g && r == b
+		let isOpaque = a == 255
+		
+		if allowCompact && (isCompact || !allowRegular) {
+			let allowOpacity = allowFormat & 0x10 != 0
+			let allowGray = allowFormat & 0x02 != 0
+			scalar = 17
+			
+			if allowGray && isGray && (isOpaque || !allowOpacity) {
+				format = "#%X"
+			} else if isOpaque ? allowFormat & 0x18 == 0x10 : allowOpacity {
+				format = "#%X%X%X%X"
+			} else {
+				format = "#%X%X%X"
+			}
+		} else {
+			let allowOpacity = allowFormat & 0x100 != 0
+			let allowGray = allowFormat & 0x04 != 0
+			scalar = 1
+			
+			if allowGray && isGray && (isOpaque || !allowOpacity) {
+				format = "#%02X"
+			} else if isOpaque ? allowFormat & 0x140 == 0x100 : allowOpacity {
+				format = "#%02X%02X%02X%02X"
+			} else {
+				format = "#%02X%02X%02X"
+			}
+		}
+		
+		return String(format:format, r / scalar, g / scalar, b / scalar, a / scalar)
+	}
+	
+	public func css(withAlpha:Int = 0) -> String {
+		if withAlpha > 0 || (withAlpha == 0 && alpha < 1) {
+			return String(format:"rgba(%.1g, %.1g, %.1g, %.3g)", red * 255, green * 255, blue * 255, alpha)
+		} else {
+			return String(format:"rgb(%.1g, %.1g, %.1g)", red * 255, green * 255, blue * 255)
+		}
+	}
+	
+	public func linear(_ chclt:CHCLT) -> CHCL.LinearRGB {
+		return CHCL.LinearRGB(chclt.linear(vector.xyz))
+	}
+	
+	public func scaled(_ scalar:Scalar) -> DisplayRGB {
+		return DisplayRGB(Scalar.vector4(vector.xyz * scalar, vector.w))
+	}
+	
+	public func normalized(_ chclt:CHCLT) -> DisplayRGB {
+		let l = linear(chclt)
+		
+		return l.normalize(luminance:l.luminance(chclt), leavePositive: true).display(chclt, alpha:vector.w)
+	}
+	
+	public func luma(_ chclt:CHCLT) -> Scalar {
+		return linear(chclt).luminance(chclt)
+	}
+	
+	public func scaleLuma(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
+		return scaled(scalar > 0 ? chclt.transfer(scalar) : 0)
+	}
+	
+	public func applyLuma(_ chclt:CHCLT, value u:Scalar) -> DisplayRGB {
+		//return linear(chclt).applyLuminance(chclt, value:u).display(chclt, alpha:vector.w)
+		
+		guard u > 0 else { return DisplayRGB(Scalar.vector4(.zero, vector.w)) }
+		guard u < 1 else { return DisplayRGB(Scalar.vector4(.one, vector.w)) }
+		
+		let l = chclt.linear(vector.xyz)
+		let v = chclt.luminance(l)
+		
+		guard v > 0 else { return DisplayRGB(gray:chclt.transfer(u), vector.w) }
+		
+		let n = CHCL.LinearRGB(l).normalize(luminance:v, leavePositive:true)
+		let rgb = chclt.display(n.vector)
+		let s = chclt.transfer(u / v)
+		let d = rgb.max()
+		
+		guard s * d > 1 else { return DisplayRGB(Scalar.vector4(rgb * s, vector.w)) }
+		
+		let maximumPreservingHue = rgb / d
+		let m = chclt.linear(maximumPreservingHue)
+		let w = chclt.luminance(m)
+		let distanceFromWhite = (1 - u) / (1 - w)
+		let interpolated = 1 - distanceFromWhite + distanceFromWhite * m
+		
+		return DisplayRGB(Scalar.vector4(chclt.display(interpolated), vector.w))
+	}
+	
+	public func contrast(_ chclt:CHCLT) -> Scalar {
+		return linear(chclt).contrast(chclt)
+	}
+	
+	public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
+		return linear(chclt).scaleContrast(chclt, by:scalar).display(chclt, alpha:vector.w)
+	}
+	
+	public func applyContrast(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
+		return linear(chclt).applyContrast(chclt, value:value).display(chclt, alpha:vector.w)
+	}
+	
+	public func contrasting(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
+		return linear(chclt).contrasting(chclt, value:value).display(chclt, alpha:vector.w)
+	}
+	
+	public func chroma(_ chclt:CHCLT) -> Scalar {
+		return linear(chclt).chroma(chclt)
+	}
+	
+	public func scaleChroma(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
+		return linear(chclt).scaleChroma(chclt, by:scalar).display(chclt, alpha:vector.w)
+	}
+	
+	public func applyChroma(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
+		return linear(chclt).applyChroma(chclt, value:value).display(chclt, alpha:vector.w)
+	}
+	
+	public func vectorHue(_ chclt:CHCLT) -> Scalar {
+		return linear(chclt).hue(chclt)
+	}
+	
+	public func hueShifted(_ chclt:CHCLT, by shift:Scalar) -> DisplayRGB {
+		return linear(chclt).hueShifted(chclt, by:shift).display(chclt, alpha:vector.w)
+	}
+	
+	public func hsb() -> (hue:Scalar, saturation:Scalar, brightness:Scalar) {
+		let domain, maximum, mid_minus_min, max_minus_min:Scalar
+		let r = vector.x, g = vector.y, b = vector.z
+		
+		if r < g {
+			if g < b {
+				maximum = b
+				mid_minus_min = r - g
+				max_minus_min = b - r
+				domain = 4
+			} else {
+				maximum = g
+				mid_minus_min = b - r
+				max_minus_min = g - min(r, b)
+				domain = 2
+			}
+		} else {
+			if r < b {
+				maximum = b
+				mid_minus_min = r - g
+				max_minus_min = b - g
+				domain = 4
+			} else {
+				maximum = r
+				mid_minus_min = g - b
+				max_minus_min = r - min(g, b)
+				domain = 0
+			}
+		}
+		
+		guard max_minus_min > 0 else { return (1, 0, 0) }
+		
+		let hue6 = domain + mid_minus_min / max_minus_min
+		let hue = hue6 / 6
+		
+		return (hue < 0 ? 1 + hue : hue, max_minus_min, maximum)
+	}
+	
+	public func hcl(_ chclt:CHCLT) -> (hue:Scalar, chroma:Scalar, luma:Scalar) {
+		let l = linear(chclt)
+		
+		return (l.hue(chclt), l.chroma(chclt), l.luminance(chclt))
+	}
+}
+
+public struct RGBA1: CustomStringConvertible {
 	public typealias Number = CHCLTScalar
 	public typealias Curved = Number
 	public typealias Linear = Number

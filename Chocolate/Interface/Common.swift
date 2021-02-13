@@ -133,6 +133,10 @@ extension PlatformView {
 		set { alphaValue = newValue }
 	}
 	
+	var center:CGPoint {
+		get { return frame.center }
+	}
+	
 	var backgroundColor:PlatformColor? {
 		get { return layer?.backgroundColor?.platformColor }
 		set { layer?.backgroundColor = newValue?.cgColor }
@@ -278,6 +282,10 @@ extension PlatformScrollingView {
 extension PlatformSlider {
 	static var intrinsicViewableSize:CGSize {
 		return CGSize(width:-1, height:15)
+	}
+	
+	var trackingFrame:CGRect {
+		return frame.insetBy(dx:knobThickness / 2, dy:0)
 	}
 	
 	var valueRange:ClosedRange<Double> {
@@ -439,6 +447,14 @@ extension PlatformScrollingView {
 extension PlatformSlider {
 	static var intrinsicViewableSize:CGSize {
 		return CGSize(width:-1, height:33)
+	}
+	
+	var trackingFrame:CGRect {
+		if let image = currentThumbImage {
+			return frame.insetBy(dx:image.size.width / 2, dy:0)
+		} else {
+			return frame.insetBy(dx:bounds.size.height / 2, dy:0)
+		}
 	}
 	
 	var doubleValue:Double {

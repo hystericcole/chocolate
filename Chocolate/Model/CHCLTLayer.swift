@@ -33,14 +33,14 @@ class CHCLTLayer: CALayer {
 		
 		for i in 0 ... limit {
 			let x = Double(i) / Double(limit)
-			let c, d:CHCLT.Vector4
+			let c, d:DisplayRGB
 			
 			if isScalarLuma {
-				c = chocolate.color(hue:x, saturation:1, luma:scalar, alpha:1)
-				d = chocolate.scaleSaturation(c, by:0)
+				c = DisplayRGB(chocolate, hue:x, chroma:1, luma:scalar, alpha:1)
+				d = c.scaleChroma(chocolate, by:0)
 			} else {
-				c = chocolate.color(hue:x, saturation:scalar, luma:1, alpha:1)
-				d = chocolate.scaleLuma(c, by:0)
+				c = DisplayRGB(chocolate, hue:x, chroma:scalar, luma:1, alpha:1)
+				d = c.scaleLuma(chocolate, by:0)
 			}
 			
 			let origin = isHorizontal ? CGPoint(x:0, y:CGFloat(i) * thickness) : CGPoint(x:CGFloat(i) * thickness, y:0)

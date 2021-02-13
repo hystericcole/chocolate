@@ -1328,7 +1328,7 @@ struct Layout {
 			return targets.indices.contains(primaryIndex) ? targets[primaryIndex].compressionResistance : .zero
 		}
 		
-		init(targets:[Positionable], vertical:Alignment = .fill, horizontal:Alignment = .fill, primary:Int = -1) {
+		init(targets:[Positionable], horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1) {
 			self.targets = targets
 			self.vertical = vertical
 			self.horizontal = horizontal
@@ -2004,6 +2004,10 @@ extension Positionable {
 	
 	func useAvailableSpace() -> Positionable {
 		return Layout.Sizing(target:self, width:Layout.Dimension(minimum:0), height:Layout.Dimension(minimum:0))
+	}
+	
+	func align(horizontal:Layout.Alignment = .center, vertical:Layout.Alignment = .center) -> Positionable {
+		return Layout.Overlay(targets:[self], horizontal:horizontal, vertical:vertical)
 	}
 	
 	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {

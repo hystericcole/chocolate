@@ -10,10 +10,10 @@ import Foundation
 
 protocol LazyViewable: AnyObject, Positionable {
 	var existingView:PlatformView? { get }
+	var viewType:PlatformView.Type { get }
+	var lazyView:PlatformView { get }
 	var tag:Int { get }
 	
-	func viewType() -> PlatformView.Type
-	func lazyView() -> PlatformView
 	func attachToExistingView(_ view:PlatformView)
 	func detachView(prepareForReuse:Bool)
 }
@@ -65,11 +65,10 @@ protocol ViewablePositionable: LazyViewable {
 
 extension ViewablePositionable {
 	var existingView:PlatformView? { return view }
+	var lazyView:PlatformView { return lazy() }
+	var viewType:PlatformView.Type { return ViewType.self }
 	var frame:CGRect { return view?.frame ?? .zero }
 	var compressionResistance:CGPoint { return view?.compressionResistance ?? .zero }
-	
-	func lazyView() -> PlatformView { return lazy() }
-	func viewType() -> PlatformView.Type { return ViewType.self }
 	
 	func lazy() -> ViewType {
 		if let view = view { return view }
@@ -986,7 +985,7 @@ extension PlatformView {
 				continue
 			}
 			
-			let viewType = viewable.viewType()
+			let viewType = viewable.viewType
 			let typeKey = ObjectIdentifier(viewType)
 			
 			if viewType === PlatformView.self {

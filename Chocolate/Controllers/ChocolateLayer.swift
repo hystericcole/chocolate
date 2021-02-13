@@ -34,14 +34,14 @@ class ChocolateLayer: CALayer {
 		
 		for i in 0 ... limit {
 			let x = Double(i) / Double(limit)
-			let c, d:CHCLT.Vector4
+			let c, d:DisplayRGB
 			
 			if isScalarLuma {
-				c = chocolate.color(hue:x, saturation:1, luma:scalar, alpha:1)
-				d = chocolate.scaleSaturation(c, by:0)
+				c = DisplayRGB(chocolate, hue:x, chroma:1, luma:scalar, alpha:1)
+				d = c.scaleChroma(chocolate, by:0)
 			} else {
-				c = chocolate.color(hue:x, saturation:scalar, luma:1, alpha:1)
-				d = chocolate.scaleLuma(c, by:0)
+				c = DisplayRGB(chocolate, hue:x, chroma:scalar, luma:1, alpha:1)
+				d = c.scaleLuma(chocolate, by:0)
 			}
 			
 			let origin = isHorizontal ? CGPoint(x:0, y:CGFloat(i) * thickness) : CGPoint(x:CGFloat(i) * thickness, y:0)
@@ -73,8 +73,35 @@ class ChocolateLayerView: BaseView {
 	override class var layerClass:AnyClass { return ChocolateLayer.self }
 	override func prepare() { super.prepare(); layer.setNeedsDisplay() }
 #endif
+	var chocolateLayer:ChocolateLayer? { return layer as? ChocolateLayer }
 }
 
 class ChocolateLayerViewController: BaseViewController {
-	override func loadView() { view = ChocolateLayerView() }
+	let chocolate = ChocolateLayerView()
+	let slider = Viewable.Slider(value:0.5, action:#selector(sliderChanged))
+	let toggle = Viewable.Switch(action:#selector(switchFlipped))
+	let group = Viewable.Group(content:Layout.EmptySpace())
+	
+	override func loadView() {
+		group.content = layout()
+		view = group.lazyView
+		group.view?.attachViewController(self)
+	}
+	
+	@objc
+	func sliderChanged() {
+		chocolate.chocolateLayer?.scalar = slider.value
+	}
+	
+	@objc
+	func switchFlipped() {
+		chocolate.chocolateLayer?.vertical = toggle.isOn ? .chroma : .luma
+	}
+	
+	func layout() -> Positionable {
+		return Layout.Vertical(targets:[
+			Layout.Horizontal(targets: [slider, toggle], spacing:20, position:.center).padding(20),
+			chocolate
+		], alignment:.fill, position:.stretch)
+	}
 }
