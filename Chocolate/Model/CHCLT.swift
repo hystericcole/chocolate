@@ -140,8 +140,9 @@ public enum CHCL {
 		//	MARK: - Luminance
 		
 		/// The luminance of this color in the given color space
-		/// # Calculation
-		/// Computed as the dot product of the linear components with the weighting coefficients of the color space
+		/// 
+		/// Computed as the dot product of the linear components with the weighting coefficients of the color space.
+		/// This is typically equivalent to conversion to the XYZ color space, where Y is the luminance.
 		/// - Parameter chclt: The color space
 		/// - Returns: The luminance
 		public func luminance(_ chclt:CHCLT) -> Linear {
@@ -490,108 +491,5 @@ public struct CHCLT_BT: CHCLT {
 	
 	public func inverseLuminance(_ vector:CHCLT.Vector3) -> CHCLT.Vector3 {
 		return vector / CHCLT_sRGB.coefficients
-	}
-}
-
-//	MARK: -
-
-public struct CHCLTShading {
-	public struct ColorLocation {
-		public let color:CHCL.LinearRGB
-		public let alpha:CHCLT.Scalar
-		public let location:CHCLT.Scalar
-		
-		func display(_ model:CHCLT) -> DisplayRGB { return color.display(model, alpha:alpha) }
-	}
-
-	public let model:CHCLT
-	public let colors:[ColorLocation]
-	var previousAbove = 0
-	
-	public init(model:CHCLT, colors:[ColorLocation]) {
-		self.model = model
-		self.colors = colors
-	}
-	
-	public init(model:CHCLT, colors:[DisplayRGB]) {
-		let scalar = CHCLT.Scalar(colors.count - 1)
-		
-		self.init(model:model, colors:colors.indices.map { ColorLocation(color:colors[$0].linear(model), alpha:colors[$0].vector.w, location:CHCLT.Scalar($0) / scalar) })
-	}
-	
-	public init(model:CHCLT, colors:[DisplayRGB], locations:[CHCLT.Scalar]) {
-		let indices = 0 ..< min(colors.count, locations.count)
-		
-		self.init(model:model, colors:indices.map { ColorLocation(color:colors[$0].linear(model), alpha:colors[$0].vector.w, location:locations[$0]) })
-	}
-	
-	public mutating func interpolate(by scalar:CHCLT.Scalar) -> DisplayRGB {
-		let count = colors.count
-		
-		guard count > 1 else { return colors.first?.display(model) ?? DisplayRGB(.zero) }
-		
-		let above, below:Int
-		let location = scalar
-		
-		if previousAbove > 0 && previousAbove < count && colors[previousAbove].location > location && colors[previousAbove - 1].location < location {
-			above = previousAbove
-			below = above - 1
-		} else {
-			above = colors.binarySearch(location) { $0.location < $1 }
-			below = above - 1
-			
-			previousAbove = above
-		}
-		
-		guard above < count else { return colors[below].display(model) }
-		guard above > 0 else { return colors[0].display(model) }
-		
-		let colorAbove = colors[above]
-		let colorBelow = colors[below]
-		let fraction = colorBelow.location.interpolate(towards:colorAbove.location, by:location)
-		let alpha = colorBelow.alpha * (1 - fraction) + colorAbove.alpha * fraction
-		
-		return colorBelow.color.interpolated(towards:colorAbove.color, by:fraction).display(model, alpha:alpha)
-	}
-	
-	public func shadingFunction() -> CGFunction? {
-		let context = UnsafeMutablePointer<CHCLTShading>.allocate(capacity:1)
-		
-		context.initialize(to:self)
-		
-		let evaluate:CGFunctionEvaluateCallback = { pointer, input, output in
-			guard let shadingPointer = pointer?.assumingMemoryBound(to:CHCLTShading.self) else { return }
-			
-			let display = shadingPointer.pointee.interpolate(by:CHCLT.Scalar(input.pointee))
-			let rgba = display.vector
-			
-			output[0] = CGFloat(rgba.x)
-			output[1] = CGFloat(rgba.y)
-			output[2] = CGFloat(rgba.z)
-			output[3] = CGFloat(rgba.w)
-		}
-		
-		let release:CGFunctionReleaseInfoCallback = { pointer in
-			guard let context = pointer?.assumingMemoryBound(to:CHCLTShading.self) else { return }
-			
-			context.deinitialize(count:1)
-			context.deallocate()
-		}
-		
-		var callbacks = CGFunctionCallbacks(version:0, evaluate:evaluate, releaseInfo:release)
-		
-		return CGFunction(info:context, domainDimension:1, domain:nil, rangeDimension:4, range:nil, callbacks:&callbacks)
-	}
-	
-	public func shading(colorSpace:CGColorSpace, start:CGPoint, end:CGPoint, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
-		guard colorSpace.model == .rgb, let function = shadingFunction() else { return nil }
-		
-		return CGShading(axialSpace:colorSpace, start:start, end:end, function:function, extendStart:extendStart, extendEnd:extendEnd)
-	}
-	
-	public func shading(colorSpace:CGColorSpace, start:CGPoint, startRadius:CGFloat = 0, end:CGPoint, endRadius:CGFloat, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
-		guard colorSpace.model == .rgb, let function = shadingFunction() else { return nil }
-		
-		return CGShading(radialSpace:colorSpace, start:start, startRadius:startRadius, end:end, endRadius:endRadius, function:function, extendStart:extendStart, extendEnd:extendEnd)
 	}
 }

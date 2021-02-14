@@ -16,5 +16,6 @@ enum DisplayStrings {
 		static let saturation = "Saturation"
 		
 		static func example(foreground:Int, background:Int) -> String { return "Foreground \(foreground), Background \(background)" }
+		static func example(foreground:Int, fc:String, background:Int, bc:String, contrast:String) -> String { return "Foreground \(foreground) \(fc)◐, Background \(background) \(bc)◐, g18 \(contrast)" }
 	}
 }

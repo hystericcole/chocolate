@@ -35,6 +35,7 @@ class ChocolateViewController: BaseViewController {
 	var previousInput:Input = .luma
 	var stableChroma:Bool = true
 	var chocolate = CHCLTPower.y709
+	
 	let group = Viewable.Group(content:Layout.EmptySpace())
 	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:1, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
@@ -64,8 +65,8 @@ class ChocolateViewController: BaseViewController {
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		
-		applyColorInput(.unknown, value:0)
 		prepareLayout()
+		applyColorInput(.unknown, value:0)
 	}
 	
 	func generateBackgrounds(primary:DisplayRGB, contrast:Double, saturation:Double, count:Int) -> [DisplayRGB] {
@@ -94,20 +95,29 @@ class ChocolateViewController: BaseViewController {
 	func applyColor(_ color:DisplayRGB) {
 		colorBox.color = color.cg?.platformColor
 		
+		let formatter = NumberFormatter()
 		let contrast = sliderContrast.value
 		let saturation = sliderSaturation.value
 		let backgrounds = generateBackgrounds(primary:color, contrast:contrast, saturation:saturation, count:examples.count)
 		let foregrounds = generateForegrounds(primary:color, contrast:contrast, saturation:saturation, count:Example.descriptionCount)
 		
+		formatter.minimumFractionDigits = 0
+		formatter.maximumFractionDigits = 2
+		
 		for i in examples.indices {
+			let bc = formatter.string(from:backgrounds[i].contrast(chocolate) as NSNumber) ?? "?"
+			let bl = backgrounds[i].luma(chocolate)
 			examples[i].background.color = backgrounds[i].cg?.platformColor
 			
 			for j in examples[i].foregrounds.indices {
+				let fc = formatter.string(from:foregrounds[j].contrast(chocolate) as NSNumber) ?? "?"
+				let fl = foregrounds[j].luma(chocolate)
+				let g18 = (max(fl, bl) + 0.05) / (min(fl, bl) + 0.05)
+				let contrast = formatter.string(from:g18 as NSNumber) ?? "?"
 				examples[i].foregrounds[j].textColor = foregrounds[j].cg?.platformColor
+				examples[i].foregrounds[j].text = DisplayStrings.Chocolate.example(foreground:j + 1, fc:fc, background:i + 1, bc:bc, contrast:contrast)
 			}
 		}
-		
-		let formatter = NumberFormatter()
 		
 		formatter.minimumFractionDigits = 1
 		formatter.maximumFractionDigits = 3
@@ -120,6 +130,8 @@ class ChocolateViewController: BaseViewController {
 		
 		formatter.maximumFractionDigits = 1
 		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"
+		
+		group.view?.invalidateLayout()
 	}
 	
 	@objc
@@ -260,7 +272,7 @@ extension ChocolateViewController {
 		func lazy() -> Positionable {
 			return Layout.Overlay(targets:[
 				background.ignoringSafeBounds(),
-				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.center, position:.center)
+				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.fill, position:.center)
 					.padding(8)
 			], horizontal:.fill, vertical:.fill)
 		}
@@ -270,7 +282,7 @@ extension ChocolateViewController {
 			self.background = Viewable.Color(tag:99, color:nil)
 			self.foregrounds = (1 ... descriptions).map { description in
 				let text = DisplayStrings.Chocolate.example(foreground:description, background:index)
-				let string = Style.example.string(text)
+				let string = Style.example.centered.string(text)
 				
 				return Viewable.Label(tag:description, string:string)
 			}
