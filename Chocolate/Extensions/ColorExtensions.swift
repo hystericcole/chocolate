@@ -45,10 +45,10 @@ extension CGColor {
 	
 	var displayRGB:DisplayRGB? { return DisplayRGB(self) }
 	
-	var chocolateHue:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.vectorHue(color.vector) }
-	var chocolateSaturation:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.saturation(color.vector) }
-	var chocolateLuma:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.luma(color.vector) }
-	var chocolateContrast:Double { guard let color = rgba else { return 0 }; return CGColor.chocolate.contrast(color.vector) }
+	var chocolateHue:Double { return displayRGB?.vectorHue(CGColor.chocolate) ?? 0 }
+	var chocolateChroma:Double { return displayRGB?.chroma(CGColor.chocolate) ?? 0 }
+	var chocolateLuma:Double { return displayRGB?.luma(CGColor.chocolate) ?? 0 }
+	var chocolateContrast:Double { return displayRGB?.contrast(CGColor.chocolate) ?? 0 }
 	
 	func chocolateTransform(transform:(DisplayRGB?) -> DisplayRGB?) -> CGColor? { return transform(displayRGB)?.color(colorSpace:colorSpace) }
 	func chocolateHueShifted(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(CGColor.chocolate, by:value) } ?? self }
@@ -62,8 +62,9 @@ extension CGColor {
 }
 
 extension SystemColor {
-	convenience init?(chocolateHue hue:Double, saturation:Double, luma:Double, alpha:Double) {
-		let vector = CGColor.chocolate.color(hue:hue, saturation:saturation, luma:luma, alpha:alpha)
+	convenience init?(chocolateHue hue:Double, chroma:Double, luma:Double, alpha:Double) {
+		let color = DisplayRGB(CGColor.chocolate, hue:hue, chroma:chroma, luma:luma, alpha:alpha)
+		let vector = color.vector
 		
 		self.init(red:CGFloat(vector.x), green:CGFloat(vector.y), blue:CGFloat(vector.z), alpha:CGFloat(vector.w))
 	}

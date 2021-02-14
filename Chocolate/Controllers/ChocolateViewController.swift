@@ -116,7 +116,7 @@ class ChocolateViewController: BaseViewController {
 		stringBlue.text = formatter.string(from:color.blue as NSNumber)
 		stringChroma.text = formatter.string(from:sliderChroma.value as NSNumber)
 		stringLuma.text = (formatter.string(from:sliderLuma.value as NSNumber) ?? "") + "❂"
-		stringContrast.text = (formatter.string(from:chocolate.contrast(color.vector) as NSNumber) ?? "") + "◐"
+		stringContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◐"
 		
 		formatter.maximumFractionDigits = 1
 		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"

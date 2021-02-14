@@ -52,8 +52,6 @@
 		07FA9F7B25C20A90005C439B /* RGBA.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7225C20A90005C439B /* RGBA.swift */; };
 		07FA9F7C25C20A90005C439B /* ColorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7325C20A90005C439B /* ColorExtensions.swift */; };
 		07FA9F7D25C20A90005C439B /* ColorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7325C20A90005C439B /* ColorExtensions.swift */; };
-		07FA9F7E25C20A90005C439B /* CHCLTLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7425C20A90005C439B /* CHCLTLayer.swift */; };
-		07FA9F7F25C20A90005C439B /* CHCLTLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7425C20A90005C439B /* CHCLTLayer.swift */; };
 		07FA9F8025C20A90005C439B /* CHCLT.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7525C20A90005C439B /* CHCLT.swift */; };
 		07FA9F8125C20A90005C439B /* CHCLT.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F7525C20A90005C439B /* CHCLT.swift */; };
 		07FA9F8F25C2129C005C439B /* ChocolateViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9F8E25C2129C005C439B /* ChocolateViewController.swift */; };
@@ -135,7 +133,6 @@
 		07FA9F7125C20A90005C439B /* GeometryExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GeometryExtensions.swift; sourceTree = "<group>"; };
 		07FA9F7225C20A90005C439B /* RGBA.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGBA.swift; sourceTree = "<group>"; };
 		07FA9F7325C20A90005C439B /* ColorExtensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ColorExtensions.swift; sourceTree = "<group>"; };
-		07FA9F7425C20A90005C439B /* CHCLTLayer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CHCLTLayer.swift; sourceTree = "<group>"; };
 		07FA9F7525C20A90005C439B /* CHCLT.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CHCLT.swift; sourceTree = "<group>"; };
 		07FA9F8E25C2129C005C439B /* ChocolateViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChocolateViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -320,7 +317,6 @@
 			children = (
 				07CF4DB525D63AB0009BADDD /* Atomic.swift */,
 				07FA9F7525C20A90005C439B /* CHCLT.swift */,
-				07FA9F7425C20A90005C439B /* CHCLTLayer.swift */,
 				07FA9F7225C20A90005C439B /* RGBA.swift */,
 			);
 			path = Model;
@@ -579,7 +575,6 @@
 				07D28D0F25C2277A008347A4 /* Layout.swift in Sources */,
 				07FA9F7625C20A90005C439B /* Extensions.swift in Sources */,
 				07FA9F7A25C20A90005C439B /* RGBA.swift in Sources */,
-				07FA9F7E25C20A90005C439B /* CHCLTLayer.swift in Sources */,
 				07FA9F8025C20A90005C439B /* CHCLT.swift in Sources */,
 				075DEB9125C3C57C002F9B6C /* ChocolateLayer.swift in Sources */,
 				07D28D4625C3BB1D008347A4 /* Styles.swift in Sources */,
@@ -618,7 +613,6 @@
 				07FA9F6925C20A25005C439B /* Common.swift in Sources */,
 				07FA9F2A25C208B0005C439B /* ViewController.swift in Sources */,
 				07FA9F9025C2129C005C439B /* ChocolateViewController.swift in Sources */,
-				07FA9F7F25C20A90005C439B /* CHCLTLayer.swift in Sources */,
 				07D28D1025C2277A008347A4 /* Layout.swift in Sources */,
 				075DEB9225C3C57C002F9B6C /* ChocolateLayer.swift in Sources */,
 				07FA9F2625C208B0005C439B /* AppDelegate.swift in Sources */,

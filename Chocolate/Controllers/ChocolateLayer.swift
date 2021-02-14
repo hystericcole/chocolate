@@ -16,7 +16,7 @@ class ChocolateLayer: CALayer {
 	var chocolate:CHCLT = CHCLTPower.y709
 	var vertical:Axis = .chroma
 	var horizontal:Axis = .hue
-	var scalar:CHCLTScalar = 0.5 { didSet { setNeedsDisplay() } }
+	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
 	var bands:Int = 40
 	
 	func drawChocolate(_ context:CGContext) {
