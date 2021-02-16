@@ -9,8 +9,30 @@ import Foundation
 import simd
 
 public protocol CHCLT {
-	/// Controls how contrast is calculated.
-	func contrastLinearity() -> CHCLT.Scalar
+	/// Luminance that is considered medium.  Color pairs with luminances straddling this value are suitable as foreground and background colors.  Used to identify contrasting colors.  Values in the range 0.1 ... 0.5 are valid.
+	/// 
+	/// Contrast is computed as a ratio or difference of luminance between two colors.  CHCLT uses a ratio.  To compute the ratio, take the luminances of two colors, add the offset to each, then divide the larger sum by the smaller sum.
+	/// 
+	/// CHCLT chooses the ratio and offset so that the medium luminance is a value, not a range.  The medium luminance (m), ratio (r) and offset (1/d) are related as follows:
+	/// ```
+	/// m = (√(d+1)-1) / d = 1/(r + 1)
+	/// d = (1 - 2m) / m² = r² - 1
+	/// r = √(d+1) = 1/m - 1
+	/// ```
+	/// 
+	/// The standard medium luminance for CHCLT is 3/10, which corresponds to a 7/3 ratio and 9/40 offset.  Compute the ratio of 2 colors with luminance a and b as follows:
+	/// ```
+	/// ratio = (max(a, b) + 9/40) / (min(a, b) + 9/40)
+	/// ```
+	/// When the ratio is > 7/3, the colors are considered to have sufficient contrast.  The contrast of a single color is computed such that two opposing colors with contrasts that add to 1 will have this ratio.
+	/// 
+	/// # G18
+	/// The G18 contrast standard calls for a ratio of 4.5 and offset of 0.05, which puts medium luminance in the range 21/120 ... 22/120.
+	/// 
+	/// - Use a medium luminance of 2/11 (0.182) to conform to the 4.5 ratio of G18.
+	/// 
+	/// The standard CHCLT contrast ratio is about half that of G18, but the visible contrast of the colors is similar.
+	func mediumLuminance() -> CHCLT.Scalar
 	
 	/// Convert the components from compressed display space to linear space.
 	/// 
@@ -192,47 +214,28 @@ public enum CHCL {
 		
 		//	MARK: - Contrast
 		
-		/// True if the luminance is below half.
+		/// True if the luminance is below the medium luminance of the color space.
 		public func isDark(_ chclt:CHCLT) -> Bool {
-			return luminance(chclt) < 0.5
+			return luminance(chclt) < chclt.mediumLuminance()
 		}
 		
-		/// The contrast of a color is a measure of the distance from medium.  Both black and white have a contrast of 1.  The contrast is computed so that light and dark color pairs with contrasts of at least 0.1 will be legible, and 0.3 is recommended.
+		/// The contrast of a color is a measure of the distance from medium.  Both black and white have a contrast of 1.  The contrast is computed so that light and dark color pairs with contrasts that add to at least 0.5 will be legible, and a sum of at least 1.0 is recommended.
 		/// - Parameter chclt: The color space
 		/// - Returns: The contrast
 		public func contrast(_ chclt:CHCLT) -> Linear {
-			let d = chclt.contrastLinearity()
+			let m = chclt.mediumLuminance()
 			let v = luminance(chclt)
-			let k = v > 0.5 ? (1 - v) / (1 - v + d) : v / (v + d)
-			let c = k * (1 + 2 * d) - 1
+			let c = v > m ? (v - m) / (1 - m) : 1 - v / m
 			
 			return c.magnitude
 		}
 		
-		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amout.  For example, scale by 0.5 to produce a color that contrasts half as much against the same background.  Scaling to 0 will result in a medium colors.  Scaling to negative will result in contrasting colors.  Scaling by a magnitude greater than 1 may denormalize the color. 
+		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.  For example, scale by 0.5 to produce a color that contrasts half as much against the same background.  Scaling to 0 will result in a color with medium luminance.  Scaling to negative will result in contrasting colors.
 		public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
-			let d = chclt.contrastLinearity()
+			let m = chclt.mediumLuminance()
 			let v = luminance(chclt)
-			let k = v > 0.5 ? (1 - v) / (1 - v + d) : v / (v + d)
-			let c = k * (1 + 2 * d) - 1
-			let s = c * scalar
-			let t = s < 0 ? (1 + s) * d / (2 * d - s) : 1 - (1 - s) * d / (2 * d + s)
-			let u = v > 0.5 ? 1 - t : t
-			
-			return applyLuminance(chclt, value:u)
-		}
-		
-		/// Adjust the luminance to create a color that contrasts well against this color.
-		/// - Parameters:
-		///   - chclt: The color space
-		///   - value: The contrast of the adjusted color.  Negative values create colors that do not contrast.  Values near zero contrast poorly.  Values near one contrast well.
-		/// - Returns: The adjusted color
-		public func contrasting(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			let d = chclt.contrastLinearity()
-			let v = luminance(chclt)
-			let s = value
-			let t = s < 0 ? (1 + s) * d / (2 * d - s) : 1 - (1 - s) * d / (2 * d + s)
-			let u = v > 0.5 ? 1 - t : t
+			let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : 1
+			let u = m - scalar.magnitude * (m - v) * t
 			
 			return applyLuminance(chclt, value:u)
 		}
@@ -243,7 +246,20 @@ public enum CHCL {
 		///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
 		/// - Returns: The adjusted color
 		public func applyContrast(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			return contrasting(chclt, value:-value)
+			let m = chclt.mediumLuminance()
+			let v = luminance(chclt)
+			let u = (v < m) == (value < 0) ? (1 - m) * value.magnitude + m : m * (1 - value.magnitude) 
+			
+			return applyLuminance(chclt, value:u)
+		}
+		
+		/// Adjust the luminance to create a color that contrasts well against this color.  Use a value of at least `1 - contrast(chclt)` for a color with the suggested minimum contrast.
+		/// - Parameters:
+		///   - chclt: The color space
+		///   - value: The contrast of the adjusted color.  Negative values create colors that do not contrast with this color.  Values near zero contrast poorly.  Values near one contrast well.
+		/// - Returns: The adjusted color
+		public func contrasting(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
+			return applyContrast(chclt, value:-value)
 		}
 		
 		//	MARK: - Chroma
@@ -365,8 +381,8 @@ public enum CHCL {
 //	MARK: -
 
 extension CHCLT {
-	public func contrastLinearity() -> CHCLT.Scalar {
-		return 0.3 // 1/8 ... 7/8
+	public func mediumLuminance() -> CHCLT.Scalar {
+		return 0.3
 	}
 	
 	public func transferSigned(_ scalar:CHCLT.Linear) -> CHCLT.Scalar {
