@@ -55,6 +55,7 @@ class ChocolateViewController: BaseViewController {
 	let stringContrast = Style.medium.label("")
 	let stringPrimary = Style.caption.label(Strings.primary)
 	let stringDerived = Style.caption.label(Strings.derived)
+	let stringWeb = Style.webColor.label("")
 	let colorBox = Viewable.Color(color:nil)
 	var examples:[Example] = (1 ... Example.exampleCount).map { Example(index:$0, descriptions:Example.descriptionCount) }
 	
@@ -101,7 +102,7 @@ class ChocolateViewController: BaseViewController {
 		let backgrounds = generateBackgrounds(primary:color, contrast:contrast, saturation:saturation, count:examples.count)
 		let foregrounds = generateForegrounds(primary:color, contrast:contrast, saturation:saturation, count:Example.descriptionCount)
 		
-		formatter.minimumFractionDigits = 0
+		formatter.minimumFractionDigits = 2
 		formatter.maximumFractionDigits = 2
 		
 		for i in examples.indices {
@@ -127,6 +128,7 @@ class ChocolateViewController: BaseViewController {
 		stringChroma.text = formatter.string(from:sliderChroma.value as NSNumber)
 		stringLuma.text = (formatter.string(from:sliderLuma.value as NSNumber) ?? "") + "❂"
 		stringContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◐"
+		stringWeb.text = color.web()
 		
 		formatter.maximumFractionDigits = 1
 		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"
@@ -229,6 +231,7 @@ class ChocolateViewController: BaseViewController {
 				Style.small.label("H"), sliderHue, stringHue,
 				Style.small.label("C"), sliderChroma, stringChroma,
 				Style.small.label("L"), sliderLuma, stringLuma,
+				Layout.EmptySpace(), stringWeb, Layout.EmptySpace()
 			], columnCount:3, template:Layout.Horizontal(targets:[], spacing:4))
 		], spacing:8, alignment:.center, position:.stretch)
 		

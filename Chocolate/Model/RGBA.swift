@@ -108,9 +108,9 @@ public struct DisplayRGB {
 	
 	public func css(withAlpha:Int = 0) -> String {
 		if withAlpha > 0 || (withAlpha == 0 && alpha < 1) {
-			return String(format:"rgba(%.1g, %.1g, %.1g, %.3g)", red * 255, green * 255, blue * 255, alpha)
+			return String(format:"rgba(%.1f, %.1f, %.1f, %.3g)", red * 255, green * 255, blue * 255, alpha).replacingOccurrences(of:".0,", with:",")
 		} else {
-			return String(format:"rgb(%.1g, %.1g, %.1g)", red * 255, green * 255, blue * 255)
+			return String(format:"rgb(%.1f, %.1f, %.1f)", red * 255, green * 255, blue * 255).replacingOccurrences(of:".0", with:"")
 		}
 	}
 	
