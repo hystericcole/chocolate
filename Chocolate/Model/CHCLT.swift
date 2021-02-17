@@ -114,15 +114,19 @@ public enum CHCL {
 		/// Interpolate each component towards the component in the target color
 		public func interpolated(towards:LinearRGB, by scalar:Scalar) -> LinearRGB {
 			let t = 1 - scalar
+			let a = vector * t
+			let b = towards.vector * scalar
 			
-			return LinearRGB(vector * t + towards.vector * scalar)
+			return LinearRGB(a + b)
 		}
 		
 		/// Interpolate each component from gray towards the component in this color
 		public func interpolated(from:Linear, by scalar:Scalar) -> LinearRGB {
 			let t = 1 - scalar
+			let a = from * t
+			let b = vector * scalar
 			
-			return LinearRGB(vector * scalar + from * t)
+			return LinearRGB(a + b)
 		}
 		
 		/// Bring each component with the 0 ... 1 range by desaturating

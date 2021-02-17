@@ -113,7 +113,9 @@ class ChocolateViewController: BaseViewController {
 			for j in examples[i].foregrounds.indices {
 				let fc = formatter.string(from:foregrounds[j].contrast(chocolate) as NSNumber) ?? "?"
 				let fl = foregrounds[j].luma(chocolate)
-				let g18 = (max(fl, bl) + 0.05) / (min(fl, bl) + 0.05)
+				let g18n = max(fl, bl) + 0.05
+				let g18d = min(fl, bl) + 0.05
+				let g18 = g18n / g18d
 				let contrast = formatter.string(from:g18 as NSNumber) ?? "?"
 				examples[i].foregrounds[j].textColor = foregrounds[j].cg?.platformColor
 				examples[i].foregrounds[j].text = DisplayStrings.Chocolate.example(foreground:j + 1, fc:fc, background:i + 1, bc:bc, contrast:contrast)

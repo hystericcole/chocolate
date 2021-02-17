@@ -1660,10 +1660,12 @@ struct Layout {
 		}
 		
 		func sizeBeforeElement(index:Int, isPositive:Bool) -> Native {
+			let space = self.space
+			
 			if isPositive {
-				return spans.prefix(index).reduce(0) { $0 + ($1 < 0 ? 0 : $1 + space) }
+				return spans.prefix(index).reduce(0.0) { $1 < 0 ? $0 : $0 + $1 + space }
 			} else {
-				return spans.suffix(from:index + 1).reduce(0) { $0 + ($1 < 0 ? 0 : $1 + space) }
+				return spans.suffix(from:index + 1).reduce(0.0) { $1 < 0 ? $0 : $0 + $1 + space }
 			}
 		}
 		
