@@ -21,18 +21,18 @@ public protocol CHCLT {
 	/// r = √(d+1) = 1/m - 1
 	/// ```
 	/// 
-	/// The standard medium luminance for CHCLT is 3/10, which corresponds to a 7/3 ratio and 9/40 offset.  Compute the ratio of 2 colors with luminance a and b as follows:
+	/// The standard medium luminance for CHCLT is 1/4, which corresponds to a ratio of 3 and 1/8 offset.  Compute the ratio of 2 colors with luminance a and b as follows:
 	/// ```
-	/// ratio = (max(a, b) + 9/40) / (min(a, b) + 9/40)
+	/// ratio = (max(a, b) + 1/8) / (min(a, b) + 1/8)
 	/// ```
-	/// When the ratio is > 7/3, the colors are considered to have sufficient contrast.  The contrast of a single color is computed such that two opposing colors with contrasts that add to 1 will have this ratio.
+	/// When the ratio is > 3, the colors are considered to have sufficient contrast.  The contrast of a single color is computed such that two opposing colors with contrasts that add to 1 will have this ratio.
 	/// 
 	/// # G18
 	/// The G18 contrast standard calls for a ratio of 4.5 and offset of 0.05, which puts medium luminance in the range 21/120 ... 22/120.
 	/// 
 	/// - Use a medium luminance of 2/11 (0.182) to conform to the 4.5 ratio of G18.
 	/// 
-	/// The standard CHCLT contrast ratio is about half that of G18, but the visible contrast of the colors is similar.
+	/// The standard CHCLT contrast ratio is 2/3 that of G18, but the visible contrast of the colors is similar.
 	func mediumLuminance() -> CHCLT.Scalar
 	
 	/// Convert the components from compressed display space to linear space.
@@ -224,7 +224,7 @@ public enum CHCL {
 			return luminance(chclt) < chclt.mediumLuminance()
 		}
 		
-		/// The contrast of a color is a measure of the distance from medium.  Both black and white have a contrast of 1.  The contrast is computed so that light and dark color pairs with contrasts that add to at least 0.5 will be legible, and a sum of at least 1.0 is recommended.
+		/// The contrast of a color is a measure of the distance from medium luminance.  Both black and white have a contrast of 1.  The contrast is computed so that light and dark color pairs with contrasts that add to at least 0.5 will be legible, and a sum of at least 1.0 is recommended.
 		/// - Parameter chclt: The color space
 		/// - Returns: The contrast
 		public func contrast(_ chclt:CHCLT) -> Linear {
@@ -307,13 +307,17 @@ public enum CHCL {
 		public func chroma(_ chclt:CHCLT) -> Scalar {
 			let v = chclt.luminance(vector)
 			let m = maximumChroma(luminance:v)
+			let c = m.isFinite ? 1 / m : 0
 			
-			return m.isFinite ? 1 / m : 0
+			return c
 		}
 		
 		/// Scale the chroma of the color.  The color approaches gray as the value approaches zero.  Values greater than one increase vibrancy and may denormalize the color.  The hue is preserved for positive, inverted for nagative, and lost at zero.  The luminance is preserved.
 		public func scaleChroma(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
-			return interpolated(from:chclt.luminance(vector), by:scalar)
+			let v = chclt.luminance(vector)
+			let s = scalar
+			
+			return interpolated(from:v, by:s)
 		}
 		
 		/// Adjust the chroma to create a color with the given relative color intensity.
@@ -323,7 +327,8 @@ public enum CHCL {
 		
 		public func applyChroma(_ chclt:CHCLT, value:Scalar, luminance v:Linear) -> LinearRGB {
 			let m = value < 0 ? minimumChroma(luminance:v) : maximumChroma(luminance:v)
-			let s = m.isFinite ? value.magnitude * m : 0
+			let value = value.magnitude
+			let s = m.isFinite ? value * m : 0
 			
 			return interpolated(from:v, by:s)
 		}
@@ -400,7 +405,7 @@ public enum CHCL {
 
 extension CHCLT {
 	public func mediumLuminance() -> CHCLT.Scalar {
-		return 0.3
+		return 0.25
 	}
 	
 	public func transferSigned(_ scalar:CHCLT.Linear) -> CHCLT.Scalar {
