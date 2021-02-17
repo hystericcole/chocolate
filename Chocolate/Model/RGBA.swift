@@ -285,6 +285,28 @@ extension DisplayRGB {
 
 //	MARK: -
 
+extension CHCL.LinearRGB {
+	public func color(colorSpace:CGColorSpace? = nil, alpha:CGFloat = 1) -> CGColor? {
+		let space:CGColorSpace
+		
+		if let colorSpace = colorSpace, colorSpace.model == .rgb {
+			space = colorSpace
+		} else if #available(macOS 10.12, iOS 10.0, *), let linear = CGColorSpace(name:CGColorSpace.linearSRGB) {
+			space = linear
+		} else if let linear = CGColorSpace(name:CGColorSpace.genericRGBLinear) {
+			space = linear
+		} else {
+			return nil
+		}
+		
+		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), alpha]
+		
+		return CGColor(colorSpace:space, components:&components)
+	}
+}
+
+//	MARK: -
+
 public struct CHCLTShading {
 	public struct ColorLocation {
 		public let color:CHCL.LinearRGB
@@ -292,6 +314,7 @@ public struct CHCLTShading {
 		public let location:CHCLT.Scalar
 		
 		func display(_ model:CHCLT) -> DisplayRGB { return color.display(model, alpha:alpha) }
+		func vector() -> CHCLT.Scalar.Vector4 { return CHCLT.Scalar.vector4(color.vector, alpha) }
 	}
 
 	public let model:CHCLT
@@ -315,10 +338,10 @@ public struct CHCLTShading {
 		self.init(model:model, colors:indices.map { ColorLocation(color:colors[$0].linear(model), alpha:colors[$0].vector.w, location:locations[$0]) })
 	}
 	
-	public mutating func interpolate(by scalar:CHCLT.Scalar) -> DisplayRGB {
+	public mutating func interpolate(by scalar:CHCLT.Scalar) -> CHCLT.Scalar.Vector4 {
 		let count = colors.count
 		
-		guard count > 1 else { return colors.first?.display(model) ?? DisplayRGB(.zero) }
+		guard count > 1 else { return colors.first?.vector() ?? .zero }
 		
 		let above, below:Int
 		let location = scalar
@@ -333,15 +356,16 @@ public struct CHCLTShading {
 			previousAbove = above
 		}
 		
-		guard above < count else { return colors[below].display(model) }
-		guard above > 0 else { return colors[0].display(model) }
+		guard above < count else { return colors[below].vector() }
+		guard above > 0 else { return colors[0].vector() }
 		
 		let colorAbove = colors[above]
 		let colorBelow = colors[below]
-		let fraction = colorBelow.location.interpolate(towards:colorAbove.location, by:location)
+		let fraction = (location - colorBelow.location) / (colorAbove.location - colorBelow.location)
 		let alpha = colorBelow.alpha * (1 - fraction) + colorAbove.alpha * fraction
+		let color = colorBelow.color.interpolated(towards:colorAbove.color, by:fraction)
 		
-		return colorBelow.color.interpolated(towards:colorAbove.color, by:fraction).display(model, alpha:alpha)
+		return CHCLT.Scalar.vector4(color.vector, alpha)
 	}
 	
 	public func shadingFunction() -> CGFunction? {
@@ -352,8 +376,7 @@ public struct CHCLTShading {
 		let evaluate:CGFunctionEvaluateCallback = { pointer, input, output in
 			guard let shadingPointer = pointer?.assumingMemoryBound(to:CHCLTShading.self) else { return }
 			
-			let display = shadingPointer.pointee.interpolate(by:CHCLT.Scalar(input.pointee))
-			let rgba = display.vector
+			let rgba = shadingPointer.pointee.interpolate(by:CHCLT.Scalar(input.pointee))
 			
 			output[0] = CGFloat(rgba.x)
 			output[1] = CGFloat(rgba.y)
@@ -373,15 +396,15 @@ public struct CHCLTShading {
 		return CGFunction(info:context, domainDimension:1, domain:nil, rangeDimension:4, range:nil, callbacks:&callbacks)
 	}
 	
-	public func shading(colorSpace:CGColorSpace, start:CGPoint, end:CGPoint, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
-		guard colorSpace.model == .rgb, let function = shadingFunction() else { return nil }
+	public func shading(linearColorSpace:CGColorSpace, start:CGPoint, end:CGPoint, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
+		guard linearColorSpace.model == .rgb, let function = shadingFunction() else { return nil }
 		
-		return CGShading(axialSpace:colorSpace, start:start, end:end, function:function, extendStart:extendStart, extendEnd:extendEnd)
+		return CGShading(axialSpace:linearColorSpace, start:start, end:end, function:function, extendStart:extendStart, extendEnd:extendEnd)
 	}
 	
-	public func shading(colorSpace:CGColorSpace, start:CGPoint, startRadius:CGFloat = 0, end:CGPoint, endRadius:CGFloat, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
-		guard colorSpace.model == .rgb, let function = shadingFunction() else { return nil }
+	public func shading(linearColorSpace:CGColorSpace, start:CGPoint, startRadius:CGFloat = 0, end:CGPoint, endRadius:CGFloat, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
+		guard linearColorSpace.model == .rgb, let function = shadingFunction() else { return nil }
 		
-		return CGShading(radialSpace:colorSpace, start:start, startRadius:startRadius, end:end, endRadius:endRadius, function:function, extendStart:extendStart, extendEnd:extendEnd)
+		return CGShading(radialSpace:linearColorSpace, start:start, startRadius:startRadius, end:end, endRadius:endRadius, function:function, extendStart:extendStart, extendEnd:extendEnd)
 	}
 }

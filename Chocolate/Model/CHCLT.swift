@@ -8,6 +8,7 @@
 import Foundation
 import simd
 
+/// Cole Hue Chroma Luma Transform
 public protocol CHCLT {
 	/// Luminance that is considered medium.  Color pairs with luminances straddling this value are suitable as foreground and background colors.  Used to identify contrasting colors.  Values in the range 0.1 ... 0.5 are valid.
 	/// 
@@ -325,6 +326,19 @@ public enum CHCL {
 			let s = m.isFinite ? value.magnitude * m : 0
 			
 			return interpolated(from:v, by:s)
+		}
+		
+		public func saturation(_ chclt:CHCLT) -> Scalar {
+			let v = chclt.luminance(vector)
+			let hueSaturation = vector - v
+			
+			return simd_length(hueSaturation)
+		}
+		
+		public func applySaturation(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
+			let s = saturation(chclt)
+			
+			return s > 0 ? scaleChroma(chclt, by: value / s) : self
 		}
 		
 		//	MARK: - Hue
