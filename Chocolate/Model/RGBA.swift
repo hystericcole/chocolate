@@ -123,9 +123,7 @@ public struct DisplayRGB {
 	}
 	
 	public func normalized(_ chclt:CHCLT) -> DisplayRGB {
-		let l = linear(chclt)
-		
-		return l.normalize(luminance:l.luminance(chclt), leavePositive: true).display(chclt, alpha:vector.w)
+		return linear(chclt).normalized(chclt).display(chclt, alpha:vector.w)
 	}
 	
 	public func luma(_ chclt:CHCLT) -> Scalar {
@@ -147,8 +145,8 @@ public struct DisplayRGB {
 		
 		guard v > 0 else { return DisplayRGB(gray:chclt.transfer(u), vector.w) }
 		
-		let n = CHCL.LinearRGB(l).normalize(luminance:v, leavePositive:true)
-		let rgb = chclt.display(n.vector)
+		let n = CHCL.LinearRGB.normalize(vector:l, luminance:v, leavePositive:true)
+		let rgb = chclt.display(n)
 		let s = chclt.transfer(u / v)
 		let d = rgb.max()
 		

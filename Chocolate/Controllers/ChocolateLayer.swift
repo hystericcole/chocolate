@@ -9,106 +9,124 @@ import QuartzCore
 import Foundation
 
 class ChocolateLayer: CALayer {
-	enum Axis {
-		case hue, chroma, luma
-	}
-	
 	var chocolate:CHCLT = CHCLTPower.y709
 	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
-	var vertical:Axis = .chroma
-	var horizontal:Axis = .hue
 	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
-	var bands:Int = 0
+	var axis = 0
 	
-	func colorsWithHueLuminance(hue:CHCLT.Scalar, luminance scalar:CHCLT.Scalar) -> [CHCLTShading.ColorLocation] {
-		let color = CHCL.LinearRGB(chocolate, hue:hue, luminance:scalar)
+	func colorsForHue(primary:CHCL.LinearRGB, chroma:CHCL.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
+		let color = primary.applyChroma(chocolate, value:chroma)
+		let value = color.luminance(chocolate)
+		let locations:[CGFloat] = [0, CGFloat(1 - value), 1]
+		let colors:[CGColor] = [CHCL.LinearRGB(.one), color, CHCL.LinearRGB(.zero)].compactMap { $0.color(colorSpace:colorSpace, alpha:1) }
 		
-		return [
-			CHCLTShading.ColorLocation(color:color, alpha:1, location:0),
-			CHCLTShading.ColorLocation(color:color.scaleChroma(chocolate, by:0), alpha:1, location:1)
-		]
+		return CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:locations)
 	}
 	
-	func colorsWithHueChroma(hue:CHCLT.Scalar, chroma scalar:CHCLT.Scalar) -> [CHCLTShading.ColorLocation] {
-		let reference = CHCL.LinearRGB(chocolate, hue:hue, luminance:0x1p-5).applyChroma(chocolate, value:scalar)
-		let value = reference.maximumLuminancePreservingRatio(chocolate)
-		let color = CHCL.LinearRGB(chocolate, hue:hue, luminance:value).applyChroma(chocolate, value:scalar)
+	func colorsForChroma(primary:CHCL.LinearRGB, chroma:CHCL.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
+		let color = primary.applyChroma(chocolate, value:chroma)
+		let value = color.luminance(chocolate)
+		let locations:[CGFloat] = [0, CGFloat(1 - value), 1]
+		let colors:[CGColor] = [CHCL.LinearRGB(.one), color, CHCL.LinearRGB(.zero)].compactMap { $0.color(colorSpace:colorSpace, alpha:1) }
 		
-		return [
-			CHCLTShading.ColorLocation(color:color.applyLuminance(chocolate, value:1), alpha:1, location:0.0),
-			CHCLTShading.ColorLocation(color:color, alpha:1, location:1 - value),
-			CHCLTShading.ColorLocation(color:color.scaleLuminance(by:0), alpha:1, location:1.0)
-		]
+		return CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:locations)
 	}
 	
-	func drawColorsInBand(_ context:CGContext, colors:[CHCLTShading.ColorLocation], shadingStart:CGPoint, shadingEnd:CGPoint, useShading:Bool) {
-		let space = colorSpace
+	func drawCHCLT(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCL.Linear) {
+		let drawSpace = colorSpace
+		let start = box.origin
+		let overEnd = CGPoint(x:box.maxX, y:box.minY)
+		let downEnd = CGPoint(x:box.minX, y:box.maxY)
+		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let isFlipped = (axis / 3) & 1 != 0
+		let count = Int(isFlipped ? box.size.height : box.size.width)
+		let size = isFlipped ? CGSize(width:box.size.width, height:1) : CGSize(width:1, height:box.size.height)
 		
-		if useShading {
-			let shading = CHCLTShading(model:chocolate, colors:colors)
+		switch axis % 3 {
+		case 0:	//	scalar is hue
+			let primary = CHCL.LinearRGB(chocolate, hue:scalar)
 			
-			if let gradient = shading.shading(linearColorSpace:space, start:shadingStart, end:shadingEnd) {
-				context.drawShading(gradient)
+			for index in 0 ..< count {
+				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
+				let stripe = CGRect(origin:origin, size:size)
+				let chroma = CHCL.Scalar(index) / CHCL.Scalar(count - 1)
+				
+				guard let gradient = colorsForHue(primary:primary, chroma:chroma, drawSpace:drawSpace) else { continue }
+				
+				context.clip(to:stripe)
+				context.drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+				context.resetClip()
 			}
-		} else {
-			let locations:[CGFloat] = colors.map { CGFloat($0.location) }
-			let stops:[CGColor] = colors.compactMap { $0.color.color(colorSpace:space) }
+		case 1:	//	scalar is chroma
+			let hues = CHCL.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCL.Scalar(count), count:count)
 			
-			if let gradient = CGGradient(colorsSpace:space, colors:stops as CFArray, locations:locations) {
-				context.drawLinearGradient(gradient, start:shadingStart, end:shadingEnd, options:[])
+			for index in 0 ..< count {
+				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
+				let stripe = CGRect(origin:origin, size:size)
+				
+				guard let gradient = colorsForChroma(primary:hues[index], chroma:scalar, drawSpace:drawSpace) else { continue }
+				
+				context.clip(to:stripe)
+				context.drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+				context.resetClip()
 			}
-		}
-	}
-	
-	func drawChocolate(_ context:CGContext) {
-		let size = bounds.size
-		let isHorizontal = vertical == .hue
-		let isScalarLuma = isHorizontal ? horizontal != .luma : vertical != .luma
-		let dimension = isHorizontal ? size.height : size.width
-		let limit = bands > 0 ? bands : Int(ceil(dimension) - 1)
-		let thickness = bands > 0 ? ceil(dimension / CGFloat(bands)) : 1
-		let band = isHorizontal ? CGSize(width:size.width, height:thickness) : CGSize(width:thickness, height:size.height)
-		let shadingStart = CGPoint(x:0, y:0)
-		let shadingEnd = isHorizontal ? CGPoint(x:size.width, y:0) : CGPoint(x:0, y:size.height)
-		
-		for i in 0 ... limit {
-			let x = Double(i) / Double(limit)
-			let colors:[CHCLTShading.ColorLocation]
-			
-			if isScalarLuma {
-				colors = colorsWithHueLuminance(hue:x, luminance:scalar)
-			} else {
-				colors = colorsWithHueChroma(hue:x, chroma:scalar)
-			}
-			
-			let origin = isHorizontal ? CGPoint(x:0, y:CGFloat(i) * thickness) : CGPoint(x:CGFloat(i) * thickness, y:0)
-			let box = CGRect(origin:origin, size:band)
+		default:	//	scalar is luminance - colors are slightly darker than intended
+			let hues = CHCL.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCL.Scalar(count), count:count)
+			let gray = CHCL.LinearRGB(gray:scalar)
+			let huesWithLuminance = hues.compactMap { $0.applyLuminance(chocolate, value:scalar).color(colorSpace:colorSpace, alpha:1) }
+			let desaturate = [gray.color(colorSpace:colorSpace, alpha:0)!, gray.color(colorSpace:colorSpace, alpha:1)!]
 			
 			context.clip(to:box)
-			drawColorsInBand(context, colors:colors, shadingStart:shadingStart, shadingEnd:shadingEnd, useShading:false)
+			
+			if let gradient = CGGradient(colorsSpace:drawSpace, colors:huesWithLuminance as CFArray, locations:nil) {
+				context.setBlendMode(.copy)
+				context.drawLinearGradient(gradient, start:start, end:isFlipped ? downEnd : overEnd, options:options)
+			}
+			
+			if let gradient = CGGradient(colorsSpace:drawSpace, colors:desaturate as CFArray, locations:nil) {
+				context.setBlendMode(.normal)
+				context.drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+			}
+			
 			context.resetClip()
 		}
 	}
 	
+	func drawRGB(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCL.Linear) {
+		let colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
+		let drawSpace = CGColorSpace(name:CGColorSpace.sRGB) ?? colorSpace
+		
+		context.clip(to:box)
+		context.drawPlaneFromCubeRGB(box:box, axis:axis, scalar:CGFloat(scalar), colorSpace:colorSpace, drawSpace:drawSpace)
+		context.resetClip()
+	}
+	
 	override func draw(in ctx: CGContext) {
-		drawChocolate(ctx)
+		let box = CGRect(origin:.zero, size:bounds.size)
+		
+		drawCHCLT(ctx, box:box, axis:axis, scalar:scalar)
 	}
 	
 	override func render(in ctx: CGContext) {
-		drawChocolate(ctx)
+		draw(in:ctx)
 	}
 }
+
+//	MARK: -
 
 class ChocolateLayerView: BaseView {
 #if os(macOS)
 	override class var layerClass:CALayer.Type { return ChocolateLayer.self }
 	override func prepare() { super.prepare(); layer?.setNeedsDisplay() }
+	override func viewDidEndLiveResize() { layer?.setNeedsDisplay() }
 #else
 	override class var layerClass:AnyClass { return ChocolateLayer.self }
 	override func prepare() { super.prepare(); layer.setNeedsDisplay() }
 #endif
 	var chocolateLayer:ChocolateLayer? { return layer as? ChocolateLayer }
 }
+
+//	MARK: -
 
 class ChocolateLayerViewController: BaseViewController {
 	let chocolate = ChocolateLayerView()
@@ -122,6 +140,12 @@ class ChocolateLayerViewController: BaseViewController {
 		group.view?.attachViewController(self)
 	}
 	
+	override func viewDidLoad() {
+		super.viewDidLoad()
+		
+		switchFlipped()
+	}
+	
 	@objc
 	func sliderChanged() {
 		chocolate.chocolateLayer?.scalar = slider.value
@@ -129,7 +153,7 @@ class ChocolateLayerViewController: BaseViewController {
 	
 	@objc
 	func switchFlipped() {
-		chocolate.chocolateLayer?.vertical = toggle.isOn ? .luma : .chroma
+		chocolate.chocolateLayer?.axis = toggle.isOn ? 1 : 2
 		chocolate.chocolateLayer?.setNeedsDisplay()
 	}
 	
@@ -138,5 +162,58 @@ class ChocolateLayerViewController: BaseViewController {
 			Layout.Horizontal(targets: [slider, toggle], spacing:20, position:.center).padding(20),
 			chocolate
 		], alignment:.fill, position:.stretch)
+	}
+}
+
+//	MARK: -
+
+extension CGContext {
+	func drawPlaneFromCubeRGB(box:CGRect, axis:Int, scalar:CGFloat, colorSpace:CGColorSpace, drawSpace:CGColorSpace) {
+		let s = CGFloat(scalar)
+		var c0:[CGFloat] = [0, 0, 0, 1]
+		var c1:[CGFloat] = [0, 0, 0, 1]
+		var c2:[CGFloat] = [0, 0, 0, 1]
+		var c3:[CGFloat] = [0, 0, 0, 1]
+		
+		switch axis % 6 {
+		case  0: c1[1] = 1; c3[2] = 1; c3[0] = s; c2[0] = s
+		case  1: c1[2] = 1; c3[0] = 1; c3[1] = s; c2[1] = s
+		case  2: c1[0] = 1; c3[1] = 1; c3[2] = s; c2[2] = s
+		case  3: c1[2] = 1; c3[1] = 1; c3[0] = s; c2[0] = s
+		case  4: c1[0] = 1; c3[2] = 1; c3[1] = s; c2[1] = s
+		default: c1[1] = 1; c3[0] = 1; c3[2] = s; c2[2] = s
+		}
+		
+		guard
+			let color0 = CGColor(colorSpace:colorSpace, components:&c0),
+			let color1 = CGColor(colorSpace:colorSpace, components:&c1),
+			let color2 = CGColor(colorSpace:colorSpace, components:&c2),
+			let color3 = CGColor(colorSpace:colorSpace, components:&c3)
+		else { return }
+		
+		let overColors:[CGColor]
+		let downColors:[CGColor]
+		
+		switch axis / 6 % 4 {
+		case  0: overColors = [color0, color1]; downColors = [color3, color2]
+		case  1: overColors = [color3, color2]; downColors = [color1, color0]
+		case  2: overColors = [color1, color0]; downColors = [color2, color3]
+		default: overColors = [color2, color3]; downColors = [color0, color1]
+		}
+		
+		let start = box.origin
+		let overEnd = CGPoint(x:box.maxX, y:box.minY)
+		let downEnd = CGPoint(x:box.minX, y:box.maxY)
+		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		
+		if let gradient = CGGradient(colorsSpace:drawSpace, colors:overColors as CFArray, locations:nil) {
+			setBlendMode(.copy)
+			drawLinearGradient(gradient, start:start, end:overEnd, options:options)
+		}
+		
+		if let gradient = CGGradient(colorsSpace:drawSpace, colors:downColors as CFArray, locations:nil) {
+			setBlendMode(.lighten)
+			drawLinearGradient(gradient, start:start, end:downEnd, options:options)
+		}
 	}
 }

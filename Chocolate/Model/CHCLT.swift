@@ -100,11 +100,26 @@ public enum CHCL {
 			vector = Linear.vector3(gray, gray, gray)
 		}
 		
+		public init(_ chclt:CHCLT, hue:Scalar) {
+			let u = 1.0
+			let axis = LinearRGB.hueAxis(chclt)
+			let reference = LinearRGB.hueReference(chclt, luminance:u)
+			let rotated = LinearRGB.rotate(vector:reference - u, axis:axis, turns:hue)
+			let normalized = LinearRGB.normalize(vector:rotated + u, luminance:u, leavePositive:true)
+			
+			vector = normalized / normalized.max()
+		}
+		
 		public init(_ chclt:CHCLT, hue:Scalar, luminance u:Linear) {
 			guard u > 0 else { self.init(.zero); return }
 			guard u < 1 else { self.init(.one); return }
 			
-			self.init(LinearRGB(chclt.inverseLuminance(Linear.vector3(u, 0, 0))).hueShifted(chclt, by:hue, luminance:u).vector)
+			let axis = LinearRGB.hueAxis(chclt)
+			let reference = LinearRGB.hueReference(chclt, luminance:u)
+			let rotated = LinearRGB.rotate(vector:reference - u, axis:axis, turns:hue)
+			let normalized = LinearRGB.normalize(vector:rotated + u, luminance:u, leavePositive:false)
+			
+			self.init(normalized)
 		}
 		
 		/// Transfer from linear RGB to display ready, gamma compressed RGB
@@ -130,38 +145,9 @@ public enum CHCL {
 			return LinearRGB(a + b)
 		}
 		
-		/// Bring each component with the 0 ... 1 range by desaturating
-		/// - Parameters:
-		///   - v: The luminance of the color
-		///   - leavePositive: Normalize negative values but allow values above one
-		/// - Returns: The adjusted color
-		public func normalize(luminance v:Linear, leavePositive:Bool) -> LinearRGB {
-			var vector = self.vector
-			let negative = vector.min()
-			
-			if negative < 0 {
-				let desaturate = v / (v - negative)
-				let t = 1 - desaturate
-				
-				vector = t * v + desaturate * vector
-			}
-			
-			if leavePositive {
-				return LinearRGB(simd_max(vector, .zero))
-			}
-			
-			let positive = vector.max()
-			
-			if positive > 1 {
-				let desaturate = (v - 1) / (v - positive)
-				let t = 1 - desaturate
-				
-				vector = t * v + desaturate * vector
-			}
-			
-			vector.clamp(lowerBound:.zero, upperBound:.one)
-			
-			return LinearRGB(vector)
+		/// Bring each component within the 0 ... 1 range by desaturating
+		public func normalized(_ chclt:CHCLT) -> LinearRGB {
+			return LinearRGB(LinearRGB.normalize(vector:vector, luminance:luminance(chclt), leavePositive:false))
 		}
 		
 		//	MARK: - Luminance
@@ -194,13 +180,13 @@ public enum CHCL {
 			
 			guard v > 0 else { return LinearRGB(gray:u) }
 			
-			let n = normalize(luminance:v, leavePositive:true)
-			let rgb = chclt.display(n.vector)
+			let n = LinearRGB.normalize(vector:vector, luminance:v, leavePositive:true)
+			let rgb = chclt.display(n)
 			let s = u / v
 			let t = chclt.transfer(s)
 			let d = rgb.max()
 			
-			guard t * d > 1 else { return n.scaleLuminance(by:s) }
+			guard t * d > 1 else { return LinearRGB(n).scaleLuminance(by:s) }
 			
 			let maximumPreservingHue = rgb / d
 			let m = chclt.linear(maximumPreservingHue)
@@ -210,11 +196,16 @@ public enum CHCL {
 			return LinearRGB(1 - distanceFromWhite + m * distanceFromWhite)
 		}
 		
-		/// The maximum luminance value that can be applied without canging the ratio of the components and desaturating the color.
+		/// The maximum luminance value that can be applied without changing the ratio of the components and desaturating the color.
 		public func maximumLuminancePreservingRatio(_ chclt:CHCLT) -> Linear {
 			let d = vector.max()
 			
 			return d > 0 ? luminance(chclt) / d : 1
+		}
+		
+		/// Applies the maximum luminance that preserves the ratio of the components.
+		public func illuminated() -> LinearRGB {
+			return LinearRGB(vector / vector.max())
 		}
 		
 		//	MARK: - Contrast
@@ -360,9 +351,8 @@ public enum CHCL {
 			guard hueSaturationLengthSquared > 0.0 else { return 0.0 }
 			
 			let hueSaturationUnit = hueSaturation / hueSaturationLengthSquared.squareRoot()
-			let red = Linear.vector3(1, 0, 0)
-			let referenceRed = chclt.inverseLuminance(red) - 1
-			let referenceUnit = simd_normalize(referenceRed)
+			let reference = LinearRGB.hueReference(chclt, luminance:1)
+			let referenceUnit = simd_normalize(reference - 1)
 			
 			let dot = min(max(-1.0, simd_dot(hueSaturationUnit, referenceUnit)), 1.0)
 			let turns = acos(dot) * 0.5 / .pi
@@ -376,18 +366,10 @@ public enum CHCL {
 			
 			guard simd_length_squared(hueSaturation) > 0 else { return self }
 			
-			let inverse = chclt.inverseLuminance(.one)
-			let red_cross_green = Linear.vector3(inverse.y, inverse.x, inverse.x * inverse.y - inverse.x - inverse.y)
-			let axisUnit = simd_normalize(red_cross_green)
+			let shifted = LinearRGB.rotate(vector:hueSaturation, axis:LinearRGB.hueAxis(chclt), turns:shift)
+			let normalized = LinearRGB.normalize(vector:shifted + v, luminance:v, leavePositive:false)
 			
-			//	use rodrigues rotation to shift hue saturation vector around axis
-			let sc = __sincospi_stret(shift * 2)
-			let v1 = hueSaturation * sc.__cosval
-			let v2 = simd_cross(axisUnit, hueSaturation) * sc.__sinval
-			let v3 = axisUnit * simd_dot(axisUnit, hueSaturation) * (1 - sc.__cosval)
-			let sum = v1 + v2 + v3
-			
-			return LinearRGB(sum + v).normalize(luminance:v, leavePositive:false)
+			return LinearRGB(normalized)
 		}
 		
 		/// Rotate the color around the normal axis, changing the ratio of the components.  Shifting the hue will preserve the luminance, and changes the chroma value.  The perceptual chroma is preserved unless the color needs to be normalized after rotation.
@@ -397,6 +379,78 @@ public enum CHCL {
 		/// - Returns: The adjusted color.
 		public func hueShifted(_ chclt:CHCLT, by shift:Linear) -> LinearRGB {
 			return hueShifted(chclt, by:shift, luminance:luminance(chclt))
+		}
+		
+		public static func rotate(vector:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
+			//	use rodrigues rotation to rotate vector around normalized axis
+			let sc = __sincospi_stret(turns * 2)
+			let v1 = vector * sc.__cosval
+			let v2 = simd_cross(axis, vector) * sc.__sinval
+			let v3 = axis * simd_dot(axis, vector) * (1 - sc.__cosval)
+			let sum = v1 + v2 + v3
+			
+			return sum
+		}
+		
+		public static func normalize(vector:Linear.Vector3, luminance v:Linear, leavePositive:Bool) -> Linear.Vector3 {
+			var vector = vector
+			let negative = vector.min()
+			
+			if negative < 0 {
+				let desaturate = v / (v - negative)
+				let t = 1 - desaturate
+				
+				vector = t * v + desaturate * vector
+			}
+			
+			if leavePositive {
+				return simd_max(vector, .zero)
+			}
+			
+			let positive = vector.max()
+			
+			if positive > 1 {
+				let desaturate = (v - 1) / (v - positive)
+				let t = 1 - desaturate
+				
+				vector = t * v + desaturate * vector
+			}
+			
+			vector.clamp(lowerBound:.zero, upperBound:.one)
+			
+			return vector
+		}
+		
+		public static func hueReference(_ chclt:CHCLT, luminance v:Linear) -> Linear.Vector3 {
+			return chclt.inverseLuminance(Linear.vector3(v, 0, 0))
+		}
+		
+		public static func hueAxis(_ chclt:CHCLT) -> Linear.Vector3 {
+			let inverse = chclt.inverseLuminance(.one)
+			let red_cross_green = Linear.vector3(inverse.y, inverse.x, inverse.x * inverse.y - inverse.x - inverse.y)
+			
+			return simd_normalize(red_cross_green)
+		}
+		
+		public static func hueRange(_ chclt:CHCLT, start:Scalar = 0, shift:Scalar, count:Int) -> [LinearRGB] {
+			let v = 1.0
+			let reference = hueReference(chclt, luminance:v)
+			let hueSaturation = reference - v
+			let axis = hueAxis(chclt)
+			
+			return Array<LinearRGB>(unsafeUninitializedCapacity:count) { buffer, initialized in
+				var hue = start
+				
+				for index in 0 ..< count {
+					let rotated = rotate(vector:hueSaturation, axis:axis, turns:hue)
+					let normalized = LinearRGB.normalize(vector:rotated + v, luminance:v, leavePositive:true)
+					
+					buffer[index] = LinearRGB(normalized / normalized.max())
+					hue += shift
+				}
+				
+				initialized = count
+			}
 		}
 	}
 }
