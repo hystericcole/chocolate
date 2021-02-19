@@ -117,16 +117,22 @@ class ChocolateLayer: CALayer {
 class ChocolateLayerView: BaseView {
 #if os(macOS)
 	override class var layerClass:CALayer.Type { return ChocolateLayer.self }
-	override func prepare() { super.prepare(); layer?.setNeedsDisplay() }
-	override func viewDidEndLiveResize() { layer?.setNeedsDisplay() }
+	override func viewDidEndLiveResize() { super.viewDidEndLiveResize(); refresh() }
+	
+	func refresh() { layer?.setNeedsDisplay() }
 #else
 	override class var layerClass:AnyClass { return ChocolateLayer.self }
 	override func prepare() { super.prepare(); layer.setNeedsDisplay() }
+	
+	func refresh() { setNeedsDisplay() }
 #endif
+	
 	var chocolateLayer:ChocolateLayer? { return layer as? ChocolateLayer }
 	
-	var axis:Int { get { return chocolateLayer?.axis ?? 0 } set { chocolateLayer?.axis = newValue; layer?.setNeedsDisplay() } }
+	var axis:Int { get { return chocolateLayer?.axis ?? 0 } set { chocolateLayer?.axis = newValue; refresh() } }
 	var scalar:CHCLT.Scalar { get { return chocolateLayer?.scalar ?? 0 } set { chocolateLayer?.scalar = newValue } }
+	
+	override func prepare() { super.prepare(); refresh() }
 }
 
 //	MARK: -
@@ -161,14 +167,18 @@ class ChocolateImageView: PlatformImageView {
 			CHCL.LinearRGB.drawPlaneFromCubeHCL(self.chocolate, axis:self.axis, value:self.scalar, image:mutable)
 			
 			DispatchQueue.main.async {
-				self.imageScaling = .scaleAxesIndependently
-				self.image = PlatformImage(cgImage:mutable.image.copy() ?? mutable.image, size:mutable.size)
-				self.isRefreshing = false
+				self.refreshed(mutable)
 			}
 		}
 	}
 	
 #if os(macOS)
+	func refreshed(_ mutable:MutableImage) {
+		imageScaling = .scaleAxesIndependently
+		image = PlatformImage(cgImage:mutable.image.copy() ?? mutable.image, size:mutable.size)
+		isRefreshing = false
+	}
+	
 	func refreshSoon() {
 		isCurrent = false
 		refresh()
@@ -190,6 +200,12 @@ class ChocolateImageView: PlatformImageView {
 	override func layoutSubviews() {
 		super.layoutSubviews()
 		refresh()
+	}
+	
+	func refreshed(_ mutable:MutableImage) {
+		contentMode = .scaleToFill
+		image = PlatformImage(cgImage:mutable.image.copy() ?? mutable.image)
+		isRefreshing = false
 	}
 	
 	func refreshSoon() {

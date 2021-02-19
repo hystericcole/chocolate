@@ -270,6 +270,7 @@
 				07FA9F2525C208B0005C439B /* AppDelegate.swift */,
 				07FA9F2725C208B0005C439B /* SceneDelegate.swift */,
 				07FA9F2925C208B0005C439B /* ViewController.swift */,
+				07FA9F2E25C208B0005C439B /* Assets.xcassets */,
 				07FA9F5925C208C2005C439B /* Resources */,
 			);
 			path = iOS;
@@ -297,7 +298,6 @@
 			isa = PBXGroup;
 			children = (
 				07FA9F2B25C208B0005C439B /* Main.storyboard */,
-				07FA9F2E25C208B0005C439B /* Assets.xcassets */,
 				07FA9F3025C208B0005C439B /* LaunchScreen.storyboard */,
 				07FA9F3325C208B0005C439B /* Info.plist */,
 			);
