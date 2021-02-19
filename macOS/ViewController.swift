@@ -25,8 +25,7 @@ class ViewController: BaseViewController {
 		
 		view.window?.title = DisplayStrings.Chocolate.title
 		
-		let viewController = ChocolateViewController()
-		//let viewController = ChocolateLayerViewController()
+		let viewController = NSEvent.modifierFlags.contains(.option) ? ChocolateLayerViewController() : ChocolateViewController()
 		
 		replaceChild(with:viewController)
 		applyMinimumSizeToWindow(from:viewController)

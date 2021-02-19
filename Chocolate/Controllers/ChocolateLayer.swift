@@ -14,15 +14,6 @@ class ChocolateLayer: CALayer {
 	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
 	var axis = 0
 	
-	func colorsForHue(primary:CHCL.LinearRGB, chroma:CHCL.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
-		let color = primary.applyChroma(chocolate, value:chroma)
-		let value = color.luminance(chocolate)
-		let locations:[CGFloat] = [0, CGFloat(1 - value), 1]
-		let colors:[CGColor] = [CHCL.LinearRGB(.one), color, CHCL.LinearRGB(.zero)].compactMap { $0.color(colorSpace:colorSpace, alpha:1) }
-		
-		return CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:locations)
-	}
-	
 	func colorsForChroma(primary:CHCL.LinearRGB, chroma:CHCL.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
 		let color = primary.applyChroma(chocolate, value:chroma)
 		let value = color.luminance(chocolate)
@@ -51,7 +42,7 @@ class ChocolateLayer: CALayer {
 				let stripe = CGRect(origin:origin, size:size)
 				let chroma = CHCL.Scalar(index) / CHCL.Scalar(count - 1)
 				
-				guard let gradient = colorsForHue(primary:primary, chroma:chroma, drawSpace:drawSpace) else { continue }
+				guard let gradient = colorsForChroma(primary:primary, chroma:chroma, drawSpace:drawSpace) else { continue }
 				
 				context.clip(to:stripe)
 				context.drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
