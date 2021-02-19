@@ -237,11 +237,11 @@ class ChocolateLayerViewController: BaseViewController {
 	}
 	
 	func layout() -> Positionable {
-		return Layout.Vertical(targets:[
+		return Layout.Vertical(alignment:.fill, position:.stretch,
 			Layout.Horizontal(targets: [slider, toggle], spacing:20, position:.center).padding(20),
 			//Viewable.Color(color:.black).fixed(height:3),
 			chocolate
-		], alignment:.fill, position:.stretch)
+		)
 	}
 }
 

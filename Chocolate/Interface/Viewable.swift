@@ -22,7 +22,7 @@ protocol LazyViewable: AnyObject, Positionable {
 
 /// A Viewable can create and manage a view.  Most viewables can measure a view without creating it.
 /// # Positionable
-/// Views, Viewables, and Layouts are all Positionabled, and can be mixed and used together.
+/// Views, Viewables, and Layouts are all Positionables, and can be mixed and used together.
 /// # View
 /// A viewable can be used to simplify the creation of a view, then discarded, keeping the view.  This would typically be used within another view.
 /// 

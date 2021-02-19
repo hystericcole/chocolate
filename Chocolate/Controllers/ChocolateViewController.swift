@@ -220,13 +220,13 @@ class ChocolateViewController: BaseViewController {
 		let colorBoxSize = 80.0
 		
 		let colorPicker = Layout.Horizontal(targets:[
-			Layout.Vertical(targets:[
+			Layout.Vertical(spacing:2, alignment:.center, position:.stretch, primary:1,
 				spacePicker.fixed(width:colorBoxSize, height:40).padding(horizontal:-10, vertical:0),
 				//stringPrimary,
 				colorBox.fixed(width:colorBoxSize, height:colorBoxSize),
 				stringContrast
-			], spacing:2, alignment:.center, position:.stretch, primary:1),
-			Layout.Columns(targets:[
+			),
+			Layout.Columns(columnCount:3, template:Layout.Horizontal(spacing:4),
 				Style.small.label("R"), sliderRed, stringRed,
 				Style.small.label("G"), sliderGreen, stringGreen,
 				Style.small.label("B"), sliderBlue, stringBlue,
@@ -234,34 +234,34 @@ class ChocolateViewController: BaseViewController {
 				Style.small.label("C"), sliderChroma, stringChroma,
 				Style.small.label("L"), sliderLuma, stringLuma,
 				Layout.EmptySpace(), stringWeb, Layout.EmptySpace()
-			], columnCount:3, template:Layout.Horizontal(targets:[], spacing:4))
+			)
 		], spacing:8, alignment:.center, position:.stretch)
 		
-		let colorDerivation = Layout.Vertical(targets:[
+		let colorDerivation = Layout.Vertical(spacing:4, alignment:.fill, position:.start,
 			stringDerived,
 			sliderContrast.minimum(width:minimumSliderWidth),
 			sliderSaturation.minimum(width:minimumSliderWidth)
-		], spacing:4, alignment:.fill, position:.start).minimum(width:minimumSliderWidth)
+		).minimum(width:minimumSliderWidth)
 		
 		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
 			targets:examples.map { $0.lazy() }, 
-			rowTemplate:Layout.Horizontal(targets:[], spacing:0, alignment:.fill, position:.stretch),
-			columnTemplate:Layout.Vertical(targets:[], spacing:0, alignment:.fill, position:.stretch),
+			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal
 		), minimum:CGSize(square:200)).ignoringSafeBounds()
 		
 		//let exampleLayout = Viewable.SimpleTable(cells:examples.map { $0.lazy() }).ignoringSafeBounds()
 		
-		let controlsLayout = Layout.Vertical(targets:[
+		let controlsLayout = Layout.Vertical(spacing:10, alignment:.fill, position:.start,
 			colorPicker,
-			colorDerivation,
-		], spacing:10, alignment:.fill, position:.start)
+			colorDerivation
+		)
 		
-		group.content = Layout.Vertical(targets:[
+		group.content = Layout.Vertical(spacing:8, alignment:.fill, position:.stretch,
 			Layout.EmptySpace(width:0, height:10),
 			controlsLayout.padding(horizontal:20, vertical:0),
 			exampleLayout
-		], spacing:8, alignment:.fill, position:.stretch)
+		)
 	}
 }
 
@@ -275,11 +275,11 @@ extension ChocolateViewController {
 		var foregrounds:[Viewable.Label]
 		
 		func lazy() -> Positionable {
-			return Layout.Overlay(targets:[
+			return Layout.Overlay(horizontal:.fill, vertical:.fill,
 				background.ignoringSafeBounds(),
 				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.fill, position:.center)
 					.padding(8)
-			], horizontal:.fill, vertical:.fill)
+			)
 		}
 		
 		init(index:Int, descriptions:Int) {

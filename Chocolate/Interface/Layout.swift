@@ -857,6 +857,15 @@ struct Layout {
 			self.direction = direction
 		}
 		
+		init(spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural, _ targets:Positionable...) {
+			self.targets = targets
+			self.spacing = spacing
+			self.position = position
+			self.alignment = alignment
+			self.primaryIndex = primary
+			self.direction = direction
+		}
+		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
@@ -934,6 +943,15 @@ struct Layout {
 		}
 		
 		init(targets:[Positionable], spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural) {
+			self.targets = targets
+			self.spacing = spacing
+			self.position = position
+			self.alignment = alignment
+			self.primaryIndex = primary
+			self.direction = direction
+		}
+		
+		init(spacing:Native = 0, alignment:Alignment = .default, position:Position = .default, primary:Int = -1, direction:Direction = .natural, _ targets:Positionable...) {
 			self.targets = targets
 			self.spacing = spacing
 			self.position = position
@@ -1026,6 +1044,19 @@ struct Layout {
 		}
 		
 		init(targets:[Positionable], columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false) {
+			self.targets = targets
+			self.columnCount = columnCount
+			self.spacing = spacing
+			self.position = position
+			self.rowTemplate = template
+			self.primaryIndex = primary
+			self.columnMajor = major
+			self.direction = direction
+			
+			rowTemplate.targets.removeAll()
+		}
+		
+		init(columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false, _ targets:Positionable...) {
 			self.targets = targets
 			self.columnCount = columnCount
 			self.spacing = spacing
@@ -1201,6 +1232,17 @@ struct Layout {
 			self.direction = direction
 		}
 		
+		init(rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false, _ targets:Positionable...) {
+			self.targets = targets
+			self.rowCount = rowCount
+			self.spacing = spacing
+			self.position = position
+			self.columnTemplate = template
+			self.primaryIndex = primary
+			self.rowMajor = major
+			self.direction = direction
+		}
+		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit) }
@@ -1329,6 +1371,13 @@ struct Layout {
 		}
 		
 		init(targets:[Positionable], horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1) {
+			self.targets = targets
+			self.vertical = vertical
+			self.horizontal = horizontal
+			self.primaryIndex = primary
+		}
+		
+		init(horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1, _ targets:Positionable...) {
 			self.targets = targets
 			self.vertical = vertical
 			self.horizontal = horizontal
@@ -1818,10 +1867,24 @@ struct Layout {
 		
 		init(
 			targets:[Positionable],
-			rowTemplate:Horizontal = Horizontal(targets:[], alignment:.leading, position:.leading),
-			columnTemplate:Vertical = Vertical(targets:[], alignment:.leading, position:.leading),
+			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
+			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
 			direction:Direction = .positive,
 			axis:Axis = .horizontal)
+		{
+			self.targets = targets
+			self.columnTemplate = columnTemplate
+			self.rowTemplate = rowTemplate
+			self.direction = direction
+			self.axis = axis
+		}
+		
+		init(
+			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
+			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
+			direction:Direction = .positive,
+			axis:Axis = .horizontal,
+			_ targets:Positionable...)
 		{
 			self.targets = targets
 			self.columnTemplate = columnTemplate
