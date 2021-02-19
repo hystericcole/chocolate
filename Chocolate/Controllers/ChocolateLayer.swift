@@ -122,7 +122,6 @@ class ChocolateLayerView: BaseView {
 	func refresh() { layer?.setNeedsDisplay() }
 #else
 	override class var layerClass:AnyClass { return ChocolateLayer.self }
-	override func prepare() { super.prepare(); layer.setNeedsDisplay() }
 	
 	func refresh() { setNeedsDisplay() }
 #endif

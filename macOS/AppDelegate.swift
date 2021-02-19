@@ -63,7 +63,7 @@ extension AppDelegate {
 	}
 	
 	static func generateIcons() {
-		let sizes:[CGFloat] = [120, 180, 76, 152, 167, 16, 32, 64, 128, 256, 1024]
+		let sizes:[CGFloat] = [120, 180, 76, 152, 167, 16, 32, 64, 128, 256, 512, 1024]
 		let axisValue:[(Int, Double)] = [(1, 0.75)]
 		let path = ("~/Desktop/Chocolate" as NSString).expandingTildeInPath
 		let folder = URL(fileURLWithPath:path)

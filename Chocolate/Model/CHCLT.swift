@@ -123,9 +123,14 @@ public enum CHCL {
 		}
 		
 		public func pixel() -> UInt32 {
-			let r = UInt32(round(vector.x * 255)) << 16
-			let g = UInt32(round(vector.y * 255)) << 8
-			let b = UInt32(round(vector.z * 255))
+			var v = vector * 255.0
+			
+			v.round(.toNearestOrAwayFromZero)
+			
+			let u = simd_uint(v)
+			let r = u.x << 16
+			let g = u.y << 8
+			let b = u.z << 0
 			
 			return r | g | b
 		}
