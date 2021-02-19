@@ -124,6 +124,79 @@ class ChocolateLayerView: BaseView {
 	override func prepare() { super.prepare(); layer.setNeedsDisplay() }
 #endif
 	var chocolateLayer:ChocolateLayer? { return layer as? ChocolateLayer }
+	
+	var axis:Int { get { return chocolateLayer?.axis ?? 0 } set { chocolateLayer?.axis = newValue; layer?.setNeedsDisplay() } }
+	var scalar:CHCLT.Scalar { get { return chocolateLayer?.scalar ?? 0 } set { chocolateLayer?.scalar = newValue } }
+}
+
+//	MARK: -
+
+class ChocolateImageView: PlatformImageView {
+	var chocolate:CHCLT = CHCLTPower.y709
+	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
+	var scalar:CHCLT.Scalar = 0.5 { didSet { refreshSoon() } }
+	var axis = 0 { didSet { refreshSoon() } }
+	var mutableImage:MutableImage?
+	var isCurrent = false
+	var isRefreshing = false
+	var parameters:MutableImage.Parameters { return MutableImage.Parameters(space:colorSpace, size:bounds.size, scale:1, opaque:true) }
+	override var intrinsicContentSize:CGSize { return CGSize(square:-1) }
+	
+	func refresh() {
+		guard !isRefreshing else { return }
+		
+		let parameters = self.parameters
+		let isEquivalent = mutableImage?.isEquivalent(parameters:parameters) ?? false
+		
+		guard !isCurrent || !isEquivalent else { return }
+		
+		MutableImage.manage(image:&mutableImage, parameters:parameters)
+		
+		guard let mutable = mutableImage else { return }
+		
+		isCurrent = true
+		isRefreshing = true
+		
+		DispatchQueue.global(qos: .userInitiated).async {
+			CHCL.LinearRGB.drawPlaneFromCubeHCL(self.chocolate, axis:self.axis, value:self.scalar, image:mutable)
+			
+			DispatchQueue.main.async {
+				self.imageScaling = .scaleAxesIndependently
+				self.image = PlatformImage(cgImage:mutable.image.copy() ?? mutable.image, size:mutable.size)
+				self.isRefreshing = false
+			}
+		}
+	}
+	
+#if os(macOS)
+	func refreshSoon() {
+		isCurrent = false
+		refresh()
+	}
+	
+	override func viewDidMoveToWindow() {
+		super.viewDidMoveToWindow()
+		if window != nil { refresh() }
+		
+		allowsCutCopyPaste = true
+		isEditable = true
+	}
+	
+	override func viewDidEndLiveResize() {
+		super.viewDidEndLiveResize()
+		refresh()
+	}
+#else
+	override func layoutSubviews() {
+		super.layoutSubviews()
+		refresh()
+	}
+	
+	func refreshSoon() {
+		isCurrent = false
+		setNeedsLayout()
+	}
+#endif
 }
 
 //	MARK: -
@@ -135,6 +208,7 @@ class ChocolateLayerViewController: BaseViewController {
 	let group = Viewable.Group(content:Layout.EmptySpace())
 	
 	override func loadView() {
+		slider.value = chocolate.scalar
 		group.content = layout()
 		view = group.lazyView
 		group.view?.attachViewController(self)
@@ -148,18 +222,18 @@ class ChocolateLayerViewController: BaseViewController {
 	
 	@objc
 	func sliderChanged() {
-		chocolate.chocolateLayer?.scalar = slider.value
+		chocolate.scalar = slider.value
 	}
 	
 	@objc
 	func switchFlipped() {
-		chocolate.chocolateLayer?.axis = toggle.isOn ? 1 : 2
-		chocolate.chocolateLayer?.setNeedsDisplay()
+		chocolate.axis = toggle.isOn ? 1 : 2
 	}
 	
 	func layout() -> Positionable {
 		return Layout.Vertical(targets:[
 			Layout.Horizontal(targets: [slider, toggle], spacing:20, position:.center).padding(20),
+			//Viewable.Color(color:.black).fixed(height:3),
 			chocolate
 		], alignment:.fill, position:.stretch)
 	}

@@ -16,6 +16,8 @@
 		079FDCAE25C81685008A2DF1 /* Viewable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 079FDC9325C81652008A2DF1 /* Viewable.swift */; };
 		079FDCBC25C8CC11008A2DF1 /* CALayerExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 079FDCBB25C8CC10008A2DF1 /* CALayerExtensions.swift */; };
 		079FDCBD25C8CC11008A2DF1 /* CALayerExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 079FDCBB25C8CC10008A2DF1 /* CALayerExtensions.swift */; };
+		07AFCAF125DED1E40004382B /* MutableImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07AFCAF025DED1E40004382B /* MutableImage.swift */; };
+		07AFCAF225DED1E40004382B /* MutableImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07AFCAF025DED1E40004382B /* MutableImage.swift */; };
 		07CF4DB625D63AB0009BADDD /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CF4DB525D63AB0009BADDD /* Atomic.swift */; };
 		07CF4DB725D63AB0009BADDD /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CF4DB525D63AB0009BADDD /* Atomic.swift */; };
 		07D28D0F25C2277A008347A4 /* Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D0E25C2277A008347A4 /* Layout.swift */; };
@@ -95,6 +97,7 @@
 		079FDC7925C75A09008A2DF1 /* LayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutTests.swift; sourceTree = "<group>"; };
 		079FDC9325C81652008A2DF1 /* Viewable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Viewable.swift; sourceTree = "<group>"; };
 		079FDCBB25C8CC10008A2DF1 /* CALayerExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CALayerExtensions.swift; sourceTree = "<group>"; };
+		07AFCAF025DED1E40004382B /* MutableImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutableImage.swift; sourceTree = "<group>"; };
 		07CF4DB525D63AB0009BADDD /* Atomic.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Atomic.swift; sourceTree = "<group>"; };
 		07D28D0E25C2277A008347A4 /* Layout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Layout.swift; sourceTree = "<group>"; };
 		07D28D1725C2620B008347A4 /* DisplayStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayStrings.swift; sourceTree = "<group>"; };
@@ -318,6 +321,7 @@
 				07CF4DB525D63AB0009BADDD /* Atomic.swift */,
 				07FA9F7525C20A90005C439B /* CHCLT.swift */,
 				07FA9F7225C20A90005C439B /* RGBA.swift */,
+				07AFCAF025DED1E40004382B /* MutableImage.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -568,6 +572,7 @@
 			files = (
 				07FA9EE625C20785005C439B /* ViewController.swift in Sources */,
 				079FDCBC25C8CC11008A2DF1 /* CALayerExtensions.swift in Sources */,
+				07AFCAF125DED1E40004382B /* MutableImage.swift in Sources */,
 				07FA9F7825C20A90005C439B /* GeometryExtensions.swift in Sources */,
 				07FA9F6825C20A25005C439B /* Common.swift in Sources */,
 				07D28D3025C3B927008347A4 /* Style.swift in Sources */,
@@ -620,6 +625,7 @@
 				07FA9F2825C208B0005C439B /* SceneDelegate.swift in Sources */,
 				07CF4DB725D63AB0009BADDD /* Atomic.swift in Sources */,
 				07FA9F8125C20A90005C439B /* CHCLT.swift in Sources */,
+				07AFCAF225DED1E40004382B /* MutableImage.swift in Sources */,
 				07FA9F7925C20A90005C439B /* GeometryExtensions.swift in Sources */,
 				07589C3C25CE37D900465F9A /* StringExtensions.swift in Sources */,
 				07D28D4725C3BB1D008347A4 /* Styles.swift in Sources */,

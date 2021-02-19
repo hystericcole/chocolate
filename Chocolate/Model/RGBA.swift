@@ -114,6 +114,15 @@ public struct DisplayRGB {
 		}
 	}
 	
+	public func pixel() -> UInt32 {
+		let a = UInt32(round(vector.w * 255)) << 24
+		let r = UInt32(round(vector.x * 255)) << 16
+		let g = UInt32(round(vector.y * 255)) << 8
+		let b = UInt32(round(vector.z * 255)) << 0
+		
+		return r | g | b | a
+	}
+	
 	public func linear(_ chclt:CHCLT) -> CHCL.LinearRGB {
 		return CHCL.LinearRGB(chclt.linear(vector.xyz))
 	}
@@ -300,6 +309,72 @@ extension CHCL.LinearRGB {
 		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), alpha]
 		
 		return CGColor(colorSpace:space, components:&components)
+	}
+	
+	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowBytes:Int) {
+		let isFlipped = (axis / 3) & 1 != 0
+		let count = isFlipped ? height : width
+		let rowLength = rowBytes / MemoryLayout<UInt32>.stride
+		
+		switch axis % 3 {
+		case 0:
+			let primary = CHCL.LinearRGB(chclt, hue:value)
+			
+			for x in 0 ..< width {
+				let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+				
+				for y in 0 ..< height {
+					let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
+					let (v, c) = isFlipped ? (b, a) : (a, b)
+					let color = primary.applyLuminance(chclt, value:v).applyChroma(chclt, value:c, luminance:v)
+					
+					pixels[y * rowLength + x] = color.pixel()
+				}
+			}
+		case 1:
+			let hues = CHCL.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCL.Scalar(count), count:count)
+			
+			for x in 0 ..< width {
+				let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+				
+				for y in 0 ..< height {
+					let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
+					let c = value
+					let (i, v) = isFlipped ? (y, a) : (x, 1 - b)
+					let color = hues[i].applyLuminance(chclt, value:v).applyChroma(chclt, value:c, luminance:v)
+					
+					pixels[y * rowLength + x] = color.pixel()
+				}
+			}
+		default:
+			let hues = CHCL.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCL.Scalar(count), count:count)
+			let value = min(max(0, value), 1)
+			
+			for x in 0 ..< width {
+				let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+				
+				for y in 0 ..< height {
+					let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
+					let v = value
+					let (i, c) = isFlipped ? (y, a) : (x, 1 - b)
+					let color = hues[i].applyLuminance(chclt, value:v).applyChroma(chclt, value:c, luminance:v)
+					
+					pixels[y * rowLength + x] = color.pixel()
+				}
+			}
+		}
+	}
+	
+	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, image:MutableImage) {
+		guard image.image.bitsPerPixel == 32 && image.image.colorSpace?.model == .rgb else { return }
+		
+		let width = image.image.width
+		let height = image.image.height
+		let rowBytes = image.image.bytesPerRow
+		let data = image.data as NSMutableData
+		let pixels = data.mutableBytes.assumingMemoryBound(to:UInt32.self)
+		
+		drawPlaneFromCubeHCL(chclt, axis:axis, value:value, pixels:pixels, width:width, height:height, rowBytes:rowBytes)
 	}
 }
 

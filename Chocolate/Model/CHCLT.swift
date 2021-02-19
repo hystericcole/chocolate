@@ -122,6 +122,14 @@ public enum CHCL {
 			self.init(normalized)
 		}
 		
+		public func pixel() -> UInt32 {
+			let r = UInt32(round(vector.x * 255)) << 16
+			let g = UInt32(round(vector.y * 255)) << 8
+			let b = UInt32(round(vector.z * 255))
+			
+			return r | g | b
+		}
+		
 		/// Transfer from linear RGB to display ready, gamma compressed RGB
 		public func display(_ chclt:CHCLT, alpha:Scalar = 1) -> DisplayRGB {
 			return DisplayRGB(Scalar.vector4(chclt.display(vector), alpha))
