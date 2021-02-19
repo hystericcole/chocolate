@@ -311,56 +311,56 @@ extension CHCL.LinearRGB {
 		return CGColor(colorSpace:space, components:&components)
 	}
 	
-	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowBytes:Int) {
+	static func drawPlaneFromPolarCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
+		for x in 0 ..< width {
+			let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+			
+			for y in 0 ..< height {
+				let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
+				let r = min(hypot(b * 2 - 1, a * 2 - 1), 1)
+				let t = atan2(b * 2 - 1, a * 2 - 1) / .pi
+				let h, c, l:CHCL.Scalar
+				
+				switch axis % 6 {
+				case 0: h = value; c = 1 - t.magnitude * 2; l = 1 - r
+				case 1: h = t * -0.5; c = value; l = 1 - r
+				case 2: h = t * -0.5; c = r; l = value
+				case 3: h = value; c = copysign(r, -t); l = t.magnitude
+				case 4: h = r; c = value; l = t.magnitude
+				default: h = r; c = 1 - t.magnitude * 2; l = value
+				}
+				
+				let color = CHCL.LinearRGB(chclt, hue:h, luminance:l).applyChroma(chclt, value:c, luminance:l)
+				
+				pixels[y * rowLength + x] = color.pixel()
+			}
+		}
+	}
+	
+	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
 		let isFlipped = (axis / 3) & 1 != 0
 		let count = isFlipped ? height : width
-		let rowLength = rowBytes / MemoryLayout<UInt32>.stride
+		let hues = axis % 3 == 0 ? [CHCL.LinearRGB(chclt, hue:value)] : CHCL.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCL.Scalar(count), count:count)
 		
-		switch axis % 3 {
-		case 0:
-			let primary = CHCL.LinearRGB(chclt, hue:value)
+		for x in 0 ..< width {
+			let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
 			
-			for x in 0 ..< width {
-				let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+			for y in 0 ..< height {
+				let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
+				let h:Int, c, l:CHCL.Scalar
 				
-				for y in 0 ..< height {
-					let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
-					let (v, c) = isFlipped ? (b, a) : (a, b)
-					let color = primary.applyLuminance(chclt, value:v).applyChroma(chclt, value:c, luminance:v)
-					
-					pixels[y * rowLength + x] = color.pixel()
+				switch axis % 6 {
+				case 0: h = 0; c = 1 - b; l = a
+				case 1: h = x; c = value; l = 1 - b
+				case 2: h = x; c = 1 - b; l = value
+				case 3: h = 0; c = a; l = 1 - b
+				case 4: h = y; c = value; l = a
+				default: h = y; c = a; l = value
 				}
-			}
-		case 1:
-			let hues = CHCL.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCL.Scalar(count), count:count)
-			
-			for x in 0 ..< width {
-				let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
 				
-				for y in 0 ..< height {
-					let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
-					let c = value
-					let (i, v) = isFlipped ? (y, a) : (x, 1 - b)
-					let color = hues[i].applyLuminance(chclt, value:v).applyChroma(chclt, value:c, luminance:v)
-					
-					pixels[y * rowLength + x] = color.pixel()
-				}
-			}
-		default:
-			let hues = CHCL.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCL.Scalar(count), count:count)
-			let value = min(max(0, value), 1)
-			
-			for x in 0 ..< width {
-				let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+				let color = hues[h].applyLuminance(chclt, value:l).applyChroma(chclt, value:c, luminance:l)
 				
-				for y in 0 ..< height {
-					let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
-					let v = value
-					let (i, c) = isFlipped ? (y, a) : (x, 1 - b)
-					let color = hues[i].applyLuminance(chclt, value:v).applyChroma(chclt, value:c, luminance:v)
-					
-					pixels[y * rowLength + x] = color.pixel()
-				}
+				pixels[y * rowLength + x] = color.pixel()
 			}
 		}
 	}
@@ -370,11 +370,15 @@ extension CHCL.LinearRGB {
 		
 		let width = image.image.width
 		let height = image.image.height
-		let rowBytes = image.image.bytesPerRow
 		let data = image.data as NSMutableData
 		let pixels = data.mutableBytes.assumingMemoryBound(to:UInt32.self)
+		let rowLength = image.image.bytesPerRow / MemoryLayout<UInt32>.stride
 		
-		drawPlaneFromCubeHCL(chclt, axis:axis, value:value, pixels:pixels, width:width, height:height, rowBytes:rowBytes)
+		if axis < 0 {
+			drawPlaneFromPolarCubeHCL(chclt, axis:-axis, value:value, pixels:pixels, width:width, height:height, rowLength:rowLength)
+		} else {
+			drawPlaneFromCubeHCL(chclt, axis:axis, value:value, pixels:pixels, width:width, height:height, rowLength:rowLength)
+		}
 	}
 }
 
