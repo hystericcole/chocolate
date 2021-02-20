@@ -12,6 +12,9 @@ import simd
 public struct DisplayRGB {
 	public typealias Scalar = CHCLT.Scalar
 	
+	public static let black = DisplayRGB(Scalar.vector4(.zero, 1.0))
+	public static let white = DisplayRGB(.one)
+	
 	public let vector:CHCLT.Vector4
 	public var clamped:DisplayRGB { return DisplayRGB(simd_min(simd_max(.zero, vector), .one)) }
 	public var inverted:DisplayRGB { return DisplayRGB(Scalar.vector4(1 - vector.xyz, vector.w)) }
@@ -481,12 +484,27 @@ public struct CHCLTShading {
 	public func shading(linearColorSpace:CGColorSpace, start:CGPoint, end:CGPoint, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
 		guard linearColorSpace.model == .rgb, let function = shadingFunction() else { return nil }
 		
-		return CGShading(axialSpace:linearColorSpace, start:start, end:end, function:function, extendStart:extendStart, extendEnd:extendEnd)
+		return CGShading(
+			axialSpace:linearColorSpace,
+			start:start,
+			end:end,
+			function:function,
+			extendStart:extendStart,
+			extendEnd:extendEnd
+		)
 	}
 	
 	public func shading(linearColorSpace:CGColorSpace, start:CGPoint, startRadius:CGFloat = 0, end:CGPoint, endRadius:CGFloat, extendStart:Bool = true, extendEnd:Bool = true) -> CGShading? {
 		guard linearColorSpace.model == .rgb, let function = shadingFunction() else { return nil }
 		
-		return CGShading(radialSpace:linearColorSpace, start:start, startRadius:startRadius, end:end, endRadius:endRadius, function:function, extendStart:extendStart, extendEnd:extendEnd)
+		return CGShading(
+			radialSpace:linearColorSpace,
+			start:start,
+			startRadius:startRadius,
+			end:end, endRadius:endRadius,
+			function:function,
+			extendStart:extendStart,
+			extendEnd:extendEnd
+		)
 	}
 }

@@ -17,13 +17,18 @@ protocol Positionable {
 	
 	/// The requested size of the element.
 	/// 
-	/// Each dimension of the size specifies a minimum, maximum, fraction of available space, and constant.  The final value, once the available space is known, will be computed as `constant + fraction × available`, clamped between minimum and maximum.  The requested size will be provided when possible.
+	/// Each dimension of the size specifies a minimum, maximum, fraction of available space, and constant.
+	/// The final value, once the available space is known, will be computed as `constant + fraction × available`, clamped between minimum and maximum.
+	/// The requested size will be provided when possible.
 	/// - Parameter limit: The limit of available space.
 	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size
 	
 	/// Apply a frame to the element.
 	///	# Layout
-	/// During typical layout, a container will get the requested size of each element, fit the sizes within available space, then apply frames to elements.  The applied frames may exceed the minimum or maximum requested size depending on available space and layout options.  When containers are nested, each container will get the size of contained elements twice, once when requesting a size for itself and again when applying a frame to itself.  Deeply nested containers will request the size of elements several times during a single layout, with a more accurate limit at each pass.
+	/// During typical layout, a container will get the requested size of each element, fit the sizes within available space, then apply frames to elements.
+	/// The applied frames may exceed the minimum or maximum requested size depending on available space and layout options.
+	/// When containers are nested, each container will get the size of contained elements twice, once when requesting a size for itself and again when applying a frame to itself.
+	/// Deeply nested containers will request the size of elements several times during a single layout, with a more accurate limit at each pass.
 	func applyPositionableFrame(_ frame:CGRect, context:Layout.Context)
 	
 	/// Retrieve elements that can be ordered in a container, or attached to elements in a container.
@@ -72,7 +77,9 @@ struct Layout {
 		/// Position each element within available bounds.  A fraction determines the ratio of empty space around the element.
 		///
 		/// # Example
-		/// Align an element with a size of 240 in a container with a limit of 400.  The unused space is 160, and a fraction of that unused space is before the element.  For a fraction of 0.25, that is 0.25 × (400 - 240) = 40 before the element, with 120 after the element.
+		/// Align an element with a size of 240 in a container with a limit of 400.
+		/// The unused space is 160, and a fraction of that unused space is before the element.
+		/// For a fraction of 0.25, that is 0.25 × (400 - 240) = 40 before the element, with 120 after the element.
 		case fraction(Native)
 		/// Position each element within available bounds, adapting to the environment.
 		case adaptiveFraction(Native)
@@ -107,19 +114,27 @@ struct Layout {
 		///	Position content within available bounds.
 		///
 		/// # Example
-		/// Position content with a size of 320 in a container with a limit of 400.  The unused space is 80, and a fraction of that unused space is before the content.  For a fraction of 0.25, that is 0.25 × (400 - 320) = 20 before the content, with 60 after the content.
+		/// Position content with a size of 320 in a container with a limit of 400.
+		/// The unused space is 80, and a fraction of that unused space is before the content.
+		/// For a fraction of 0.25, that is 0.25 × (400 - 320) = 20 before the content, with 60 after the content.
 		case fraction(Native)
-		/// Position content within available bounds, adapting to the environment.  Equivalent to gravityAreas in a stack view.
+		/// Position content within available bounds, adapting to the environment.
+		/// Equivalent to gravityAreas in a stack view.
 		case adaptiveFraction(Native)
-		/// Fill available bounds by stretching elements.  Equivalent to fill or fillProportionally in a stack view.
+		/// Fill available bounds by stretching elements.
+		/// Equivalent to fill or fillProportionally in a stack view.
 		case stretch
-		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.  Equivalent to fillEqually in a stackView.
+		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.
+		/// Equivalent to fillEqually in a stackView.
 		case uniform
-		/// Fill available bounds by aligning each element within a uniform space.  Equivalent to equalCentering in a stack view, when value is 0.5.
+		/// Fill available bounds by aligning each element within a uniform space.
+		/// Equivalent to equalCentering in a stack view, when value is 0.5.
 		case uniformAlign(Native)
-		/// Fill available bounds by stretching space between elements.  Equivalent to equalSpacing in a stack view.
+		/// Fill available bounds by stretching space between elements.
+		/// Equivalent to equalSpacing in a stack view.
 		case distribute
-		/// Position the container around the primary element, with other elements hanging outside the container.  Equivalent to constraining one arranged view of a stack view.
+		/// Position the container around the primary element, with other elements hanging outside the container.
+		/// Equivalent to constraining one arranged view of a stack view.
 		case float
 		
 		static let start = Position.fraction(0.0)
@@ -527,7 +542,9 @@ struct Layout {
 		
 		/// Constrain unbound aspects of each dimension using the bound aspects of the other dimension.
 		/// # Example
-		/// Given a width of `0 < 100 < ∞` and a height of `20 < 150 < ∞`, a new minimum width will be computed.  The constant values are both bound (`> 0`), and the maximum values are both unbound (`>= unlimited`), so neither will be affected.  If either dimension has a fraction, then neither constant will be affected.
+		/// Given a width of `0 < 100 < ∞` and a height of `20 < 150 < ∞`, a new minimum width will be computed.
+		/// The constant values are both bound (`> 0`), and the maximum values are both unbound (`>= unlimited`), so neither will be affected.
+		/// If either dimension has a fraction, then neither constant will be affected.
 		/// - Parameter ratio: Ratio to apply to unconstrained values
 		/// - Returns: Size with additional constraints
 		func constrainingWithRatio(_ ratio:CGSize) -> Size {
@@ -589,6 +606,8 @@ struct Layout {
 	
 	/// Set of amounts to inset or pad the edges of a rectangle
 	struct EdgeInsets: CustomStringConvertible {
+		static let zero = EdgeInsets(uniform:0)
+		
 		var minX, maxX, minY, maxY:Native
 		
 		/// Sum of horizontal insets
@@ -597,21 +616,51 @@ struct Layout {
 		var vertical:Native { return minY + maxY }
 		var description:String { return "→\(minX) ↓\(minY) ←\(maxX) ↑\(maxY)" }
 		
-		init(top:Native = 0, bottom:Native = 0, leading:Native = 0, trailing:Native = 0, environment:Environment) { self.minX = environment.isRTL ? trailing : leading; self.maxX = environment.isRTL ? leading : trailing; self.minY = top; self.maxY = bottom }
-		init(minX:Native = 0, maxX:Native = 0, minY:Native = 0, maxY:Native = 0) { self.minX = minX; self.maxX = maxX; self.minY = minY; self.maxY = maxY }
-		init(horizontal:Native, vertical:Native) { minX = horizontal; maxX = horizontal; minY = vertical; maxY = vertical }
-		init(uniform:Native) { minX = uniform; maxX = uniform; minY = uniform; maxY = uniform }
+		init(top:Native = 0, bottom:Native = 0, leading:Native = 0, trailing:Native = 0, environment:Environment) {
+			self.minX = environment.isRTL ? trailing : leading; self.maxX = environment.isRTL ? leading : trailing; self.minY = top; self.maxY = bottom
+		}
 		
-		func paddingSize(_ size:CGSize) -> CGSize { return CGSize(width:size.width + CGFloat(minX + maxX), height:size.height + CGFloat(minY + maxY)) }
-		func paddingBox(_ box:CGRect) -> CGRect { return CGRect(x:box.origin.x - CGFloat(minX), y:box.origin.y - CGFloat(minY), width:box.size.width + CGFloat(minX + maxX), height:box.size.height + CGFloat(minY + maxY)) }
+		init(minX:Native = 0, maxX:Native = 0, minY:Native = 0, maxY:Native = 0) {
+			self.minX = minX; self.maxX = maxX; self.minY = minY; self.maxY = maxY
+		}
 		
-		func reducingSize(_ size:CGSize) -> CGSize { return CGSize(width:size.width - CGFloat(minX + maxX), height:size.height - CGFloat(minY + maxY)) }
-		func reducingBox(_ box:CGRect) -> CGRect { return CGRect(x:box.origin.x + CGFloat(minX), y:box.origin.y + CGFloat(minY), width:box.size.width - CGFloat(minX + maxX), height:box.size.height - CGFloat(minY + maxY)) }
+		init(horizontal:Native, vertical:Native) {
+			minX = horizontal; maxX = horizontal; minY = vertical; maxY = vertical
+		}
 		
-		static let zero = EdgeInsets(uniform:0)
+		init(uniform:Native) {
+			minX = uniform; maxX = uniform; minY = uniform; maxY = uniform
+		}
+		
+		func paddingSize(_ size:CGSize) -> CGSize {
+			return CGSize(width:size.width + CGFloat(minX + maxX), height:size.height + CGFloat(minY + maxY))
+		}
+		
+		func paddingBox(_ box:CGRect) -> CGRect {
+			return CGRect(
+				x:box.origin.x - CGFloat(minX),
+				y:box.origin.y - CGFloat(minY),
+				width:box.size.width + CGFloat(minX + maxX),
+				height:box.size.height + CGFloat(minY + maxY)
+			)
+		}
+		
+		func reducingSize(_ size:CGSize) -> CGSize {
+			return CGSize(width:size.width - CGFloat(minX + maxX), height:size.height - CGFloat(minY + maxY))
+		}
+		
+		func reducingBox(_ box:CGRect) -> CGRect {
+			return CGRect(
+				x:box.origin.x + CGFloat(minX),
+				y:box.origin.y + CGFloat(minY),
+				width:box.size.width - CGFloat(minX + maxX),
+				height:box.size.height - CGFloat(minY + maxY)
+			)
+		}
 	}
 	
-	/// Targets that reach the safe bounds will be extended to the outer bounds.  Typically used for backgrounds and full screen media.
+	/// Targets that reach the safe bounds will be extended to the outer bounds.
+	/// Typically used for backgrounds and full screen media.
 	struct IgnoreSafeBounds: PositionableWithTarget {
 		var target:Positionable
 		
@@ -649,7 +698,10 @@ struct Layout {
 		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] { return [] }
 	}
 	
-	/// Specify padding around the target.  Positive insets will increase the distance between adjacent targets.  Negative insets may cause adjacent targets to overlap.  Affects both measured size and applied frame.
+	/// Specify padding around the target.
+	/// Positive insets will increase the distance between adjacent targets.
+	/// Negative insets may cause adjacent targets to overlap.
+	/// Affects both measured size and applied frame.
 	struct Padding: PositionableWithTarget {
 		var target:Positionable
 		var insets:EdgeInsets
@@ -687,7 +739,9 @@ struct Layout {
 	
 	/// Replace the normal dimensions of the target when being measured.  Does not affect the assigned frame.
 	///
-	/// When both the width and height are specified, the target will not be measured during layout.  This can improve performance with complex targets.  When only one dimension is specified, the limits passed to the target during measurement will be adjusted.
+	/// When both the width and height are specified, the target will not be measured during layout.
+	/// This can improve performance with complex targets.
+	/// When only one dimension is specified, the limits passed to the target during measurement will be adjusted.
 	struct Sizing: PositionableWithTarget {
 		var target:Positionable
 		var width:Dimension?
@@ -760,7 +814,8 @@ struct Layout {
 		}
 	}
 	
-	/// Impose aspect fit on the target.  The assigned frame will be reduced to fit the specified aspect ratio.  The measured size of the target may also be changed.
+	/// Impose aspect fit on the target.  The assigned frame will be reduced to fit the specified aspect ratio.
+	/// The measured size of the target may also be changed.
 	struct Aspect: PositionableWithTarget {
 		/// The affected target.
 		var target:Positionable
@@ -876,8 +931,17 @@ struct Layout {
 		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.vertical, environment:context.environment)
 			let align = alignment.value(axis:.horizontal, environment:context.environment)
-			let offset = axial.offset(isFloating:isFloating, position:position, axis:.vertical, environment:context.environment, available:available, index:primaryIndex, isPositive:isPositive)
 			let uniformAlign = position.alignValue(axis:.vertical, environment:context.environment)
+			
+			let offset = axial.offset(
+				isFloating:isFloating,
+				position:position,
+				axis:.vertical,
+				environment:context.environment,
+				available:available,
+				index:primaryIndex,
+				isPositive:isPositive
+			)
 			
 			axial.computeFramesVertical(offset:offset, alignment:align, uniformAlign:uniformAlign, sizes:sizes, bounds:box, isPositive:isPositive)
 			axial.applyFrames(targets:targets, sizes:sizes, context:context)
@@ -970,8 +1034,17 @@ struct Layout {
 		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:context.environment)
 			let align = alignment.value(axis:.vertical, environment:context.environment)
-			let offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryIndex, isPositive:isPositive)
 			let uniformAlign = position.alignValue(axis:.horizontal, environment:context.environment)
+			
+			let offset = axial.offset(
+				isFloating:isFloating,
+				position:position,
+				axis:.horizontal,
+				environment:context.environment,
+				available:available,
+				index:primaryIndex,
+				isPositive:isPositive
+			)
 			
 			axial.computeFramesHorizontal(offset:offset, alignment:align, uniformAlign:uniformAlign, sizes:sizes, bounds:box, isPositive:isPositive)
 			axial.applyFrames(targets:targets, sizes:sizes, context:context)
@@ -1011,7 +1084,8 @@ struct Layout {
 		var primaryIndex:Int
 		/// The spacing between columns.
 		var spacing:Native
-		/// When true elements are ordered along columns, filling each column before wrapping to the next.  When false, elements are ordered across columns, filling each row before wrapping to the next.  The default is false.  
+		/// When true elements are ordered along columns, filling each column before wrapping to the next.
+		/// When false, elements are ordered across columns, filling each row before wrapping to the next.  The default is false.  
 		var columnMajor:Bool
 		/// The display order of rows, with positive being down.
 		var direction:Direction
@@ -1074,7 +1148,15 @@ struct Layout {
 			guard columnCount > 1 else { return singleColumn.positionableSize(fitting:limit) }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
-			return Axial.sizeColumns(fitting:limit, splittingTargets:targets, intoColumns:columnCount, columnMajor:columnMajor, columnSpacing:spacing, rowSpacing:rowTemplate.spacing, rowPosition:rowTemplate.position)
+			return Axial.sizeColumns(
+				fitting:limit,
+				splittingTargets:targets,
+				intoColumns:columnCount,
+				columnMajor:columnMajor,
+				columnSpacing:spacing,
+				rowSpacing:rowTemplate.spacing,
+				rowPosition:rowTemplate.position
+			)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
@@ -1122,7 +1204,16 @@ struct Layout {
 				primaryRow = primaryIndex / columnCount
 			}
 			
-			var offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryRow, isPositive:isPositive)
+			var offset = axial.offset(
+				isFloating:isFloating,
+				position:position,
+				axis:.horizontal,
+				environment:context.environment,
+				available:available,
+				index:primaryRow,
+				isPositive:isPositive
+			)
+			
 			var readyTargets = targets
 			var readySizes = sizes
 			let incompleteRow = readyTargets.count % columnCount
@@ -1189,7 +1280,8 @@ struct Layout {
 		var primaryIndex:Int
 		/// The spacing between rows.
 		var spacing:Native
-		/// When true elements are ordered along rows, filling each row before wrapping to the next.  When false, elements are ordered across rows, filling each column before wrapping to the next.  The default is false.  
+		/// When true elements are ordered along rows, filling each row before wrapping to the next.
+		/// When false, elements are ordered across rows, filling each column before wrapping to the next.  The default is false.  
 		var rowMajor:Bool
 		/// The display order of columns, with positive being right.
 		var direction:Direction
@@ -1248,7 +1340,15 @@ struct Layout {
 			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit) }
 			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
 			
-			return Axial.sizeRows(fitting:limit, splittingTargets:targets, intoRows:rowCount, rowMajor:rowMajor, rowSpacing:spacing, columnSpacing:columnTemplate.spacing, columnPosition:columnTemplate.position)
+			return Axial.sizeRows(
+				fitting:limit,
+				splittingTargets:targets,
+				intoRows:rowCount,
+				rowMajor:rowMajor,
+				rowSpacing:spacing,
+				columnSpacing:columnTemplate.spacing,
+				columnPosition:columnTemplate.position
+			)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
@@ -1296,7 +1396,16 @@ struct Layout {
 				primaryColumn = primaryIndex / rowCount
 			}
 			
-			var offset = axial.offset(isFloating:isFloating, position:position, axis:.horizontal, environment:context.environment, available:available, index:primaryColumn, isPositive:isPositive)
+			var offset = axial.offset(
+				isFloating:isFloating,
+				position:position,
+				axis:.horizontal,
+				environment:context.environment,
+				available:available,
+				index:primaryColumn,
+				isPositive:isPositive
+			)
+			
 			var readyTargets = targets
 			var readySizes = sizes
 			let incompleteColumn = readyTargets.count % rowCount
@@ -1337,7 +1446,14 @@ struct Layout {
 				
 				let columnBox = CGRect(x:box.origin.x + CGFloat(x), y:box.origin.y, width:CGFloat(width), height:box.size.height)
 				
-				column.applyPositionableFrame(columnBox, context:context, axial:&columnAxial, sizes:columnSizes, available:columnAvailable, isFloating:isFloating)
+				column.applyPositionableFrame(
+					columnBox,
+					context:context,
+					axial:&columnAxial,
+					sizes:columnSizes,
+					available:columnAvailable,
+					isFloating:isFloating
+				)
 			}
 		}
 		
@@ -1642,7 +1758,15 @@ struct Layout {
 			return result
 		}
 		
-		static func sizeRows(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoRows rowCount:Int, rowMajor:Bool, rowSpacing:Native, columnSpacing:Native, columnPosition:Position) -> Layout.Size {
+		static func sizeRows(
+			fitting limit:Layout.Limit,
+			splittingTargets:[Positionable],
+			intoRows rowCount:Int,
+			rowMajor:Bool,
+			rowSpacing:Native,
+			columnSpacing:Native,
+			columnPosition:Position
+		) -> Layout.Size {
 			var result:Layout.Size = .zero
 			let itemLimit = splittingTargets.count - 1
 			let columnCount = 1 + itemLimit / rowCount
@@ -1675,7 +1799,15 @@ struct Layout {
 			return result
 		}
 		
-		static func sizeColumns(fitting limit:Layout.Limit, splittingTargets:[Positionable], intoColumns columnCount:Int, columnMajor:Bool, columnSpacing:Native, rowSpacing:Native, rowPosition:Position) -> Layout.Size {
+		static func sizeColumns(
+			fitting limit:Layout.Limit,
+			splittingTargets:[Positionable],
+			intoColumns columnCount:Int,
+			columnMajor:Bool,
+			columnSpacing:Native,
+			rowSpacing:Native,
+			rowPosition:Position
+		) -> Layout.Size {
 			var result:Layout.Size = .zero
 			let itemLimit = splittingTargets.count - 1
 			let rowCount = 1 + itemLimit / columnCount

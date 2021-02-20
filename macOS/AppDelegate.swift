@@ -10,7 +10,7 @@ import Cocoa
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
 	func applicationDidFinishLaunching(_ aNotification: Notification) {
-		positionMainWindow()
+		positionWindow(NSApplication.shared.mainWindow)
 		//AppDelegate.generateIcons()
 	}
 
@@ -22,13 +22,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		return true
 	}
 	
-	func positionMainWindow() {
-		guard let window = NSApplication.shared.mainWindow, let screen = NSScreen.main else { return }
+	func positionWindow(_ window:NSWindow?) {
+		guard let window = window, let screen = NSScreen.main else { return }
 		
 		let screenHeight = screen.frame.size.height
 		
 		window.setContentSize(CGSize(width:400, height:min(800, screenHeight * 0.75)))
 		window.center()
+	}
+	
+	@objc
+	func newDocument(_ sender:NSObject) {
+		let controller = ViewController()
+		let window = NSWindow(contentViewController: controller)
+		
+		positionWindow(window)
+		
+		window.makeKeyAndOrderFront(sender)
 	}
 }
 

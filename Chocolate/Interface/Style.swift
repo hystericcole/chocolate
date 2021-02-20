@@ -207,5 +207,8 @@ extension Style {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			return view?.positionableSize(fitting: limit) ?? model.positionableSize(fitting: limit)
 		}
+		
+		func text(_ string:String) -> Self { text = string; return self }
+		func color(_ color:PlatformColor?) -> Self { textColor = color; return self }
 	}
 }

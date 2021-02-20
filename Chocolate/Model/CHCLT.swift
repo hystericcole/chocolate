@@ -10,22 +10,29 @@ import simd
 
 /// Cole Hue Chroma Luma Transform
 public protocol CHCLT {
-	/// Luminance that is considered medium.  Color pairs with luminances straddling this value are suitable as foreground and background colors.  Used to identify contrasting colors.  Values in the range 0.1 ... 0.5 are valid.
+	/// Luminance that is considered medium.
+	/// Color pairs with luminances straddling this value are suitable as foreground and background colors.
+	/// Used to identify contrasting colors.
+	/// Values in the range 0.1 ... 0.5 are valid.
 	/// 
-	/// Contrast is computed as a ratio or difference of luminance between two colors.  CHCLT uses a ratio.  To compute the ratio, take the luminances of two colors, add the offset to each, then divide the larger sum by the smaller sum.
+	/// Contrast is computed as a ratio or difference of luminance between two colors.  CHCLT uses a ratio.
+	/// To compute the ratio, take the luminances of two colors, add the offset to each, then divide the larger sum by the smaller sum.
 	/// 
-	/// CHCLT chooses the ratio and offset so that the medium luminance is a value, not a range.  The medium luminance (m), ratio (r) and offset (1/d) are related as follows:
+	/// CHCLT chooses the ratio and offset so that the medium luminance is a value, not a range.
+	/// The medium luminance (m), ratio (r) and offset (1/d) are related as follows:
 	/// ```
 	/// m = (√(d+1)-1) / d = 1/(r + 1)
 	/// d = (1 - 2m) / m² = r² - 1
 	/// r = √(d+1) = 1/m - 1
 	/// ```
 	/// 
-	/// The standard medium luminance for CHCLT is 1/4, which corresponds to a ratio of 3 and 1/8 offset.  Compute the ratio of 2 colors with luminance a and b as follows:
+	/// The standard medium luminance for CHCLT is 1/4, which corresponds to a ratio of 3 and 1/8 offset.
+	/// Compute the ratio of 2 colors with luminance a and b as follows:
 	/// ```
 	/// ratio = (max(a, b) + 1/8) / (min(a, b) + 1/8)
 	/// ```
-	/// When the ratio is > 3, the colors are considered to have sufficient contrast.  The contrast of a single color is computed such that two opposing colors with contrasts that add to 1 will have this ratio.
+	/// When the ratio is > 3, the colors are considered to have sufficient contrast.
+	/// The contrast of a single color is computed such that two opposing colors with contrasts that add to 1 will have this ratio.
 	/// 
 	/// # G18
 	/// The G18 contrast standard calls for a ratio of 4.5 and offset of 0.05, which puts medium luminance in the range 21/120 ... 22/120.
@@ -83,8 +90,14 @@ public enum CHCL {
 	/// # Range
 	/// The range of the color components is 0 ... 1 and colors outside this range can be brought within the range using normalize
 	/// # Stability
-	/// Shifting the hue will not change the luminance, but it will usually change the chroma.  Changing the chroma will not change the luminance and will not change the hue if chroma remains positive.  Changing the luminance will not change the hue unless color information is lost at the extrema, but it may change the saturation.  Changing the contrast is equivalent to changing the luminance.
+	/// Shifting the hue will not change the luminance, and will only change the saturation if the colors becomes denormalized, but it will usually change the chroma value.
+	/// Changing the chroma will not change the luminance and will not change the hue if chroma remains positive.
+	/// Changing the luminance will not change the hue unless color information is lost at the extrema, but it may change the chroma value.
+	/// Changing the contrast is equivalent to changing the luminance.
 	public struct LinearRGB {
+		public static let black = DisplayRGB(.zero)
+		public static let white = DisplayRGB(.one)
+		
 		public let vector:CHCLT.Vector3
 		public var clamped:LinearRGB { return LinearRGB(simd_min(simd_max(.zero, vector), .one)) }
 		
@@ -180,7 +193,9 @@ public enum CHCL {
 			return LinearRGB(vector * scalar)
 		}
 		
-		/// Create a new color with the same hue and given luminance.  Increasing the luminance to the point where it would be denormalized will instead desaturate the color, in which case decreasing the luminance to the original value will not produce the original color.  The chroma value may change while the perceptual chroma is preserved.
+		/// Create a new color with the same hue and given luminance.
+		/// Increasing the luminance to the point where it would be denormalized will instead desaturate the color, in which case decreasing the luminance to the original value will not produce the original color.
+		/// The chroma value may change while the perceptual chroma is preserved.
 		/// - Parameters:
 		///   - chclt: The color space
 		///   - u: Value from 0 ... 1 to apply.  Zero is black, one is white.
@@ -228,7 +243,9 @@ public enum CHCL {
 			return luminance(chclt) < chclt.mediumLuminance()
 		}
 		
-		/// The contrast of a color is a measure of the distance from medium luminance.  Both black and white have a contrast of 1.  The contrast is computed so that light and dark color pairs with contrasts that add to at least 0.5 will be legible, and a sum of at least 1.0 is recommended.
+		/// The contrast of a color is a measure of the distance from medium luminance.
+		/// Both black and white have a contrast of 1.
+		/// The contrast is computed such that light and dark color pairs with contrasts that add to at least 1.0 satisfy the minimum recommended contrast.
 		/// - Parameter chclt: The color space
 		/// - Returns: The contrast
 		public func contrast(_ chclt:CHCLT) -> Linear {
@@ -239,7 +256,10 @@ public enum CHCL {
 			return c.magnitude
 		}
 		
-		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.  For example, scale by 0.5 to produce a color that contrasts half as much against the same background.  Scaling to 0 will result in a color with medium luminance.  Scaling to negative will result in contrasting colors.
+		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
+		/// For example, scale by 0.5 to produce a color that contrasts half as much against the same background.
+		/// Scaling to 0 will result in a color with medium luminance.
+		/// Scaling to negative will result in contrasting colors.
 		public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
 			let m = chclt.mediumLuminance()
 			let v = luminance(chclt)
@@ -250,6 +270,8 @@ public enum CHCL {
 		}
 		
 		/// Adjust the luminance to create a color that contrasts against the same colors as this color.
+		/// 
+		/// Use a value less than `contrast(chclt) - 1` for a color with the suggested minimum contrast.
 		/// - Parameters:
 		///   - chclt: The color space
 		///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
@@ -262,13 +284,36 @@ public enum CHCL {
 			return applyLuminance(chclt, value:u)
 		}
 		
-		/// Adjust the luminance to create a color that contrasts well against this color.  Use a value of at least `1 - contrast(chclt)` for a color with the suggested minimum contrast.
+		/// Adjust the luminance to create a color that contrasts well against this color.
+		/// 
+		/// Use a value greater than `1 - contrast(chclt)` for a color with the suggested minimum contrast.
 		/// - Parameters:
 		///   - chclt: The color space
 		///   - value: The contrast of the adjusted color.  Negative values create colors that do not contrast with this color.  Values near zero contrast poorly.  Values near one contrast well.
 		/// - Returns: The adjusted color
-		public func contrasting(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
+		public func opposing(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
 			return applyContrast(chclt, value:-value)
+		}
+		
+		/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
+		/// 
+		/// A light and dark color pair with contrasts that add to at least 1.0 satisfy the minimum suggested contrast.
+		/// This method will generate the second color of that contrasting color pair.
+		/// A value of zero will apply the minimum suggested contrast between the colors.
+		/// Positive values will increase the contrast between the pair, up to 1.0 which will result in black or white.
+		/// Negative values will decrease the contrast between the colors below the minimum suggested contrast.
+		/// - Parameters:
+		///   - chclt: The color space
+		///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
+		/// - Returns: The adjusted color
+		public func contrasting(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
+			let m = chclt.mediumLuminance()
+			let v = luminance(chclt)
+			let c = v > m ? (v - m) / (1 - m) : 1 - v / m
+			let t = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
+			let u = v > m ? m * (1 - t) : (1 - m) * t + m
+			
+			return applyLuminance(chclt, value:u)
 		}
 		
 		//	MARK: - Chroma
@@ -305,7 +350,9 @@ public enum CHCL {
 			return max(r, g, b)
 		}
 		
-		///	A color with all components equal is desaturated and has a chroma of zero.  A color with a component at 0 or 1 cannot have the saturation increased without denormalizing the color and has a chroma of one.  The chroma of a color is the desaturation scale that would be applied to the maximum color to reach this color.
+		///	A color with all components equal is desaturated and has a chroma of zero.
+		///	A color with a component at 0 or 1 cannot have the saturation increased without denormalizing the color and has a chroma of one.
+		///	The chroma of a color is the desaturation scale that would be applied to the maximum color to reach this color.
 		/// - Parameter chclt: The color space
 		/// - Returns: The croma
 		public func chroma(_ chclt:CHCLT) -> Scalar {
@@ -316,7 +363,11 @@ public enum CHCL {
 			return c
 		}
 		
-		/// Scale the chroma of the color.  The color approaches gray as the value approaches zero.  Values greater than one increase vibrancy and may denormalize the color.  The hue is preserved for positive, inverted for nagative, and lost at zero.  The luminance is preserved.
+		/// Scale the chroma of the color.
+		/// The color approaches gray as the value approaches zero.
+		/// Values greater than one increase vibrancy and may denormalize the color.
+		/// The hue is preserved for positive, inverted for nagative, and lost at zero.
+		/// The luminance is preserved.
 		public func scaleChroma(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
 			let v = chclt.luminance(vector)
 			let s = scalar
@@ -352,7 +403,8 @@ public enum CHCL {
 		
 		//	MARK: - Hue
 		
-		/// Hue is the angle between the color and red, normalized to the 0 ... 1 range.  Reds are near 0 or 1, greens are near ⅓, and blues are near ⅔ but the actual angles vary by color space.
+		/// Hue is the angle between the color and red, normalized to the 0 ... 1 range.
+		/// Reds are near 0 or 1, greens are near ⅓, and blues are near ⅔ but the actual angles vary by color space.
 		/// - Parameter chclt: The color space
 		/// - Returns: The hue
 		public func hue(_ chclt:CHCLT) -> Linear {
@@ -385,7 +437,9 @@ public enum CHCL {
 			return LinearRGB(normalized)
 		}
 		
-		/// Rotate the color around the normal axis, changing the ratio of the components.  Shifting the hue will preserve the luminance, and changes the chroma value.  The perceptual chroma is preserved unless the color needs to be normalized after rotation.
+		/// Rotate the color around the normal axis, changing the ratio of the components.
+		/// Shifting the hue will preserve the luminance, and changes the chroma value.
+		/// The perceptual chroma is preserved unless the color needs to be normalized after rotation.
 		/// - Parameters:
 		///   - chclt: The color space.
 		///   - shift: The amount to shift.  Shifting by zero or one has no effect.  Shifting by half gives the same hue as negating chroma.
@@ -473,6 +527,12 @@ public enum CHCL {
 extension CHCLT {
 	public func mediumLuminance() -> CHCLT.Scalar {
 		return 0.25
+	}
+	
+	public func offset() -> CHCLT.Scalar {
+		let m = mediumLuminance()
+		
+		return m * m / (1 - 2*m)
 	}
 	
 	public func transferSigned(_ scalar:CHCLT.Linear) -> CHCLT.Scalar {

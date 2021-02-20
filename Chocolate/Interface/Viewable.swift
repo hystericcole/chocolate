@@ -24,26 +24,34 @@ protocol LazyViewable: AnyObject, Positionable {
 /// # Positionable
 /// Views, Viewables, and Layouts are all Positionables, and can be mixed and used together.
 /// # View
-/// A viewable can be used to simplify the creation of a view, then discarded, keeping the view.  This would typically be used within another view.
+/// A viewable can be used to simplify the creation of a view, then discarded, keeping the view.
+/// This would typically be used within another view.
 /// 
 /// ```
 /// let gradient = Viewable.Gradient(colors: [.red, .blue]).lazy()
 /// ```
 /// # Layout
-/// A viewable can be created directly within a layout, if no further interaction is needed.  The view will not be created until the layout is ordered in a container.
+/// A viewable can be created directly within a layout, if no further interaction is needed.
+/// The view will not be created until the layout is ordered in a container.
 ///
 /// ```
 /// Layout.Overlay(targets: [Viewable.Color(color: .green), anotherView])
 /// ```
 /// # View Controller
-/// A viewable can be used to prepare a view for later creation.  This would typically be used in a view controller.  The view will not be created until ordered, usually in `viewDidLoad`.  Using a viewable can simplify attaching targets and delegates to views.
+/// A viewable can be used to prepare a view for later creation.
+/// This would typically be used in a view controller.
+/// The view will not be created until ordered, usually in `viewDidLoad`.
+/// Using a viewable can simplify attaching targets and delegates to views.
 /// 
 /// ```
 /// let slider = Viewable.Slider(target: self, action: #selector(sliderValueChanged))
 /// ```
 /// Use a Viewable.Group or Viewable.Scroll as the root view of a view controller that only uses Positionable layout.
 /// # Cell
-/// A viewable can be used as the model for a cell.  The viewable can be used to measure the cell before it is created, for most content.  When the cell is created, the viewable is ordered into the cell.  When the cell is reused, one viewable is detached from the views in the cell, and later a similar viewable can be attached to the same views.
+/// A viewable can be used as the model for a cell.
+/// The viewable can be used to measure the cell before it is created, for most content.
+/// When the cell is created, the viewable is ordered into the cell.
+/// When the cell is reused, one viewable is detached from the views in the cell, and later a similar viewable can be attached to the same views.
 ///
 /// ```
 /// let imageView = Viewable.Image(image: ...)
@@ -143,7 +151,11 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var content:Positionable { get { return view?.content ?? model.content } set { model.content = newValue; view?.content = newValue } }
+		
+		var content:Positionable {
+			get { return view?.content ?? model.content }
+			set { model.content = newValue; view?.content = newValue }
+		}
 		
 		init(tag:Int = 0, content:Positionable) {
 			self.model = Model(tag:tag, content:content)
@@ -186,8 +198,16 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var color:PlatformColor? { get { return view?.backgroundColor ?? model.color } set { model.color = newValue; view?.backgroundColor = newValue } }
-		var intrinsicSize:CGSize { get { return model.intrinsicSize } set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() } }
+		
+		var color:PlatformColor? {
+			get { return view?.backgroundColor ?? model.color }
+			set { model.color = newValue; view?.backgroundColor = newValue }
+		}
+		
+		var intrinsicSize:CGSize {
+			get { return model.intrinsicSize }
+			set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() }
+		}
 		
 		init(tag:Int = 0, color:PlatformColor?, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
 			self.model = Model(tag:tag, color:color, intrinsicSize:intrinsicSize)
@@ -278,10 +298,26 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var attributedText:NSAttributedString? { get { return view?.attributedText ?? model.string } set { model.string = newValue; view?.attributedText = newValue } }
-		var intrinsicWidth:CGFloat { get { return view?.preferredMaxLayoutWidth ?? model.intrinsicWidth } set { model.intrinsicWidth = newValue; view?.preferredMaxLayoutWidth = newValue } }
-		var textColor:PlatformColor? { get { return view?.textColor } set { view?.textColor = newValue } }
-		var text:String? { get { return attributedText?.string } set { applyText(newValue) } }
+		
+		var attributedText:NSAttributedString? {
+			get { return view?.attributedText ?? model.string }
+			set { model.string = newValue; view?.attributedText = newValue }
+		}
+		
+		var intrinsicWidth:CGFloat {
+			get { return view?.preferredMaxLayoutWidth ?? model.intrinsicWidth }
+			set { model.intrinsicWidth = newValue; view?.preferredMaxLayoutWidth = newValue }
+		}
+		
+		var textColor:PlatformColor? {
+			get { return view?.textColor }
+			set { view?.textColor = newValue }
+		}
+		
+		var text:String? {
+			get { return attributedText?.string }
+			set { applyText(newValue) }
+		}
 		
 		init(tag:Int = 0, string:NSAttributedString?, maximumLines:Int = 0, intrinsicWidth:CGFloat = 0) {
 			self.model = Model(tag:tag, string:string, maximumLines:maximumLines, intrinsicWidth:intrinsicWidth)
@@ -374,8 +410,16 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var select:Int { get { return view?.selectionIndex ?? model.select } set { model.select = newValue; view?.selectionIndex = newValue } }
-		var titles:[NSAttributedString] { get { return model.itemTitles } set { applyItems(newValue) } }
+		
+		var select:Int {
+			get { return view?.selectionIndex ?? model.select }
+			set { model.select = newValue; view?.selectionIndex = newValue }
+		}
+		
+		var titles:[NSAttributedString] {
+			get { return model.itemTitles }
+			set { applyItems(newValue) }
+		}
 		
 		init(tag:Int = 0, titles:[NSAttributedString], select:Int = 0, target:AnyObject? = nil, action:Selector?) {
 			self.model = Model(tag:tag, select:select, itemTitles:titles, target:target, action:action)
@@ -460,9 +504,21 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var minimum:CGSize { get { return model.minimum } set { model.minimum = newValue } }
-		var maximum:CGSize { get { return model.maximum } set { model.maximum = newValue } }
-		var content:Positionable { get { return view?.content ?? model.content } set { model.content = newValue; view?.content = newValue } }
+		
+		var minimum:CGSize {
+			get { return model.minimum }
+			set { model.minimum = newValue }
+		}
+		
+		var maximum:CGSize {
+			get { return model.maximum }
+			set { model.maximum = newValue }
+		}
+		
+		var content:Positionable {
+			get { return view?.content ?? model.content }
+			set { model.content = newValue; view?.content = newValue }
+		}
 		
 		var zoom:CGFloat {
 			get { return view?.zoomScale ?? 1 }
@@ -600,10 +656,22 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var path:CGPath? { get { return shapeLayer?.path ?? model.path } set { model.path = newValue; applyPath(path) } }
-		var style:Style { get { return shapeLayer?.shapeStyle ?? model.style } set { model.style = newValue; shapeLayer?.shapeStyle = newValue } }
-		var shadow:Shadow? { get { return shapeLayer?.shadow ?? model.shadow } set { model.shadow = newValue; shapeLayer?.shadow = newValue ?? .default } }
 		var shapeLayer:CAShapeLayer? { return view?.shapeLayer }
+		
+		var path:CGPath? {
+			get { return shapeLayer?.path ?? model.path }
+			set { model.path = newValue; applyPath(path) }
+		}
+		
+		var style:Style {
+			get { return shapeLayer?.shapeStyle ?? model.style }
+			set { model.style = newValue; shapeLayer?.shapeStyle = newValue }
+		}
+		
+		var shadow:Shadow? {
+			get { return shapeLayer?.shadow ?? model.shadow }
+			set { model.shadow = newValue; shapeLayer?.shadow = newValue ?? .default }
+		}
 		
 		init(tag:Int = 0, path:CGPath? = nil, style:Style, shadow:Shadow? = nil) {
 			self.model = Model(tag:tag, path:path, style:style, shadow:shadow)
@@ -690,11 +758,27 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var descriptor:Descriptor { get { return gradientLayer?.gradient ?? model.gradient } set { model.gradient = newValue; gradientLayer?.gradient = newValue } }
-		var colors:[CGColor] { get { return gradientLayer?.colors as? [CGColor] ?? model.gradient.colors } set { model.gradient.colors = newValue; gradientLayer?.colors = newValue } }
-		var direction:Direction { get { return gradientLayer?.direction ?? model.gradient.direction } set { model.gradient.direction = newValue; gradientLayer?.direction = newValue } }
-		var intrinsicSize:CGSize { get { return model.intrinsicSize } set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() } }
 		var gradientLayer:CAGradientLayer? { return view?.gradientLayer }
+		
+		var descriptor:Descriptor {
+			get { return gradientLayer?.gradient ?? model.gradient }
+			set { model.gradient = newValue; gradientLayer?.gradient = newValue }
+		}
+		
+		var colors:[CGColor] {
+			get { return gradientLayer?.colors as? [CGColor] ?? model.gradient.colors }
+			set { model.gradient.colors = newValue; gradientLayer?.colors = newValue }
+		}
+		
+		var direction:Direction {
+			get { return gradientLayer?.direction ?? model.gradient.direction }
+			set { model.gradient.direction = newValue; gradientLayer?.direction = newValue }
+		}
+		
+		var intrinsicSize:CGSize {
+			get { return model.intrinsicSize }
+			set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() }
+		}
 		
 		init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
 			self.model = Model(tag:tag, gradient:gradient, intrinsicSize:intrinsicSize)
@@ -783,7 +867,11 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var isOn:Bool { get { return view?.isOn ?? model.isOn } set { model.isOn = newValue; view?.isOn = newValue } }
+		
+		var isOn:Bool {
+			get { return view?.isOn ?? model.isOn }
+			set { model.isOn = newValue; view?.isOn = newValue }
+		}
 		
 		init(tag:Int = 0, isOn:Bool = false, target:AnyObject? = nil, action:Selector?) {
 			self.model = Model(tag:tag, isOn:isOn, target:target, action:action)
@@ -828,7 +916,11 @@ enum Viewable {
 		weak var view:ViewType?
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
-		var cells:[Positionable] { get { return model.cells } set { model.cells = newValue; view?.reloadData() } }
+		
+		var cells:[Positionable] {
+			get { return model.cells }
+			set { model.cells = newValue; view?.reloadData() }
+		}
 		
 #if os(macOS)
 		var selectionIndex:Int {
@@ -1640,7 +1732,8 @@ extension Viewable {
 		
 		func applyPositionableFrame(_ frame:CGRect, context: Layout.Context) {
 			target.applyPositionableFrame(frame, context:context)
-			target.orderablePositionables(environment:context.environment, order:.existing).compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.cornerRadius = $0.bounds.size.minimum / 2 }
+			target.orderablePositionables(environment:context.environment, order:.existing)
+				.compactMap { ($0 as? PlatformView)?.layer }.forEach { $0.cornerRadius = $0.bounds.size.minimum / 2 }
 		}
 	}
 	
@@ -1649,10 +1742,11 @@ extension Viewable {
 		var recognizers:[Common.Recognizer]
 		
 		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
-			let viewables = order == .create && !recognizers.isEmpty ? target.orderablePositionables(environment:environment, order:.attach).compactMap { $0 as? LazyViewable }.filter { $0.existingView == nil } : []
+			let unordered = order == .create && !recognizers.isEmpty ? target.orderablePositionables(environment:environment, order:.attach)
+				.compactMap { $0 as? LazyViewable }.filter { $0.existingView == nil } : []
 			let result = target.orderablePositionables(environment:environment, order:order)
 			
-			for viewable in viewables {
+			for viewable in unordered {
 				if let view = viewable.existingView {
 					Common.Recognizer.attachRecognizers(recognizers, to:view)
 				}

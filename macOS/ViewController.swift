@@ -20,12 +20,16 @@ class ViewController: BaseViewController {
 		//preferredContentSize = CGSize(width:400, height:800)
 	}
 	
+	override func loadView() {
+		view = PlatformView()
+	}
+	
 	override func viewWillAppear() {
 		super.viewWillAppear()
 		
 		view.window?.title = DisplayStrings.Chocolate.title
 		
-		let viewController = NSEvent.modifierFlags.contains(.option) ? ChocolateLayerViewController() : ChocolateViewController()
+		let viewController = NSEvent.modifierFlags.contains(.control) ? ChocolateLayerViewController() : ChocolateViewController()
 		
 		replaceChild(with:viewController)
 		applyMinimumSizeToWindow(from:viewController)
