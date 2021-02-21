@@ -300,8 +300,8 @@ public enum CHCL {
 		/// A light and dark color pair with contrasts that add to at least 1.0 satisfy the minimum suggested contrast.
 		/// This method will generate the second color of that contrasting color pair.
 		/// A value of zero will apply the minimum suggested contrast between the colors.
-		/// Positive values will increase the contrast between the pair, up to 1.0 which will result in black or white.
-		/// Negative values will decrease the contrast between the colors below the minimum suggested contrast.
+		/// Positive values are the fraction of maximum possible contrast, up to 1.0 which result in black or white and have the maximum contrast.
+		/// Negative values are a fraction of the range below the minimum suggested contrast towards medium luminance.
 		/// - Parameters:
 		///   - chclt: The color space
 		///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).

@@ -59,7 +59,9 @@ class ChocolateViewController: BaseViewController {
 	let stringHue = Style.small.label("")
 	let stringChroma = Style.small.label("")
 	let stringLuma = Style.small.label("")
-	let stringContrast = Style.medium.label("")
+	let stringContrast = Style.small.label("")
+	let stringSaturation = Style.small.label("")
+	let stringPrimaryContrast = Style.medium.label("")
 	let stringPrimary = Style.caption.label(Strings.primary)
 	let stringForeground = Style.caption.label(Strings.foreground)
 	let stringWeb = Style.webColor.label("")
@@ -91,8 +93,8 @@ class ChocolateViewController: BaseViewController {
 		
 		if wasCount == 0 {
 			for index in 0 ..< count {
-				samples[index].sliderContrast.value = Double(count - index - 1) / Double(count - 1)
-				samples[index].sliderChroma.value = Double(index) / Double(count - 1)
+				samples[index].sliderContrast.value = Double(count - index) / Double(count)
+				samples[index].sliderSaturation.value = 0.25 * Double(index) / Double(count - 1)
 			}
 		}
 		
@@ -152,8 +154,11 @@ class ChocolateViewController: BaseViewController {
 		stringBlue.text = formatter.string(from:color.blue as NSNumber)
 		stringChroma.text = formatter.string(from:sliderChroma.value as NSNumber)
 		stringLuma.text = (formatter.string(from:sliderLuma.value as NSNumber) ?? "") + "❂"
-		stringContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◑"
+		stringPrimaryContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◑"
 		stringWeb.text = color.web()
+		
+		stringContrast.text = formatter.string(from:sliderContrast.value as NSNumber)
+		stringSaturation.text = formatter.string(from:sliderSaturation.value as NSNumber)
 		
 		formatter.maximumFractionDigits = 1
 		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"
@@ -242,17 +247,17 @@ class ChocolateViewController: BaseViewController {
 	
 	func prepareLayout() {
 		let minimumSliderWidth = 200.0
+		let minimumStringWidth = 48.0
 		let colorBoxSize = 80.0
 		
 		let colorPicker = Layout.Horizontal(targets:[
 			Layout.Vertical(spacing:2, alignment:.center, position:.stretch, primary:1,
 				spacePicker.fixed(width:colorBoxSize, height:40).padding(horizontal:-10, vertical:0),
-				//stringPrimary,
 				colorBox.fixed(width:colorBoxSize, height:colorBoxSize),
-				stringContrast
+				stringPrimaryContrast
 			),
 			Layout.Columns(columnCount:3, template:Layout.Horizontal(spacing:4),
-				Style.small.label("R"), sliderRed, stringRed,
+				Style.small.label("R"), sliderRed, stringRed.minimum(width:minimumStringWidth),
 				Style.small.label("G"), sliderGreen, stringGreen,
 				Style.small.label("B"), sliderBlue, stringBlue,
 				Style.small.label("H"), sliderHue, stringHue,
@@ -262,11 +267,11 @@ class ChocolateViewController: BaseViewController {
 			)
 		], spacing:8, alignment:.center, position:.stretch)
 		
-		let colorDerivation = Layout.Vertical(spacing:4, alignment:.fill, position:.start,
-			stringForeground,
-			sliderContrast.minimum(width:minimumSliderWidth),
-			sliderSaturation.minimum(width:minimumSliderWidth)
-		).minimum(width:minimumSliderWidth)
+		let colorDerivation = Layout.Columns(columnCount:2, spacing:4, template:Layout.Horizontal(spacing:4),
+			stringForeground, Layout.EmptySpace().minimum(width:minimumStringWidth),
+			sliderContrast.minimum(width:minimumSliderWidth), stringContrast,
+			sliderSaturation.minimum(width:minimumSliderWidth), stringSaturation
+		)
 		
 		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
 			targets:samples.map { $0.layout() },
@@ -274,8 +279,6 @@ class ChocolateViewController: BaseViewController {
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal
 		), minimum:CGSize(square:200)).ignoringSafeBounds()
-		
-		//let exampleLayout = Viewable.SimpleTable(cells:examples.map { $0.lazy() }).ignoringSafeBounds()
 		
 		let controlsLayout = Layout.Vertical(spacing:10, alignment:.fill, position:.start,
 			colorPicker,
@@ -292,25 +295,27 @@ class ChocolateViewController: BaseViewController {
 
 extension ChocolateViewController {
 	class Sample: NSObject {
-		var model:ChocolateViewController.Model
-		
+		let model:ChocolateViewController.Model
 		var index:Int = 0
-		var background = Viewable.Color(color: nil)
+		
 		var foregrounds:[Style.Label] = []
-		var sliderContrast = Viewable.Slider(range:-1 ... 1, action:#selector(applyColor))
-		var sliderChroma = Viewable.Slider(range:-1 ... 1, action:#selector(applyColor))
+		let background = Viewable.Color(color: nil)
+		let sliderContrast = Viewable.Slider(range:-1 ... 1, action:#selector(applyColor))
+		let sliderSaturation = Viewable.Slider(range:-1 ... 1, action:#selector(applyColor))
+		let stringContrast = Style.small.label("")
+		let stringSaturation = Style.small.label("")
 		
 		var color:DisplayRGB {
 			return model.primary
 				.contrasting(model.chocolate, value:sliderContrast.value)
 				//.applyContrast(model.chocolate, value:model.primary.contrast(model.chocolate) - sliderContrast.value - 1)
-				.applyChroma(model.chocolate, value:sliderChroma.value)
+				.applyChroma(model.chocolate, value:sliderSaturation.value)
 		}
 		
 		init(_ model:ChocolateViewController.Model) {
 			self.model = model
 			super.init()
-			sliderChroma.model.target = self
+			sliderSaturation.model.target = self
 			sliderContrast.model.target = self
 		}
 		
@@ -337,6 +342,13 @@ extension ChocolateViewController {
 			if wasCount < newCount {
 				foregrounds += strings.suffix(from:wasCount).map { Style.example.centered.label($0.text).color($0.color) }
 			}
+			
+			let formatter = NumberFormatter(fractionDigits:1 ... 3)
+			let legible = model.primary.applyContrast(model.chocolate, value:1).color()?.platformColor
+			stringContrast.text = formatter.string(from:sliderContrast.value as NSNumber)
+			stringContrast.textColor = legible
+			stringSaturation.text = formatter.string(from:sliderSaturation.value as NSNumber)
+			stringSaturation.textColor = legible
 		}
 		
 		func applyForegrounds() {
@@ -360,13 +372,17 @@ extension ChocolateViewController {
 		}
 		
 		func layout() -> Positionable {
+			let colorDerivation = Layout.Columns(columnCount:2, spacing:4, template:Layout.Horizontal(spacing:4),
+				sliderContrast.minimum(width:200), stringContrast.minimum(width:48),
+				sliderSaturation.minimum(width:200), stringSaturation.minimum(width:48)
+			)
+			
 			return Layout.Overlay(horizontal: .fill, vertical: .fill,
 				background.ignoringSafeBounds(),
 				Layout.Vertical(targets:foregrounds + [
 					Layout.EmptySpace(height:10),
-					sliderContrast.minimum(width:200),
-					sliderChroma.minimum(width:200)
-				], spacing:4, alignment:.center, position:.center).padding(8)
+					colorDerivation,
+				], spacing:4, alignment:.fill, position:.center).padding(20)
 			)
 		}
 	}
