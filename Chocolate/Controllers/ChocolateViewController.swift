@@ -15,7 +15,7 @@ class ChocolateViewController: BaseViewController {
 	class Model {
 		static let sampleCount = 3
 		
-		var chocolate = CHCLTPower.y709
+		var chocolate:CHCLT = ColorSpace.y709.chocolate
 		var primary = DisplayRGB(0.2, 0.4, 0.6)
 		var foregrounds:[DisplayRGB] = []
 	}
@@ -25,17 +25,21 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	enum ColorSpace: Int {
-		case y601, y709, sRGB
+		case y601power, y601, y709power, y709, y2020, sRGB, g18
 		
-		var chocolate:CHCLTPower {
+		var chocolate:CHCLT {
 			switch self {
-			case .y601: return CHCLTPower.y601
-			case .y709: return CHCLTPower.y709
-			case .sRGB: return CHCLTPower.sRGB
+			case .y601power: return CHCLTPower.y601
+			case .y601: return CHCLT_BT.y601
+			case .y709power: return CHCLTPower.y709
+			case .y709: return CHCLT_BT.y709
+			case .y2020: return CHCLT_BT.y2020
+			case .sRGB: return CHCLT_sRGB.standard
+			case .g18: return CHCLT_sRGB.g18
 			}
 		}
 		
-		static var titles:[String] = ["y601", "y709", "sRGB"]
+		static var titles:[String] = ["y601s", "y601", "y709s", "y709", "y2020", "sRGB", "G18"]
 	}
 	
 	var model = Model()
@@ -44,7 +48,7 @@ class ChocolateViewController: BaseViewController {
 	var stableChroma:Bool = true
 	
 	let group = Viewable.Group(content:Layout.EmptySpace())
-	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:1, action:#selector(colorSpaceChanged))
+	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:3, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
 	let sliderGreen = Viewable.Slider(tag:Input.green.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.green)
 	let sliderBlue = Viewable.Slider(tag:Input.blue.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.blue)
@@ -353,14 +357,15 @@ extension ChocolateViewController {
 		
 		func applyForegrounds() {
 			let color = self.color
+			let sRGB = CHCLT_sRGB.g18
 			let chocolate = model.chocolate
 			let formatter = NumberFormatter(fractionDigits:2 ... 2)
 			let bc = formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "?"
-			let bl = color.luma(chocolate)
+			let bl = color.luma(sRGB)
 			
 			applyForegrounds(model.foregrounds.enumerated().map { order, color in
 				let fc = formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "?"
-				let fl = color.luma(chocolate)
+				let fl = color.luma(sRGB)
 				let g18n = max(fl, bl) + 0.05
 				let g18d = min(fl, bl) + 0.05
 				let g18 = g18n / g18d
