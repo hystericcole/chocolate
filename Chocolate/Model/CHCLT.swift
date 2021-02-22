@@ -10,49 +10,6 @@ import simd
 
 /// Cole Hue Chroma Luma Transform
 public protocol CHCLT {
-	/// Luminance that is considered medium.
-	/// Color pairs with luminances straddling this value are suitable as foreground and background colors.
-	/// Used to identify contrasting colors.
-	/// Values in the range 0.1 ... 0.5 are valid.  0.25 is the CHCLT standard.
-	/// 
-	/// Contrast is computed as a ratio or difference of luminance between two colors.  CHCLT uses a ratio.
-	/// To compute the ratio, take the luminances of two colors, add the offset to each, then divide the larger sum by the smaller sum.
-	/// 
-	/// CHCLT chooses the ratio and offset so that the medium luminance is a value, not a range.
-	/// The medium luminance (m), ratio (r) and offset (1/d) are related as follows:
-	/// ```
-	/// m = (√(d+1)-1) / d = 1/(r + 1)
-	/// d = (1 - 2m) / m² = r² - 1
-	/// r = √(d+1) = 1/m - 1
-	/// ```
-	/// 
-	/// The standard medium luminance for CHCLT is 1/4, which corresponds to a ratio of 3 and 1/8 offset.
-	/// Compute the ratio of 2 colors with luminance a and b as follows:
-	/// ```
-	/// ratio = (max(a, b) + 1/8) / (min(a, b) + 1/8)
-	/// ```
-	/// When the ratio is greater than 3, the colors are considered to have sufficient contrast.
-	/// The contrast of a single color is computed such that two opposing colors with contrasts that add to 1 will have this ratio.
-	/// Choose colors with a grater sum of contrasts to impose more stringent contrast requirements.
-	/// 
-	/// # WCAG G18 and section508
-	/// The WCAG G18 and section508 standards for contrast specify a fixed offset of 1/20 and ratios of 3, 4.5, or 7.
-	/// Ratio 3 is for large or bold text.
-	/// Ratio 7 is for more stringent compliance.
-	/// 
-	/// - ratio 3 gives a 1/10 ... 3/10 range for medium luminance.  Use 1/4 (0.25) as the medium luminance.
-	/// - ratio 4.5 gives a 21/120 ... 22/120 range for medium luminance.  Use 2/11 (0.182) as the medium luminance.
-	/// - ratio 7 gives a 3/10 ... 1/10 range for medium luminance, excluding values in 1/10 ... 3/10.  Use 1/8 (0.125) as the medium luminance.
-	///	- ratio 4.5 is also used in the WCAG21 G18 contrast standard.
-	///
-	/// CHCLT uses an invariant medium luminance instead of the ratio for consistent and intuitive color choices.
-	/// With the range of medium luminance, section508 leaves ambiguity in choosing a contrasting color.
-	/// With the fixed offset of section508, increasing the ratio decreases the medium luminance.
-	///
-	/// Specifically, for colors with luminance in 21/120 ... 30/120, CHCLT will choose a light contrasting color where section508 and G18 with ratio 4.5 would suggest a dark contrasting color.
-	/// This will provide a visually higher contrast and fail the section508 and G18 standards.
-	func mediumLuminance() -> CHCLT.Scalar
-	
 	/// Convert the components from compressed display space to linear space.
 	/// 
 	/// display(linear(rgb)) == rgb
@@ -80,6 +37,9 @@ public protocol CHCLT {
 	/// luminance(inverseLuminance(rgb)) = ∑ rgb
 	/// - Parameter vector: The linear results.
 	func inverseLuminance(_ vector:CHCLT.Vector3) -> CHCLT.Vector3
+	
+	/// Parameters for determining the contrast value of colors
+	func contrast() -> CHCL.Contrast
 }
 
 //	MARK: -
@@ -96,6 +56,58 @@ extension CHCLT {
 public enum CHCL {
 	public typealias Scalar = CHCLT.Scalar
 	public typealias Linear = CHCLT.Linear
+	
+	/// Parameters use to compute contrast
+	public struct Contrast {
+		public static let standard = Contrast(mediumLuminance:0.25, power:1.5)
+		public static let g18 = Contrast(mediumLuminance:2 / 11, power:1.0)
+		
+		/// The luminance value between light and dark colors.
+		/// 
+		/// Colors with luminance below this value are dark and have better contrast against white than black.
+		/// Colors with luminance above this value are light and have better contrast against black than white.
+		/// All the contrast mwthods of CHCLT are primarily controlled by this value.
+		/// 
+		/// # Ratio
+		/// Some models of contrast, such as WCAG G18 and section508, use a ratio of luminances to determine the contrast between colors.
+		/// The ratio (r) and offset (1/d) are related to the medium luminance (m) by the following equations:
+		/// ```
+		/// m = (√(d+1)-1) / d = 1/(r + 1)
+		/// d = (1 - 2m) / m² = r² - 1
+		/// r = √(d+1) = 1/m - 1
+		/// ```
+		/// CHCLT uses an invariant medium luminance instead of a ratio to determine contrast.
+		/// Using a ratio is percpetually inconsistent and introduces ambiguity as the medium luminance becomes a range and the range moves.
+		/// 
+		/// # WCAG G18 and section508
+		/// The WCAG G18 and section508 standards for contrast specify a fixed offset of 1/20 and ratios of 3, 4.5, or 7.
+		/// In terms of offset and ratios, the CHCLT standard of 0.25 has a ratio of 3 and offset of 1/8 when used with a linear power.
+		/// 
+		/// - ratio 3 gives a 1/10 ... 3/10 range for medium luminance.  Use 1/4 (0.25) as the medium luminance.
+		/// - ratio 4.5 gives a 21/120 ... 22/120 range for medium luminance.  Use 2/11 (0.182) as the medium luminance.
+		/// - ratio 7 gives a 3/10 ... 1/10 range for medium luminance, excluding values in 1/10 ... 3/10.  Use 1/8 (0.125) as the medium luminance.
+		///
+		/// For colors with luminance in 21/120 ... 30/120, standard CHCLT will choose a light contrasting color where section508 and G18 with ratio 4.5 would suggest a dark contrasting color.
+		/// This will provide a visually higher contrast and fail the section508 and G18 standards.
+		public let mediumLuminance: Scalar
+		
+		/// Controls the shape of the luminance curve.
+		/// Typical values are in the 1 ... 2 range.  1.0 is linear.
+		/// As power increases, the contrast value of most colors will decrease, creating color pairs with higher visual contrast for the same contrast value.
+		///
+		/// ```
+		/// v = luminance
+		/// m = mediumLuminance
+		/// pow(v > m ? (v - m) / (1 - m) : 1 - v / m, power)
+		/// ```
+		/// Colors with luminance equal to the medium luminance have a contrast of zero.
+		/// Colors with luminance equal to zero (black) or one (white) have a contrast of one.
+		///
+		/// CHCLT is designed so that a light and dark color with contrasts adding to at least 1.0 will satisfy the minimum recommended contrast.
+		/// The greatest sum of contrasts of two colors is 2.0 for black and white.
+		/// The power parameter influences the luminance value of colors chosen to have a specific contrast relative to another color.
+		public let power: Scalar
+	}
 	
 	/// A color in the linear RGB space reached via the CHCLT.
 	/// # Range
@@ -251,7 +263,7 @@ public enum CHCL {
 		
 		/// True if the luminance is below the medium luminance of the color space.
 		public func isDark(_ chclt:CHCLT) -> Bool {
-			return luminance(chclt) < chclt.mediumLuminance()
+			return luminance(chclt) < chclt.contrast().mediumLuminance
 		}
 		
 		/// The contrast of a color is a measure of the distance from medium luminance.
@@ -260,11 +272,12 @@ public enum CHCL {
 		/// - Parameter chclt: The color space
 		/// - Returns: The contrast
 		public func contrast(_ chclt:CHCLT) -> Linear {
-			let m = chclt.mediumLuminance()
+			let p = chclt.contrast()
+			let m = p.mediumLuminance
 			let v = luminance(chclt)
 			let c = v > m ? (v - m) / (1 - m) : 1 - v / m
 			
-			return c.magnitude
+			return pow(c.magnitude, p.power)
 		}
 		
 		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
@@ -272,10 +285,11 @@ public enum CHCL {
 		/// Scaling to 0 will result in a color with medium luminance.
 		/// Scaling to negative will result in contrasting colors.
 		public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
-			let m = chclt.mediumLuminance()
+			let p = chclt.contrast()
+			let m = p.mediumLuminance
 			let v = luminance(chclt)
 			let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : 1
-			let u = m - scalar.magnitude * (m - v) * t
+			let u = m - pow(scalar.magnitude, 1 / p.power) * (m - v) * t
 			
 			return applyLuminance(chclt, value:u)
 		}
@@ -288,9 +302,11 @@ public enum CHCL {
 		///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
 		/// - Returns: The adjusted color
 		public func applyContrast(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			let m = chclt.mediumLuminance()
+			let p = chclt.contrast()
+			let m = p.mediumLuminance
 			let v = luminance(chclt)
-			let u = (v < m) == (value < 0) ? (1 - m) * value.magnitude + m : m * (1 - value.magnitude) 
+			let t = pow(value.magnitude, 1 / p.power)
+			let u = (v < m) == (value < 0) ? (1 - m) * t + m : m * (1 - t)
 			
 			return applyLuminance(chclt, value:u)
 		}
@@ -318,10 +334,13 @@ public enum CHCL {
 		///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
 		/// - Returns: The adjusted color
 		public func contrasting(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			let m = chclt.mediumLuminance()
+			let p = chclt.contrast()
+			let m = p.mediumLuminance
 			let v = luminance(chclt)
-			let c = v > m ? (v - m) / (1 - m) : 1 - v / m
-			let t = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
+			let cc = v > m ? (v - m) / (1 - m) : 1 - v / m
+			let c = pow(cc, p.power)
+			let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
+			let t = pow(tt, 1 / p.power)
 			let u = v > m ? m * (1 - t) : (1 - m) * t + m
 			
 			return applyLuminance(chclt, value:u)
@@ -478,7 +497,7 @@ public enum CHCL {
 				let desaturate = v / (v - negative)
 				let t = 1 - desaturate
 				
-				vector = t * v + desaturate * vector
+				vector = desaturate * vector + t * v
 			}
 			
 			if leavePositive {
@@ -491,7 +510,7 @@ public enum CHCL {
 				let desaturate = (v - 1) / (v - positive)
 				let t = 1 - desaturate
 				
-				vector = t * v + desaturate * vector
+				vector = desaturate * vector + t * v
 			}
 			
 			vector.clamp(lowerBound:.zero, upperBound:.one)
@@ -536,12 +555,12 @@ public enum CHCL {
 //	MARK: -
 
 extension CHCLT {
-	public func mediumLuminance() -> CHCLT.Scalar {
-		return 0.25
+	public func contrast() -> CHCL.Contrast {
+		return CHCL.Contrast.standard
 	}
 	
 	public func offset() -> CHCLT.Scalar {
-		let m = mediumLuminance()
+		let m = contrast().mediumLuminance
 		
 		return m * m / (1 - 2*m)
 	}
@@ -623,17 +642,17 @@ public struct CHCLTPower: CHCLT {
 
 public struct CHCLT_sRGB: CHCLT {
 	public static let coefficients:CHCLT.Vector3 = CHCLT.Linear.vector3(0.21263901, 0.71516867, 0.07219232)
-	public static let standard = CHCLT_sRGB(mediumLuminance:1 / 4)
-	public static let g18 = CHCLT_sRGB(mediumLuminance:2 / 11)
+	public static let standard = CHCLT_sRGB(contrast:.standard)
+	public static let g18 = CHCLT_sRGB(contrast:.g18)
 	
-	public let medium:CHCLT.Scalar
+	public let useContrast:CHCL.Contrast
 	
-	public init(mediumLuminance:CHCLT.Scalar) {
-		medium = mediumLuminance
+	public init(contrast:CHCL.Contrast) {
+		useContrast = contrast
 	}
 	
-	public func mediumLuminance() -> CHCLT.Scalar {
-		return medium
+	public func contrast() -> CHCL.Contrast {
+		return useContrast
 	}
 	
 	public func linear(_ value:CHCLT.Scalar) -> CHCLT.Linear {
@@ -660,9 +679,9 @@ public struct CHCLT_sRGB: CHCLT {
 //	MARK: -
 
 public struct CHCLT_BT: CHCLT {
-	public static let y601 = CHCLT_BT(CHCLT.Linear.vector3(0.299, 0.587, 0.114))				//	34:67:13	SDTV
-	public static let y709 = CHCLT_BT(CHCLT.Linear.vector3(0.2126, 0.7152, 0.0722))				//	53:178:18	HDTV
-	public static let y2020 = CHCLT_BT(CHCLT.Linear.vector3(0.2627, 0.6780, 0.0593))			//	31:80:7		UHDTV
+	public static let y601 = CHCLT_BT(CHCLT.Linear.vector3(0.299, 0.587, 0.114))		//	34:67:13	SDTV
+	public static let y709 = CHCLT_BT(CHCLT.Linear.vector3(0.2126, 0.7152, 0.0722))		//	53:178:18	HDTV
+	public static let y2020 = CHCLT_BT(CHCLT.Linear.vector3(0.2627, 0.6780, 0.0593))	//	31:80:7		UHDTV
 	
 	public let coefficients:CHCLT.Vector3
 	

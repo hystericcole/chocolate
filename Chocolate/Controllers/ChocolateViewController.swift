@@ -97,7 +97,7 @@ class ChocolateViewController: BaseViewController {
 		
 		if wasCount == 0 {
 			for index in 0 ..< count {
-				samples[index].sliderContrast.value = Double(count - index) / Double(count)
+				samples[index].sliderContrast.value = 2.0 * Double(count - index) / Double(count + 1) - 1
 				samples[index].sliderSaturation.value = 0.25 * Double(index) / Double(count - 1)
 			}
 		}

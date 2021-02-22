@@ -680,7 +680,7 @@ enum Viewable {
 		func pathForSize(_ size:CGSize) -> CGPath? {
 			guard size.minimum > 0, let path = model.path, !path.isEmpty else { return nil }
 			
-			let stroke = model.style.stroke?.alpha ?? 0 > 0 ? model.style.width : 0 
+			let stroke = model.style.stroke?.alpha ?? 0 > 0 ? model.style.width : 0
 			let box = model.lazyBoundingBox()
 			let size = CGSize(width:size.width - stroke, height:size.height - stroke)
 			var transform = CGAffineTransform(a:size.width / box.size.width, b:0, c:0, d:size.height / box.size.height, tx:stroke / 2 - box.origin.x, ty:stroke / 2 - box.origin.y)

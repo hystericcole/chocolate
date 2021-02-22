@@ -37,7 +37,7 @@ protocol Positionable {
 	/// # Order attach
 	/// A container is being reused and attempting to reform attachments.  Viewables should return self.
 	/// # Order existing
-	/// A modifier is affecting views in the hierarchy.  Viewables should return existing views but not create views. 
+	/// A modifier is affecting views in the hierarchy.  Viewables should return existing views but not create views.
 	func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable]
 }
 
@@ -670,7 +670,7 @@ struct Layout {
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			let epsilon = 0.5 / context.scale
-			let minX = box.minX - epsilon > context.safeBounds.minX ? 0 : max(box.minX - context.bounds.minX, 0) 
+			let minX = box.minX - epsilon > context.safeBounds.minX ? 0 : max(box.minX - context.bounds.minX, 0)
 			let minY = box.minY - epsilon > context.safeBounds.minY ? 0 : max(box.minY - context.bounds.minY, 0)
 			let maxX = box.maxX + epsilon < context.safeBounds.maxX ? 0 : max(context.bounds.maxX - box.maxX, 0)
 			let maxY = box.maxY + epsilon < context.safeBounds.maxY ? 0 : max(context.bounds.maxY - box.maxY, 0)
@@ -1085,7 +1085,7 @@ struct Layout {
 		/// The spacing between columns.
 		var spacing:Native
 		/// When true elements are ordered along columns, filling each column before wrapping to the next.
-		/// When false, elements are ordered across columns, filling each row before wrapping to the next.  The default is false.  
+		/// When false, elements are ordered across columns, filling each row before wrapping to the next.  The default is false.
 		var columnMajor:Bool
 		/// The display order of rows, with positive being down.
 		var direction:Direction
@@ -1281,7 +1281,7 @@ struct Layout {
 		/// The spacing between rows.
 		var spacing:Native
 		/// When true elements are ordered along rows, filling each row before wrapping to the next.
-		/// When false, elements are ordered across rows, filling each column before wrapping to the next.  The default is false.  
+		/// When false, elements are ordered across rows, filling each column before wrapping to the next.  The default is false.
 		var rowMajor:Bool
 		/// The display order of columns, with positive being right.
 		var direction:Direction
