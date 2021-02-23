@@ -259,7 +259,13 @@ class ChocolateViewController: BaseViewController {
 		let colorPicker = Layout.Horizontal(targets:[
 			Layout.Vertical(spacing:2, alignment:.center, position:.stretch, primary:1,
 				spacePicker.fixed(width:colorBoxSize, height:40).padding(horizontal:-10, vertical:0),
-				colorBox.fixed(width:colorBoxSize, height:colorBoxSize),
+				Layout.Overlay(
+					Layout.Horizontal(alignment:.fill, position:.uniform,
+						Viewable.Color(color:.white),
+						Viewable.Color(color:.black)
+					),
+					colorBox.padding(4)
+				).fixed(width:colorBoxSize, height:colorBoxSize),
 				stringPrimaryContrast
 			),
 			Layout.Columns(columnCount:3, template:Layout.Horizontal(spacing:4),
