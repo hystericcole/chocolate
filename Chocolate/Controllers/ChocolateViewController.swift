@@ -50,7 +50,7 @@ class ChocolateViewController: BaseViewController {
 	var stableChroma:Bool = true
 	
 	let group = Viewable.Group(content:Layout.EmptySpace())
-	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:0, action:#selector(colorSpaceChanged))
+	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, attributes:Style.medium.attributes, select:0, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
 	let sliderGreen = Viewable.Slider(tag:Input.green.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.green)
 	let sliderBlue = Viewable.Slider(tag:Input.blue.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.blue)
@@ -258,7 +258,7 @@ class ChocolateViewController: BaseViewController {
 		
 		let colorPicker = Layout.Horizontal(targets:[
 			Layout.Vertical(spacing:2, alignment:.center, position:.stretch, primary:1,
-				spacePicker.fixed(width:colorBoxSize, height:40).padding(horizontal:-10, vertical:0),
+				spacePicker.fixed(width:colorBoxSize).limiting(height:30 ... colorBoxSize),
 				Layout.Overlay(
 					Layout.Horizontal(alignment:.fill, position:.uniform,
 						Viewable.Color(color:.white),

@@ -41,7 +41,7 @@ extension CGColor {
 }
 
 extension CGColor {
-	static var chocolate = CHCLTPower.y709
+	static var chocolate = CHCLT_sRGB.standard
 	
 	var displayRGB:DisplayRGB? { return DisplayRGB(self) }
 	

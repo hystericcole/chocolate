@@ -63,6 +63,7 @@ protocol PositionableWithTargets: Positionable {
 
 struct Layout {
 	typealias Native = CGFloat.NativeType
+	typealias NativeRange = ClosedRange<Native>
 	
 	enum Order {
 		case existing, create, attach
@@ -331,6 +332,7 @@ struct Layout {
 	/// - To request a fraction of available space, set fraction, and optionally minimum and maximum.
 	struct Dimension: CustomStringConvertible {
 		static let unbound = Limit.unlimited * 0x1p10
+		static let unlimited = 0 ... unbound
 		static let zero = Dimension(value:0)
 		
 		/// The preferred value is constant + fraction × limit
@@ -345,7 +347,7 @@ struct Layout {
 		var isUnbounded:Bool { return minimum <= 0 && constant == 0 && fraction == 0 && maximum >= Limit.unlimited }
 		var description:String { return "\(minimum) <= \(constant) + \(fraction) × limit <= \(maximum < Limit.unlimited ? String(maximum) : "∞")" }
 		
-		init(constant:Native, range:ClosedRange<Native> = 0 ... Dimension.unbound, fraction:Native = 0) {
+		init(constant:Native, range:NativeRange = Dimension.unlimited, fraction:Native = 0) {
 			self.constant = constant
 			self.minimum = range.lowerBound
 			self.maximum = range.upperBound
@@ -437,14 +439,14 @@ struct Layout {
 			fraction = max(fraction, dimension.fraction)
 		}
 		
-		mutating func minimize(_ range:ClosedRange<Double>) {
+		mutating func minimize(_ range:NativeRange) {
 			minimum = min(minimum, range.lowerBound)
 			maximum = min(maximum, range.upperBound)
 		}
 		
-		mutating func intersect(_ range:ClosedRange<Double>) {
-			minimum = max(minimum, range.lowerBound)
-			maximum = min(maximum, range.upperBound)
+		mutating func intersect(_ range:NativeRange) {
+			minimum = min(max(range.lowerBound, minimum), range.upperBound)
+			maximum = min(max(range.lowerBound, maximum), range.upperBound)
 		}
 	}
 	
@@ -771,10 +773,10 @@ struct Layout {
 	
 	struct Limiting: PositionableWithTarget {
 		var target:Positionable
-		var width:ClosedRange<Native>
-		var height:ClosedRange<Native>
+		var width:NativeRange
+		var height:NativeRange
 		
-		init(target:Positionable, width:ClosedRange<Native>, height:ClosedRange<Native>) {
+		init(target:Positionable, width:NativeRange, height:NativeRange) {
 			self.target = target
 			self.width = width
 			self.height = height
@@ -785,6 +787,10 @@ struct Layout {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			if width.lowerBound == width.upperBound && height.lowerBound == height.upperBound {
+				return Layout.Size(width:Dimension(constant:0, range:width), height:Dimension(constant:0, range:height))
+			}
+			
 			let limit = limit.minimize(width:width.upperBound, height:height.upperBound)
 			var size = target.positionableSize(fitting:limit)
 			
@@ -2197,6 +2203,10 @@ extension Positionable {
 	
 	func minimum(width:Layout.Native = 0, height:Layout.Native = 0) -> Positionable {
 		return Layout.Limiting(target:self, minimumWidth:width, minimumHeight:height)
+	}
+	
+	func limiting(width:Layout.NativeRange = Layout.Dimension.unlimited, height:Layout.NativeRange = Layout.Dimension.unlimited) -> Positionable {
+		return Layout.Limiting(target:self, width:width, height:height)
 	}
 	
 	func useAvailableSpace() -> Positionable {

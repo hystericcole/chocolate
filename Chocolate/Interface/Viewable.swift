@@ -14,7 +14,7 @@ protocol LazyViewable: AnyObject, Positionable {
 	var lazyView:PlatformView { get }
 	var tag:Int { get }
 	
-	func attachToExistingView(_ view:PlatformView)
+	func attachToExistingView(_ view:PlatformView?)
 	func detachView(prepareForReuse:Bool)
 }
 
@@ -89,7 +89,7 @@ extension ViewablePositionable {
 		return view
 	}
 	
-	func attachToExistingView(_ view:PlatformView) {
+	func attachToExistingView(_ view:PlatformView?) {
 		guard let view = view as? ViewType else { return }
 		
 		applyToView(view)
@@ -167,7 +167,7 @@ enum Viewable {
 			view.content = model.content
 		}
 		
-		func attachToExistingView(_ view: PlatformView) {
+		func attachToExistingView(_ view: PlatformView?) {
 			guard let view = view as? ViewType else { return }
 			
 			view.attachPositionables(content, environment:view.positionableEnvironment)
@@ -438,6 +438,7 @@ enum Viewable {
 			view.action = model.action
 			view.pullsDown = false
 #else
+			view.layoutMargins = .zero
 			view.delegate = self
 			view.dataSource = self
 			view.showsSelectionIndicator = false
@@ -999,8 +1000,18 @@ extension Viewable.Picker: PlatformPickerDelegate, PlatformPickerDataSource {
 		return component == 0 ? model.itemTitles[row] : nil
 	}
 	
+	func pickerView(_ pickerView:PlatformPicker, viewForRow row:Int, forComponent component:Int, reusing view:PlatformView?) -> PlatformView {
+		let label = Viewable.Label(string:model.itemTitles[row], maximumLines:1)
+
+		label.attachToExistingView(view)
+
+		return label.lazy()
+	}
+	
 	func pickerView(_ pickerView:PlatformPicker, widthForComponent component:Int) -> CGFloat {
-		return component == 0 ? pickerView.bounds.size.width : 0
+		guard component == 0 else { return 0 }
+		
+		return model.itemTitles.map { $0.size().width }.max() ?? 0
 	}
 	
 	func pickerView(_ pickerView:PlatformPicker, didSelectRow row:Int, inComponent component:Int) {
