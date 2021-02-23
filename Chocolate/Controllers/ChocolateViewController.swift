@@ -15,7 +15,7 @@ class ChocolateViewController: BaseViewController {
 	class Model {
 		static let sampleCount = 3
 		
-		var chocolate:CHCLT = ColorSpace.y709.chocolate
+		var chocolate:CHCLT = ColorSpace.default.chocolate
 		var primary = DisplayRGB(0.2, 0.4, 0.6)
 		var foregrounds:[DisplayRGB] = []
 	}
@@ -25,21 +25,23 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	enum ColorSpace: Int {
-		case y601power, y601, y709power, y709, y2020, sRGB, g18
+		case sRGBpower, sRGB, g18, y601power, y601, y709power, y709, y2020
 		
 		var chocolate:CHCLT {
 			switch self {
+			case .sRGBpower: return CHCLTPower.sRGB
+			case .sRGB: return CHCLT_sRGB.standard
+			case .g18: return CHCLT_sRGB.g18
 			case .y601power: return CHCLTPower.y601
 			case .y601: return CHCLT_BT.y601
 			case .y709power: return CHCLTPower.y709
 			case .y709: return CHCLT_BT.y709
 			case .y2020: return CHCLT_BT.y2020
-			case .sRGB: return CHCLT_sRGB.standard
-			case .g18: return CHCLT_sRGB.g18
 			}
 		}
 		
-		static var titles:[String] = ["y601s", "y601", "y709s", "y709", "y2020", "sRGB", "G18"]
+		static let `default` = sRGBpower
+		static var titles:[String] = ["sRGBⁿ", "sRGB", "G18", "y601ⁿ", "y601", "y709ⁿ", "y709", "y2020"]
 	}
 	
 	var model = Model()
@@ -48,7 +50,7 @@ class ChocolateViewController: BaseViewController {
 	var stableChroma:Bool = true
 	
 	let group = Viewable.Group(content:Layout.EmptySpace())
-	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:3, action:#selector(colorSpaceChanged))
+	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, select:0, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
 	let sliderGreen = Viewable.Slider(tag:Input.green.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.green)
 	let sliderBlue = Viewable.Slider(tag:Input.blue.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.blue)

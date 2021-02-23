@@ -81,8 +81,9 @@ public enum CHCL {
 		/// 
 		/// # WCAG G18 and section508
 		/// The WCAG G18 and section508 standards for contrast specify a fixed offset of 1/20 and ratios of 3, 4.5, or 7.
-		/// In terms of offset and ratios, the CHCLT standard of 0.25 has a ratio of 3 and offset of 1/8 when used with a linear power.
+		/// In terms of offset and ratio, the CHCLT standard of 0.25 has a ratio of 3 and offset of 1/8 when used with a linear power.
 		/// 
+		/// - offset 0.5 gives 1/(1+√21) = 0.179 as medium luminance.
 		/// - ratio 3 gives a 1/10 ... 3/10 range for medium luminance.  Use 1/4 (0.25) as the medium luminance.
 		/// - ratio 4.5 gives a 21/120 ... 22/120 range for medium luminance.  Use 2/11 (0.182) as the medium luminance.
 		/// - ratio 7 gives a 3/10 ... 1/10 range for medium luminance, excluding values in 1/10 ... 3/10.  Use 1/8 (0.125) as the medium luminance.
@@ -579,6 +580,10 @@ extension CHCLT {
 public struct CHCLTSquare: CHCLT {
 	public let coefficients:CHCLT.Vector3
 	
+	public init(_ coefficients:CHCLT.Vector3) {
+		self.coefficients = coefficients
+	}
+	
 	public func linear(_ value:CHCLT.Scalar) -> CHCLT.Linear {
 		return value * value.magnitude
 	}
@@ -598,6 +603,8 @@ public struct CHCLTSquare: CHCLT {
 	public func inverseLuminance(_ luma:CHCLT.Vector3) -> CHCLT.Vector3 {
 		return luma / coefficients
 	}
+	
+	public static let y240 = CHCLTSquare(CHCLT.Linear.vector3(0.212, 0.701, 0.087))	//	39:129:16
 }
 
 //	MARK: -
@@ -631,11 +638,10 @@ public struct CHCLTPower: CHCLT {
 		return vector / coefficients
 	}
 	
-	public static let y240 = CHCLTPower(CHCLT.Linear.vector3(0.212, 0.701, 0.087), exponent:0.5)	//	39:129:16
-	public static let y601 = CHCLTPower(CHCLT_BT.y601.coefficients, exponent:9 / 20)
-	public static let y709 = CHCLTPower(CHCLT_BT.y709.coefficients, exponent:9 / 20)
-	public static let y2020 = CHCLTPower(CHCLT_BT.y2020.coefficients, exponent:9 / 20)
-	public static let sRGB = CHCLTPower(CHCLT_sRGB.coefficients, exponent:5 / 12)
+	public static let y601 = CHCLTPower(CHCLT_BT.y601.coefficients, exponent:10 / 19)
+	public static let y709 = CHCLTPower(CHCLT_BT.y709.coefficients, exponent:10 / 19)
+	public static let y2020 = CHCLTPower(CHCLT_BT.y2020.coefficients, exponent:10 / 19)
+	public static let sRGB = CHCLTPower(CHCLT_sRGB.coefficients, exponent:5 / 11)
 }
 
 //	MARK: -
