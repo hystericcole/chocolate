@@ -50,6 +50,7 @@ class ChocolateViewController: BaseViewController {
 	var stableChroma:Bool = true
 	
 	let group = Viewable.Group(content:Layout.EmptySpace())
+	let foregrounds = Viewable.Group(content:Layout.EmptySpace())
 	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, attributes:Style.medium.attributes, select:0, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
 	let sliderGreen = Viewable.Slider(tag:Input.green.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.green)
@@ -113,18 +114,6 @@ class ChocolateViewController: BaseViewController {
 		}
 	}
 	
-	func generateBackgrounds(primary:DisplayRGB, contrast:Double, saturation:Double, count:Int) -> [DisplayRGB] {
-		let limit = Double(count - 1)
-		let chocolate = model.chocolate
-		
-		return (0 ..< count).map { index in
-			let s = 2 * (saturation - 0.5) * Double(count - index) / limit
-			let c = 0.5 * (1 + contrast - Double(index) / limit)
-			
-			return primary.applyChroma(chocolate, value:s).contrasting(chocolate, value:c)
-		}
-	}
-	
 	func generateForegrounds(primary:DisplayRGB, contrast:Double, saturation:Double, count:Int) -> [DisplayRGB] {
 		let limit = Double(count - 1)
 		let chocolate = model.chocolate
@@ -168,6 +157,17 @@ class ChocolateViewController: BaseViewController {
 		
 		formatter.maximumFractionDigits = 1
 		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"
+		
+		foregrounds.content = Layout.Overlay(
+			Viewable.Gradient(colors:[.black, .white]),
+			Layout.Horizontal(
+				targets:model.foregrounds.map { Viewable.Color(color:$0.color()?.platformColor).aspect(ratio:2) },
+				spacing:4,
+				alignment:.fill,
+				position:.uniform,
+				direction:.reverse
+			).padding(4).rounded()
+		)
 		
 		group.view?.invalidateLayout()
 	}
@@ -294,7 +294,8 @@ class ChocolateViewController: BaseViewController {
 		
 		let controlsLayout = Layout.Vertical(spacing:10, alignment:.fill, position:.start,
 			colorPicker,
-			colorDerivation
+			colorDerivation,
+			foregrounds.fixed(height:40)
 		)
 		
 		group.content = Layout.Vertical(spacing:8, alignment:.fill, position:.stretch,

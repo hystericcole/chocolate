@@ -1932,6 +1932,10 @@ struct Layout {
 				frames.append(box.offsetBy(dx:bounds.origin.x, dy:bounds.origin.y))
 			}
 			
+			if !isPositive {
+				frames.reverse()
+			}
+			
 			self.frames = frames
 		}
 		
@@ -1978,6 +1982,10 @@ struct Layout {
 				}
 				
 				frames.append(box.offsetBy(dx:bounds.origin.x, dy:bounds.origin.y))
+			}
+			
+			if !isPositive {
+				frames.reverse()
 			}
 			
 			self.frames = frames
