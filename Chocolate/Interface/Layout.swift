@@ -393,6 +393,7 @@ struct Layout {
 		///   - maximumWeight: maximum is clamped to multiple of limit
 		/// - Returns: Dimension with fraction of limit added to constant
 		func resolved(_ limit:Native, maximumWeight:Native = 8) -> Dimension {
+			let limit = max(0, limit)
 			let a = min(max(0, minimum), limit)
 			let b = min(max(a, maximum), limit * maximumWeight)
 			let c = min(max(a, constant + fraction * limit), b)
