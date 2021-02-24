@@ -1473,6 +1473,12 @@ struct Layout {
 	}
 	
 	/// Arrange a group of elements into the same space with the same alignment.
+	///
+	/// Use an overlay to
+	/// - align a single element within available space
+	/// - put a background behind an element
+	/// - put an overlay above an element
+	/// - have independent layouts share the same space
 	struct Overlay: Positionable {
 		/// The elements to arrange
 		var targets:[Positionable]
@@ -1480,7 +1486,7 @@ struct Layout {
 		var vertical:Alignment
 		/// The horizontal alignment.  Defaults to fill.
 		var horizontal:Alignment
-		/// When specified, the primary element is measured and aligned with the same frame applied to all elements.
+		/// When specified, the primary element is measured and aligned then the same frame is applied to all elements.
 		var primaryIndex:Int
 		
 		var frame:CGRect {
@@ -1989,11 +1995,30 @@ struct Layout {
 	}
 	
 	/// Arrange a group of elements in a flow that uses available space along an axis then wraps to continue using available space.
+	///
+	/// The targets will be arranged into a row of columns when vertical or a column of rows when horizontal.
+	/// The flow will use available space along the axis and ignore available space in the other direction while separating targets into rows or columns.
+	/// The flow is best suited to limited space in the direction of the axis and unlimited space in the other direction.
+	/// Each target will be affected by both the row template and column template.
+	/// Nesting a Flow in another Flow is not generally supported.
 	struct Flow: Positionable {
+		/// The elements to arrange into a row of columns or a column of rows
 		var targets:[Positionable]
+		/// When axis is vertical, the row template is used to arrange columns of targets.
+		/// When axis is horizontal, targets are grouped into rows using the row template then all the rows are arranged as a single column.
+		/// Defaults to leading alignment and position.  Targets in the template are ignored.
 		var rowTemplate:Horizontal
+		/// When axis is vertical, targets are grouped into columns using the column template then all the columns are arranged as a single row.
+		/// When axis is horizontal, the column template is used to arrange rows of targets.
+		/// Defaults to leading alignment and position.  Targets in the template are ignored.
 		var columnTemplate:Vertical
+		/// Controls the order in which targets are added to rows or columns.
+		/// Use the direction in the row and column templates to match the environment.
+		/// Defaults to positive.
 		var direction:Direction
+		/// When axis is vertical, each target is added to a vertical column, filling available vertical space before wrapping to the next column, and all the columns are added to a horizontal row for final layout.
+		/// When axis is horizontal, each target is added to a horizontal row, filling available horizontal space before wrapping to the next row, and all rows are added to a vertical column for final layout.
+		/// Defaults to korizontal.
 		var axis:Axis
 		
 		var frame:CGRect {
