@@ -14,6 +14,14 @@ extension BinaryFloatingPoint {
 	func interpolate(towards:Self, by:Self) -> Self { let n = 1.0 - by; return self * n + towards * by }
 }
 
+extension DispatchQueue {
+	static var background:DispatchQueue { return global(qos:.background) }
+	static var utility:DispatchQueue { return global(qos:.utility) }
+	static var normal:DispatchQueue { return global(qos:.default) }
+	static var userInitiated:DispatchQueue { return global(qos:.userInitiated) }
+	static var userInteractive:DispatchQueue { return global(qos:.userInteractive) }
+}
+
 extension RandomAccessCollection where Index == Int {
 	/// return index (0 ... count) such that array[index - 1] < value <= array[index]
 	func binarySearch<T>(_ value:T, by areInIncreasingOrder:(Element, T) throws -> Bool) rethrows -> Index {

@@ -94,7 +94,7 @@ extension AppDelegate {
 		}
 		
 		for dimension in sizes {
-			DispatchQueue.global(qos:.userInitiated).async {
+			DispatchQueue.userInitiated.async {
 				for (axis, value) in axisValue {
 					for (chclt, name) in spaceName {
 						guard let image = generateIcon(chclt:chclt, dimension:dimension, axis:axis, value:value) else { return }

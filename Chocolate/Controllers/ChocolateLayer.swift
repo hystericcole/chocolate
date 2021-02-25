@@ -153,7 +153,7 @@ class ChocolateImageView: PlatformImageView {
 		isCurrent = true
 		isRefreshing = true
 		
-		DispatchQueue.global(qos: .userInitiated).async {
+		DispatchQueue.userInitiated.async {
 			CHCL.LinearRGB.drawPlaneFromCubeHCL(self.chocolate, axis:self.axis, value:self.scalar, image:mutable)
 			
 			DispatchQueue.main.async {
