@@ -43,10 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate {
-	static func generateIcon(dimension:CGFloat, axis:Int, value:CHCL.Scalar) -> CGImage? {
+	static func generateIcon(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCL.Scalar) -> CGImage? {
 		guard let colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) else { return nil }
 		
-		let chocolate = CHCLTPower.y709
 		let outerSize = CGSize(square:dimension)
 		let innerSize = CGSize(square:min(dimension * 0.875, dimension - 4))
 		let innerBox = CGRect(origin:.zero, size:outerSize).relative(x:0.5, y:0.5, size:innerSize)
@@ -56,7 +55,7 @@ extension AppDelegate {
 		guard let outerMutable = MutableImage(size:outerSize, colorSpace:colorSpace, scale:1, opaque:false, intent:.absoluteColorimetric) else { return nil }
 		guard let innerMutable = MutableImage(size:innerSize, colorSpace:colorSpace, scale:1, opaque:true, intent:.absoluteColorimetric) else { return nil }
 		
-		CHCL.LinearRGB.drawPlaneFromCubeHCL(chocolate, axis:axis, value:value, image:innerMutable)
+		CHCL.LinearRGB.drawPlaneFromCubeHCL(chclt, axis:axis, value:value, image:innerMutable)
 		outerMutable.context.setLineWidth(lineWidth)
 		
 		if !isRadiusLuminance {
@@ -75,6 +74,7 @@ extension AppDelegate {
 	static func generateIcons() {
 		let sizes:[CGFloat] = [120, 180, 76, 152, 167, 16, 32, 64, 128, 256, 512, 1024]
 		let axisValue:[(Int, Double)] = [(1, 0.75)]
+		let spaceName:[(CHCLT, String)] = [(CHCLTPower.y709, "y709n")]
 		let path = ("~/Desktop/Chocolate" as NSString).expandingTildeInPath
 		let folder = URL(fileURLWithPath:path)
 		let manager = FileManager.default
@@ -96,13 +96,20 @@ extension AppDelegate {
 		for dimension in sizes {
 			DispatchQueue.global(qos:.userInitiated).async {
 				for (axis, value) in axisValue {
-					guard let image = generateIcon(dimension:dimension, axis:axis, value:value) else { return }
-					guard let data = NSBitmapImageRep(cgImage:image).representation(using:.png, properties:[:]) else { return }
-					
-					let suffix = axisValue.count > 1 ? "_" + (axis < 0 ? "p" : "c") + String(axis.magnitude) : ""
-					let file = folder.appendingPathComponent(prefix + suffix + "_\(Int(dimension)).png")
-					
-					do { try data.write(to:file) } catch { print(error) }
+					for (chclt, name) in spaceName {
+						guard let image = generateIcon(chclt:chclt, dimension:dimension, axis:axis, value:value) else { return }
+						guard let data = NSBitmapImageRep(cgImage:image).representation(using:.png, properties:[:]) else { return }
+						
+						var suffix = ""
+						
+						if axisValue.count > 1 { suffix += "_" + (axis < 0 ? "p" : "c") + String(axis.magnitude)  }
+						if spaceName.count > 1 { suffix += "_" + name }
+						if sizes.count > 1 { suffix += "_\(Int(dimension))" }
+						
+						let file = folder.appendingPathComponent(prefix + suffix + ".png")
+						
+						do { try data.write(to:file) } catch { print(error) }
+					}
 				}
 			}
 		}
