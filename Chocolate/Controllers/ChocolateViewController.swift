@@ -20,12 +20,12 @@ class ChocolateViewController: BaseViewController {
 		var foregrounds:[DisplayRGB] = []
 	}
 	
-	enum Input:Int {
+	enum Input: Int {
 		case unknown, red, green, blue, hue, chroma, luma
 	}
 	
 	enum ColorSpace: Int {
-		case sRGBpower, sRGB, g18, y601power, y601, y709power, y709, y2020
+		case sRGB, sRGBpower, g18, y601, y601power, y709, y709power, y2020
 		
 		var chocolate:CHCLT {
 			switch self {
@@ -40,8 +40,8 @@ class ChocolateViewController: BaseViewController {
 			}
 		}
 		
-		static let `default` = sRGBpower
-		static var titles:[String] = ["sRGBⁿ", "sRGB", "G18", "y601ⁿ", "y601", "y709ⁿ", "y709", "y2020"]
+		static let `default` = sRGB
+		static var titles:[String] = ["sRGB", "sRGBⁿ", "G18", "y601", "y601ⁿ", "y709", "y709ⁿ", "y2020"]
 	}
 	
 	var model = Model()

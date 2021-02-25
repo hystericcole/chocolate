@@ -59,14 +59,14 @@ public enum CHCL {
 	
 	/// Parameters use to compute contrast
 	public struct Contrast {
-		public static let standard = Contrast(mediumLuminance:0.25, power:1.5)
-		public static let g18 = Contrast(mediumLuminance:2 / 11, power:1.0)
-		
-		/// The luminance value between light and dark colors.
+		/// The luminance value separating light and dark colors.
+		/// Contrast in CHCLT is a measure of distance from medium luminance.
 		/// 
 		/// Colors with luminance below this value are dark and have better contrast against white than black.
 		/// Colors with luminance above this value are light and have better contrast against black than white.
-		/// All the contrast mwthods of CHCLT are primarily controlled by this value.
+		/// All the contrast methods of CHCLT are primarily controlled by this value.
+		///
+		/// The typical value for medium luminance is `linear(0.5)` where linear is the inverse transfer function.
 		/// 
 		/// # Ratio
 		/// Some models of contrast, such as WCAG G18 and section508, use a ratio of luminances to determine the contrast between colors.
@@ -77,20 +77,21 @@ public enum CHCL {
 		/// r = √(d+1) = 1/m - 1
 		/// ```
 		/// CHCLT uses an invariant medium luminance instead of a ratio to determine contrast.
-		/// Using a ratio is percpetually inconsistent and introduces ambiguity as the medium luminance becomes a range and the range moves.
-		/// 
+		/// Using medium luminance is perceptually consistent and unambiguous.
+		///
 		/// # WCAG G18 and section508
 		/// The WCAG G18 and section508 standards for contrast specify a fixed offset of 1/20 and ratios of 3, 4.5, or 7.
-		/// In terms of offset and ratio, the CHCLT standard of 0.25 has a ratio of 3 and offset of 1/8 when used with a linear power.
+		/// With a linear power, an equivalent ratio and offset can be computed from the medium luminance.
 		/// 
 		/// - offset 0.5 gives 1/(1+√21) = 0.179 as medium luminance.
 		/// - ratio 3 gives a 1/10 ... 3/10 range for medium luminance.  Use 1/4 (0.25) as the medium luminance.
 		/// - ratio 4.5 gives a 21/120 ... 22/120 range for medium luminance.  Use 2/11 (0.182) as the medium luminance.
 		/// - ratio 7 gives a 3/10 ... 1/10 range for medium luminance, excluding values in 1/10 ... 3/10.  Use 1/8 (0.125) as the medium luminance.
 		///
-		/// For colors with luminance in 21/120 ... 30/120, standard CHCLT will choose a light contrasting color where section508 and G18 with ratio 4.5 would suggest a dark contrasting color.
+		/// There will usually be a small range of luminances below the medium luminance where CHCLT will choose a light contrasting color and G18 or section508 would suggest a dark contrasting color.
 		/// This will provide a visually higher contrast and fail the section508 and G18 standards.
-		public let mediumLuminance: Scalar
+		/// For sRGB and a 4.5 ratio this range will be from 0.182 to 0.214.
+		public let mediumLuminance:Scalar
 		
 		/// Controls the shape of the luminance curve.
 		/// Typical values are in the 1 ... 2 range.  1.0 is linear.
@@ -107,7 +108,14 @@ public enum CHCL {
 		/// CHCLT is designed so that a light and dark color with contrasts adding to at least 1.0 will satisfy the minimum recommended contrast.
 		/// The greatest sum of contrasts of two colors is 2.0 for black and white.
 		/// The power parameter influences the luminance value of colors chosen to have a specific contrast relative to another color.
-		public let power: Scalar
+		///
+		/// The typical value for power is `13m√m` where m is the medium luminance.  Use 1.0 for linear contrast.
+		public let power:Scalar
+		
+		public init(_ mediumLuminance:Scalar, power:Scalar = 0) {
+			self.mediumLuminance = mediumLuminance
+			self.power = power > 0 ? power : max(1, 13 * pow(mediumLuminance, 1.5))
+		}
 	}
 	
 	/// A color in the linear RGB space reached via the CHCLT.
@@ -556,10 +564,6 @@ public enum CHCL {
 //	MARK: -
 
 extension CHCLT {
-	public func contrast() -> CHCL.Contrast {
-		return CHCL.Contrast.standard
-	}
-	
 	public func offset() -> CHCLT.Scalar {
 		let m = contrast().mediumLuminance
 		
@@ -604,6 +608,10 @@ public struct CHCLTSquare: CHCLT {
 		return luma / coefficients
 	}
 	
+	public func contrast() -> CHCL.Contrast {
+		return CHCL.Contrast(0.25)
+	}
+	
 	public static let y240 = CHCLTSquare(CHCLT.Linear.vector3(0.212, 0.701, 0.087))	//	39:129:16
 }
 
@@ -638,6 +646,10 @@ public struct CHCLTPower: CHCLT {
 		return vector / coefficients
 	}
 	
+	public func contrast() -> CHCL.Contrast {
+		return CHCL.Contrast(linear(0.5))
+	}
+	
 	public static let y601 = CHCLTPower(CHCLT_BT.y601.coefficients, exponent:10 / 19)
 	public static let y709 = CHCLTPower(CHCLT_BT.y709.coefficients, exponent:10 / 19)
 	public static let y2020 = CHCLTPower(CHCLT_BT.y2020.coefficients, exponent:10 / 19)
@@ -648,8 +660,8 @@ public struct CHCLTPower: CHCLT {
 
 public struct CHCLT_sRGB: CHCLT {
 	public static let coefficients:CHCLT.Vector3 = CHCLT.Linear.vector3(0.21263901, 0.71516867, 0.07219232)
-	public static let standard = CHCLT_sRGB(contrast:.standard)
-	public static let g18 = CHCLT_sRGB(contrast:.g18)
+	public static let standard = CHCLT_sRGB(contrast:CHCL.Contrast(CHCLT_sRGB.linear(0.5)))
+	public static let g18 = CHCLT_sRGB(contrast:CHCL.Contrast(2 / 11, power:1.0))
 	
 	public let useContrast:CHCL.Contrast
 	
@@ -661,7 +673,7 @@ public struct CHCLT_sRGB: CHCLT {
 		return useContrast
 	}
 	
-	public func linear(_ value:CHCLT.Scalar) -> CHCLT.Linear {
+	public static func linear(_ value:CHCLT.Scalar) -> CHCLT.Linear {
 		return value > 11.0 / 280.0 ? pow((200.0 * value + 11.0) / 211.0, 12.0 / 5.0) : value / 12.9232102
 	}
 	
@@ -670,7 +682,7 @@ public struct CHCLT_sRGB: CHCLT {
 	}
 	
 	public func linear(_ vector:CHCLT.Vector3) -> CHCLT.Vector3 {
-		return CHCLT.Linear.vector3(linear(vector.x), linear(vector.y), linear(vector.z))
+		return CHCLT.Linear.vector3(CHCLT_sRGB.linear(vector.x), CHCLT_sRGB.linear(vector.y), CHCLT_sRGB.linear(vector.z))
 	}
 	
 	public func luminance(_ vector:CHCLT.Vector3) -> CHCLT.Scalar {
@@ -713,5 +725,9 @@ public struct CHCLT_BT: CHCLT {
 	
 	public func inverseLuminance(_ vector:CHCLT.Vector3) -> CHCLT.Vector3 {
 		return vector / coefficients
+	}
+	
+	public func contrast() -> CHCL.Contrast {
+		return CHCL.Contrast(linear(0.5))
 	}
 }
