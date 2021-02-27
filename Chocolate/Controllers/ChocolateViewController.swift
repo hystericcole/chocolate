@@ -30,16 +30,16 @@ class ChocolateViewController: BaseViewController {
 		var chocolate:CHCLT {
 			switch self {
 			case .sRGB: return CHCLT_sRGB.standard
-			case .sRGBpower: return CHCLTPower.sRGB
+			case .sRGBpower: return CHCLT_Pure.sRGB
 			case .displayP3: return CHCLT_sRGB.displayP3
 			case .g18: return CHCLT_sRGB.g18
 			case .y601: return CHCLT_BT.y601
-			case .y601power: return CHCLTPower.y601
+			case .y601power: return CHCLT_Pure.y601
 			case .y709: return CHCLT_BT.y709
-			case .y709power: return CHCLTPower.y709
+			case .y709power: return CHCLT_Pure.y709
 			case .y2020: return CHCLT_BT.y2020
-			case .adobeRGB: return CHCLTPower.adobeRGB
-			case .theaterP3: return CHCLTPower.dciP3
+			case .adobeRGB: return CHCLT_Pure.adobeRGB
+			case .theaterP3: return CHCLT_Pure.dciP3
 			}
 		}
 		
@@ -134,7 +134,7 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	func applyColorToCircle(_ color:DisplayRGB) {
-		let hues:[CHCL.LinearRGB] = [.red, .orange, .yellow, .chartreuse, .green, .spring, .cyan, .azure, .blue, .violet, .magenta, .rose]
+		let hues:[CHCLT.LinearRGB] = [.red, .orange, .yellow, .chartreuse, .green, .spring, .cyan, .azure, .blue, .violet, .magenta, .rose]
 		let chocolate = model.chocolate
 		let primary = color.linear(chocolate)
 		let contrast = primary.contrast(chocolate)

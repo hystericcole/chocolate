@@ -43,7 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate {
-	static func generateIcon(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCL.Scalar) -> CGImage? {
+	static func generateIcon(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCLT.Scalar) -> CGImage? {
 		guard let colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) else { return nil }
 		
 		let outerSize = CGSize(square:dimension)
@@ -55,7 +55,7 @@ extension AppDelegate {
 		guard let outerMutable = MutableImage(size:outerSize, colorSpace:colorSpace, scale:1, opaque:false, intent:.absoluteColorimetric) else { return nil }
 		guard let innerMutable = MutableImage(size:innerSize, colorSpace:colorSpace, scale:1, opaque:true, intent:.absoluteColorimetric) else { return nil }
 		
-		CHCL.LinearRGB.drawPlaneFromCubeHCL(chclt, axis:axis, value:value, image:innerMutable)
+		CHCLT.LinearRGB.drawPlaneFromCubeHCL(chclt, axis:axis, value:value, image:innerMutable)
 		outerMutable.context.setLineWidth(lineWidth)
 		
 		if !isRadiusLuminance {
@@ -71,7 +71,7 @@ extension AppDelegate {
 		return outerMutable.image
 	}
 	
-	static func generateIconPNG(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCL.Scalar, file:URL) {
+	static func generateIconPNG(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCLT.Scalar, file:URL) {
 		guard let image = generateIcon(chclt:chclt, dimension:dimension, axis:axis, value:value) else { return }
 		guard let data = NSBitmapImageRep(cgImage:image).representation(using:.png, properties:[:]) else { return }
 		
@@ -81,7 +81,7 @@ extension AppDelegate {
 	static func generateIcons() {
 		let sizes:[CGFloat] = [120, 180, 76, 152, 167, 16, 32, 64, 128, 256, 512, 1024]
 		let axisValue:[(Int, Double)] = [(1, 0.75)]
-		let spaceName:[(CHCLT, String)] = [(CHCLTPower.y709, "y709n")]
+		let spaceName:[(CHCLT, String)] = [(CHCLT_Pure.y709, "y709n")]
 		let path = ("~/Desktop/Chocolate" as NSString).expandingTildeInPath
 		let folder = URL(fileURLWithPath:path)
 		let manager = FileManager.default

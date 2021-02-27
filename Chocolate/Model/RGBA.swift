@@ -51,7 +51,7 @@ public struct DisplayRGB {
 	}
 	
 	public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luma:Scalar, alpha:Scalar = 1) {
-		let linear = CHCL.LinearRGB.init(chclt, hue:hue, luminance:luma).applyChroma(chclt, value:chroma)
+		let linear = CHCLT.LinearRGB.init(chclt, hue:hue, luminance:luma).applyChroma(chclt, value:chroma)
 		
 		vector = Scalar.vector4(chclt.display(simd_max(linear.vector, simd_double3.zero)), alpha)
 	}
@@ -131,8 +131,8 @@ public struct DisplayRGB {
 		return r | g | b | a
 	}
 	
-	public func linear(_ chclt:CHCLT) -> CHCL.LinearRGB {
-		return CHCL.LinearRGB(chclt.linear(vector.xyz))
+	public func linear(_ chclt:CHCLT) -> CHCLT.LinearRGB {
+		return CHCLT.LinearRGB(chclt.linear(vector.xyz))
 	}
 	
 	public func scaled(_ scalar:Scalar) -> DisplayRGB {
@@ -162,7 +162,7 @@ public struct DisplayRGB {
 		
 		guard v > 0 else { return DisplayRGB(gray:chclt.transfer(u), vector.w) }
 		
-		let n = CHCL.LinearRGB.normalize(vector:l, luminance:v, leavePositive:true)
+		let n = CHCLT.LinearRGB.normalize(vector:l, luminance:v, leavePositive:true)
 		let rgb = chclt.display(n)
 		let s = chclt.transfer(u / v)
 		let d = rgb.max()
@@ -302,7 +302,7 @@ extension DisplayRGB {
 
 //	MARK: -
 
-extension CHCL.LinearRGB {
+extension CHCLT.LinearRGB {
 	public static var colorSpace = linearColorSpace()
 	
 	public static func linearColorSpace() -> CGColorSpace? {
@@ -315,7 +315,7 @@ extension CHCL.LinearRGB {
 	public init?(_ color:CGColor?) {
 		guard
 			#available(macOS 10.11, iOS 9.0, *),
-			let space = CHCL.LinearRGB.colorSpace,
+			let space = CHCLT.LinearRGB.colorSpace,
 			let color = color?.converted(to:space, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
 			let components = color.components
 		else { return nil }
@@ -328,7 +328,7 @@ extension CHCL.LinearRGB {
 		
 		if let colorSpace = colorSpace, colorSpace.model == .rgb {
 			space = colorSpace
-		} else if let linear = CHCL.LinearRGB.colorSpace {
+		} else if let linear = CHCLT.LinearRGB.colorSpace {
 			space = linear
 		} else {
 			return nil
@@ -339,15 +339,15 @@ extension CHCL.LinearRGB {
 		return CGColor(colorSpace:space, components:&components)
 	}
 	
-	static func drawPlaneFromPolarCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
+	static func drawPlaneFromPolarCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCLT.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
 		for x in 0 ..< width {
-			let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+			let a = CHCLT.Scalar(x) / CHCLT.Scalar(width - 1)
 			
 			for y in 0 ..< height {
-				let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
+				let b = CHCLT.Scalar(y) / CHCLT.Scalar(height - 1)
 				let r = min(hypot(b * 2 - 1, a * 2 - 1), 1)
 				let t = atan2(b * 2 - 1, a * 2 - 1) / .pi
-				let h, c, l:CHCL.Scalar
+				let h, c, l:CHCLT.Scalar
 				
 				switch axis % 6 {
 				case 0: h = value; c = 1 - t.magnitude * 2; l = 1 - r
@@ -358,24 +358,24 @@ extension CHCL.LinearRGB {
 				default: h = r; c = 1 - t.magnitude * 2; l = value
 				}
 				
-				let color = CHCL.LinearRGB(chclt, hue:h, luminance:l).applyChroma(chclt, value:c, luminance:l)
+				let color = CHCLT.LinearRGB(chclt, hue:h, luminance:l).applyChroma(chclt, value:c, luminance:l)
 				
 				pixels[y * rowLength + x] = color.pixel()
 			}
 		}
 	}
 	
-	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
+	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCLT.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
 		let isFlipped = (axis / 3) & 1 != 0
 		let count = isFlipped ? height : width
-		let hues = axis % 3 == 0 ? [CHCL.LinearRGB(chclt, hue:value)] : CHCL.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCL.Scalar(count), count:count)
+		let hues = axis % 3 == 0 ? [CHCLT.LinearRGB(chclt, hue:value)] : CHCLT.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCLT.Scalar(count), count:count)
 		
 		for x in 0 ..< width {
-			let a = CHCL.Scalar(x) / CHCL.Scalar(width - 1)
+			let a = CHCLT.Scalar(x) / CHCLT.Scalar(width - 1)
 			
 			for y in 0 ..< height {
-				let b = CHCL.Scalar(y) / CHCL.Scalar(height - 1)
-				let h:Int, c, l:CHCL.Scalar
+				let b = CHCLT.Scalar(y) / CHCLT.Scalar(height - 1)
+				let h:Int, c, l:CHCLT.Scalar
 				
 				switch axis % 6 {
 				case 0: h = 0; c = 1 - b; l = a
@@ -393,7 +393,7 @@ extension CHCL.LinearRGB {
 		}
 	}
 	
-	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCL.Scalar, image:MutableImage) {
+	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCLT.Scalar, image:MutableImage) {
 		guard image.image.bitsPerPixel == 32 && image.image.colorSpace?.model == .rgb else { return }
 		
 		let width = image.image.width
@@ -414,7 +414,7 @@ extension CHCL.LinearRGB {
 
 public struct CHCLTShading {
 	public struct ColorLocation {
-		public let color:CHCL.LinearRGB
+		public let color:CHCLT.LinearRGB
 		public let alpha:CHCLT.Scalar
 		public let location:CHCLT.Scalar
 		

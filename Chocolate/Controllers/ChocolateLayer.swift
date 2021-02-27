@@ -9,21 +9,21 @@ import QuartzCore
 import Foundation
 
 class ChocolateLayer: CALayer {
-	var chocolate:CHCLT = CHCLTPower.y709
+	var chocolate:CHCLT = CHCLT.default
 	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
 	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
 	var axis = 0
 	
-	func colorsForChroma(primary:CHCL.LinearRGB, chroma:CHCL.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
+	func colorsForChroma(primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
 		let color = primary.applyChroma(chocolate, value:chroma)
 		let value = color.luminance(chocolate)
 		let locations:[CGFloat] = [0, CGFloat(1 - value), 1]
-		let colors:[CGColor] = [CHCL.LinearRGB(.one), color, CHCL.LinearRGB(.zero)].compactMap { $0.color(colorSpace:colorSpace, alpha:1) }
+		let colors:[CGColor] = [CHCLT.LinearRGB(.one), color, CHCLT.LinearRGB(.zero)].compactMap { $0.color(colorSpace:colorSpace, alpha:1) }
 		
 		return CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:locations)
 	}
 	
-	func drawCHCLT(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCL.Linear) {
+	func drawCHCLT(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCLT.Linear) {
 		let drawSpace = colorSpace
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
@@ -35,12 +35,12 @@ class ChocolateLayer: CALayer {
 		
 		switch axis % 3 {
 		case 0:	//	scalar is hue
-			let primary = CHCL.LinearRGB(chocolate, hue:scalar)
+			let primary = CHCLT.LinearRGB(chocolate, hue:scalar)
 			
 			for index in 0 ..< count {
 				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
 				let stripe = CGRect(origin:origin, size:size)
-				let chroma = CHCL.Scalar(index) / CHCL.Scalar(count - 1)
+				let chroma = CHCLT.Scalar(index) / CHCLT.Scalar(count - 1)
 				
 				guard let gradient = colorsForChroma(primary:primary, chroma:chroma, drawSpace:drawSpace) else { continue }
 				
@@ -49,7 +49,7 @@ class ChocolateLayer: CALayer {
 				context.resetClip()
 			}
 		case 1:	//	scalar is chroma
-			let hues = CHCL.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCL.Scalar(count), count:count)
+			let hues = CHCLT.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCLT.Scalar(count), count:count)
 			
 			for index in 0 ..< count {
 				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
@@ -62,8 +62,8 @@ class ChocolateLayer: CALayer {
 				context.resetClip()
 			}
 		default:	//	scalar is luminance - colors are slightly darker than intended
-			let hues = CHCL.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCL.Scalar(count), count:count)
-			let gray = CHCL.LinearRGB(gray:scalar)
+			let hues = CHCLT.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let gray = CHCLT.LinearRGB(gray:scalar)
 			let huesWithLuminance = hues.compactMap { $0.applyLuminance(chocolate, value:scalar).color(colorSpace:colorSpace, alpha:1) }
 			let desaturate = [gray.color(colorSpace:colorSpace, alpha:0)!, gray.color(colorSpace:colorSpace, alpha:1)!]
 			
@@ -83,7 +83,7 @@ class ChocolateLayer: CALayer {
 		}
 	}
 	
-	func drawRGB(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCL.Linear) {
+	func drawRGB(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCLT.Linear) {
 		let colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
 		let drawSpace = CGColorSpace(name:CGColorSpace.sRGB) ?? colorSpace
 		
@@ -128,7 +128,7 @@ class ChocolateLayerView: BaseView {
 //	MARK: -
 
 class ChocolateImageView: PlatformImageView {
-	var chocolate:CHCLT = CHCLTPower.y709
+	var chocolate:CHCLT = CHCLT.default
 	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
 	var scalar:CHCLT.Scalar = 0.5 { didSet { refreshSoon() } }
 	var axis = 0 { didSet { refreshSoon() } }
@@ -154,7 +154,7 @@ class ChocolateImageView: PlatformImageView {
 		isRefreshing = true
 		
 		DispatchQueue.userInitiated.async {
-			CHCL.LinearRGB.drawPlaneFromCubeHCL(self.chocolate, axis:self.axis, value:self.scalar, image:mutable)
+			CHCLT.LinearRGB.drawPlaneFromCubeHCL(self.chocolate, axis:self.axis, value:self.scalar, image:mutable)
 			
 			DispatchQueue.main.async {
 				self.refreshed(mutable)

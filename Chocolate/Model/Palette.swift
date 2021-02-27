@@ -10,10 +10,10 @@ import Foundation
 
 class Palette {
 	let chclt:CHCLT
-	let primary:CHCL.LinearRGB
-	let primaryAdjustment:CHCL.Adjustment
-	let contrasting:CHCL.LinearRGB
-	let contrastingAdjustment:CHCL.Adjustment
+	let primary:CHCLT.LinearRGB
+	let primaryAdjustment:CHCLT.Adjustment
+	let contrasting:CHCLT.LinearRGB
+	let contrastingAdjustment:CHCLT.Adjustment
 	
 	var primaryForeground:CGColor! { return primary.color() }
 	var secondaryForeground:CGColor! { return foreground(0.5).color() }
@@ -26,7 +26,7 @@ class Palette {
 	var placeholder:CGColor! { return background(2.0).color() }
 	var divider:CGColor! { return background(1.5).color() }
 	
-	init(chclt:CHCLT, primary:CHCL.LinearRGB, contrasting:CHCL.LinearRGB, primaryAdjustment:CHCL.Adjustment, contrastingAdjustment:CHCL.Adjustment) {
+	init(chclt:CHCLT, primary:CHCLT.LinearRGB, contrasting:CHCLT.LinearRGB, primaryAdjustment:CHCLT.Adjustment, contrastingAdjustment:CHCLT.Adjustment) {
 		self.chclt = chclt
 		self.primary = primary
 		self.primaryAdjustment = primaryAdjustment
@@ -34,21 +34,21 @@ class Palette {
 		self.contrastingAdjustment = contrastingAdjustment
 	}
 	
-	convenience init(chclt:CHCLT, primary:CHCL.LinearRGB, contrasting:CHCL.Adjustment, primaryAdjustment:CHCL.Adjustment, contrastingAdjustment:CHCL.Adjustment) {
+	convenience init(chclt:CHCLT, primary:CHCLT.LinearRGB, contrasting:CHCLT.Adjustment, primaryAdjustment:CHCLT.Adjustment, contrastingAdjustment:CHCLT.Adjustment) {
 		let color = primary.contrasting(chclt, value:contrasting.contrast).applyChroma(chclt, value:contrasting.chroma)
 		
 		self.init(chclt:chclt, primary:primary, contrasting:color, primaryAdjustment:primaryAdjustment, contrastingAdjustment:contrastingAdjustment)
 	}
 	
-	func disabled(_ color:CHCL.LinearRGB) -> CHCL.LinearRGB {
+	func disabled(_ color:CHCLT.LinearRGB) -> CHCLT.LinearRGB {
 		return color.scaleContrast(chclt, by:0.5)
 	}
 	
-	func inverted(_ color:CHCL.LinearRGB) -> CHCL.LinearRGB {
+	func inverted(_ color:CHCLT.LinearRGB) -> CHCLT.LinearRGB {
 		return color.scaleContrast(chclt, by:-1)
 	}
 	
-	func adapt(_ color:CHCL.LinearRGB, similar:CHCL.LinearRGB) -> CHCL.LinearRGB {
+	func adapt(_ color:CHCLT.LinearRGB, similar:CHCLT.LinearRGB) -> CHCLT.LinearRGB {
 		let contrast = similar.contrast(chclt)
 		
 		let c = color
@@ -59,7 +59,7 @@ class Palette {
 		return c
 	}
 	
-	func foreground(_ value:CHCL.Scalar) -> CHCL.LinearRGB {
+	func foreground(_ value:CHCLT.Scalar) -> CHCLT.LinearRGB {
 		let n = 1 - value
 		
 		return primary
@@ -67,7 +67,7 @@ class Palette {
 			.scaleChroma(chclt, by:value * primaryAdjustment.chroma + n)
 	}
 	
-	func background(_ value:CHCL.Scalar) -> CHCL.LinearRGB {
+	func background(_ value:CHCLT.Scalar) -> CHCLT.LinearRGB {
 		let n = 1 - value
 		
 		return contrasting
