@@ -3,6 +3,7 @@
 //  Chocolate
 //
 //  Created by Eric Cole on 2/25/21.
+//	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
 import CoreGraphics

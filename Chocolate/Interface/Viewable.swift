@@ -1,8 +1,9 @@
 //
 //  Viewable.swift
-//  ChocolateTests
+//  Chocolate
 //
 //  Created by Eric Cole on 2/1/21.
+//	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
 import QuartzCore

@@ -1,8 +1,9 @@
 //
 //  Atomic.swift
-//  MaggicTones
+//  Chocolate
 //
 //  Created by Eric Cole on 12/24/20.
+//	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
 import Foundation

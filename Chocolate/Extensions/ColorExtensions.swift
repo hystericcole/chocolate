@@ -1,8 +1,9 @@
 //
 //  ColorExtensions.swift
-//  CHCLT
+//  Chocolate
 //
 //  Created by Eric Cole on 1/26/21.
+//	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
 import Foundation

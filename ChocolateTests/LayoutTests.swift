@@ -3,6 +3,7 @@
 //  ChocolateTests
 //
 //  Created by Eric Cole on 1/31/21.
+//	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
 import XCTest
