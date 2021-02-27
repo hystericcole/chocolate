@@ -53,16 +53,16 @@ public struct DisplayRGB {
 	public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luma:Scalar, alpha:Scalar = 1) {
 		let linear = CHCL.LinearRGB.init(chclt, hue:hue, luminance:luma).applyChroma(chclt, value:chroma)
 		
-		vector = Scalar.vector4(chclt.display(simd_max(linear.vector, .zero)), alpha)
+		vector = Scalar.vector4(chclt.display(simd_max(linear.vector, simd_double3.zero)), alpha)
 	}
 	
 	public init(hexagonal hue:Scalar, saturation:Scalar, brightness:Scalar, alpha:Scalar = 1) {
 		guard brightness > 0 && saturation > 0 else { self.init(gray:brightness, alpha); return }
 		
-		let hue1 = Scalar.vector3(hue, hue - 1/3, hue - 2/3)
+		let hue1 = Scalar.vector3(hue, hue - 1.0/3.0, hue - 2.0/3.0)
 		let hue2 = hue1 - hue1.rounded(.down) - 0.5
 		let hue3 = simd_abs(hue2) * 6.0 - 1.0
-		let hue4 = simd_clamp(hue3, .zero, .one)
+		let hue4 = simd_clamp(hue3, simd_double3.zero, simd_double3.one)
 		let c = saturation * brightness
 		let m = brightness - c
 		
@@ -262,13 +262,15 @@ public struct DisplayRGB {
 //	MARK: -
 
 extension DisplayRGB {
-	public static var colorSpace:CGColorSpace = {
+	public static var colorSpace = displayColorSpace()
+	
+	public static func displayColorSpace() -> CGColorSpace {
 		if #available(macOS 11.0, iOS 14.0, *), let extended = CGColorSpace(name:CGColorSpace.extendedDisplayP3) { return extended }
 		if #available(macOS 10.12, iOS 10.0, *), let extended = CGColorSpace(name:CGColorSpace.extendedSRGB) { return extended }
 		if #available(macOS 10.11.2, iOS 9.3, *), let display = CGColorSpace(name:CGColorSpace.displayP3) { return display }
 		
 		return CGColorSpace(name:CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-	}()
+	}
 	
 	public var cg:CGColor? { return color() }
 	
@@ -276,7 +278,7 @@ extension DisplayRGB {
 		guard
 			let color = color,
 			color.numberOfComponents == 4,
-			color.colorSpace?.model ?? .rgb == .rgb,
+			color.colorSpace?.model ?? .rgb == CGColorSpaceModel.rgb,
 			let components = color.components
 		else { return nil }
 		
@@ -301,14 +303,32 @@ extension DisplayRGB {
 //	MARK: -
 
 extension CHCL.LinearRGB {
+	public static var colorSpace = linearColorSpace()
+	
+	public static func linearColorSpace() -> CGColorSpace? {
+		if #available(macOS 10.14.3, iOS 12.3, *), let linear = CGColorSpace(name:CGColorSpace.extendedLinearDisplayP3) { return linear }
+		if #available(macOS 10.12, iOS 10.0, *), let linear = CGColorSpace(name:CGColorSpace.linearSRGB) { return linear }
+		
+		return CGColorSpace(name:CGColorSpace.genericRGBLinear)
+	}
+	
+	public init?(_ color:CGColor?) {
+		guard
+			#available(macOS 10.11, iOS 9.0, *),
+			let space = CHCL.LinearRGB.colorSpace,
+			let color = color?.converted(to:space, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
+			let components = color.components
+		else { return nil }
+		
+		self.init(components[0].native, components[1].native, components[2].native)
+	}
+	
 	public func color(colorSpace:CGColorSpace? = nil, alpha:CGFloat = 1) -> CGColor? {
 		let space:CGColorSpace
 		
 		if let colorSpace = colorSpace, colorSpace.model == .rgb {
 			space = colorSpace
-		} else if #available(macOS 10.12, iOS 10.0, *), let linear = CGColorSpace(name:CGColorSpace.linearSRGB) {
-			space = linear
-		} else if let linear = CGColorSpace(name:CGColorSpace.genericRGBLinear) {
+		} else if let linear = CHCL.LinearRGB.colorSpace {
 			space = linear
 		} else {
 			return nil

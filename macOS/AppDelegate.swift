@@ -102,9 +102,9 @@ extension AppDelegate {
 						
 						var suffix = ""
 						
-						if axisValue.count > 1 { suffix += "_" + (axis < 0 ? "p" : "c") + String(axis.magnitude)  }
+						if axisValue.count > 1 { suffix += "_" + (axis < 0 ? "p" : "c") + String(axis.magnitude) }
 						if spaceName.count > 1 { suffix += "_" + name }
-						if sizes.count > 1 { suffix += "_\(Int(dimension))" }
+						if sizes.count > 1 { suffix += "_" + String(Int(dimension)) }
 						
 						let file = folder.appendingPathComponent(prefix + suffix + ".png")
 						

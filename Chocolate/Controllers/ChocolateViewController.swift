@@ -73,6 +73,9 @@ class ChocolateViewController: BaseViewController {
 	let stringForeground = Style.caption.label(Strings.foreground)
 	let stringWeb = Style.webColor.label("")
 	let colorBox = Viewable.Color(color:nil)
+	let colorCircleBackground = Viewable.Color(color:nil)
+	let colorCircleCenter = Viewable.Color(color:nil)
+	let colorCircles:[Viewable.Color] = (0 ..< 12).map { _ in Viewable.Color(color:nil) }
 	var samples:[Sample] = []
 	
 	override func loadView() {
@@ -127,6 +130,24 @@ class ChocolateViewController: BaseViewController {
 		}
 	}
 	
+	func applyColorToCircle(_ color:DisplayRGB) {
+		let hues:[CHCL.LinearRGB] = [.red, .orange, .yellow, .chartreuse, .green, .spring, .cyan, .azure, .blue, .violet, .magenta, .rose]
+		let chocolate = model.chocolate
+		let primary = color.linear(chocolate)
+		let contrast = primary.contrast(chocolate)
+		
+		colorCircleCenter.color = primary.color()?.platformColor
+		colorCircleBackground.color = primary.opposing(chocolate, value:1).color()?.platformColor
+		
+		for index in colorCircles.indices {
+			colorCircles[index].color = hues[index]
+				.matchLuminance(chocolate, to:primary, by:0.625 - 0.125 * contrast)
+				.matchChroma(chocolate, to:primary, by:0.75 - 0.5 * contrast)
+				.huePushed(chocolate, from:primary, minimumShift:0.05)
+				.color()?.platformColor
+		}
+	}
+	
 	func applyColor(_ color:DisplayRGB) {
 		colorBox.color = color.cg?.platformColor
 		
@@ -168,6 +189,8 @@ class ChocolateViewController: BaseViewController {
 				direction:.reverse
 			).padding(4).rounded()
 		)
+		
+		applyColorToCircle(color)
 		
 		group.view?.invalidateLayout()
 	}
@@ -285,8 +308,14 @@ class ChocolateViewController: BaseViewController {
 			sliderSaturation.minimum(width:minimumSliderWidth), stringSaturation
 		)
 		
+		let colorCircle = Layout.Overlay(
+			colorCircleBackground,
+			colorCircleCenter.rounded().fraction(width:0.5, height:0.5).aspect(ratio:1).align(),
+			Layout.Circle(targets:colorCircles, scalar:0.875, radius:80).rounded().padding(10)
+		)
+		
 		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
-			targets:samples.map { $0.layout() },
+			targets:samples.map { $0.layout() } + [colorCircle],
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal

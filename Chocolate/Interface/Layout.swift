@@ -355,7 +355,7 @@ struct Layout {
 		}
 		
 		init(value:Native) {
-			constant = value
+			constant = 0
 			minimum = value
 			maximum = value
 			fraction = 0
@@ -383,8 +383,12 @@ struct Layout {
 		/// Computes constant + fraction × limit, clamped between minimum and maximum
 		/// - Parameter limit: Bounds of container
 		/// - Returns: Resolved value
-		func resolve(_ limit:Native) -> Native {
-			return min(max(minimum, constant + fraction * limit), maximum)
+		func resolve(_ limit:Native, maximize:Bool = false) -> Native {
+			let prefer = min(max(minimum, constant + fraction * limit), maximum)
+			
+			if maximize && prefer < limit && fraction == 0 { return min(limit, maximum) }
+			
+			return prefer
 		}
 		
 		/// Computes constant + fraction × limit
@@ -403,7 +407,7 @@ struct Layout {
 		
 		func limit(fitting limit:Native?) -> Native? {
 			if let limit = limit, limit < Limit.unlimited {
-				let resolved = resolve(limit)
+				let resolved = resolve(limit, maximize:true)
 				
 				return min(resolved, limit)
 			} else if maximum < Limit.unlimited {
@@ -516,8 +520,8 @@ struct Layout {
 		}
 		
 		///	Compute the resolved value for both dimensions
-		func resolve(_ size:CGSize) -> CGSize {
-			return CGSize(width:width.resolve(size.width.native), height:height.resolve(size.height.native))
+		func resolve(_ size:CGSize, maximize:Bool = false) -> CGSize {
+			return CGSize(width:width.resolve(size.width.native, maximize:maximize), height:height.resolve(size.height.native, maximize:maximize))
 		}
 		
 		/// Pin dimensions of box within mininum and maximum of size
@@ -667,7 +671,7 @@ struct Layout {
 	struct IgnoreSafeBounds: PositionableWithTarget {
 		var target:Positionable
 		
-		init(target:Positionable) {
+		init(_ target:Positionable) {
 			self.target = target
 		}
 		
@@ -711,12 +715,12 @@ struct Layout {
 		
 		var frame:CGRect { return insets.paddingBox(target.frame) }
 		
-		init(target:Positionable, insets:EdgeInsets) {
+		init(_ target:Positionable, insets:EdgeInsets) {
 			self.target = target
 			self.insets = insets
 		}
 		
-		init(target:Positionable, uniform:Native) {
+		init(_ target:Positionable, uniform:Native) {
 			self.target = target
 			self.insets = EdgeInsets(uniform:uniform)
 		}
@@ -750,14 +754,14 @@ struct Layout {
 		var width:Dimension?
 		var height:Dimension?
 		
-		init(target:Positionable, width:Dimension?, height:Dimension?) {
+		init(_ target:Positionable, width:Dimension?, height:Dimension?) {
 			self.target = target
 			self.width = width
 			self.height = height
 		}
 		
-		init(target:Positionable, width:Native?, height:Native?) {
-			self.init(target:target, width:Dimension(value:width), height:Dimension(value:height))
+		init(_ target:Positionable, width:Native?, height:Native?) {
+			self.init(target, width:Dimension(value:width), height:Dimension(value:height))
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -777,14 +781,14 @@ struct Layout {
 		var width:NativeRange
 		var height:NativeRange
 		
-		init(target:Positionable, width:NativeRange, height:NativeRange) {
+		init(_ target:Positionable, width:NativeRange, height:NativeRange) {
 			self.target = target
 			self.width = width
 			self.height = height
 		}
 		
-		init(target:Positionable, minimumWidth:Native = 0, minimumHeight:Native = 0) {
-			self.init(target:target, width:minimumWidth ... Dimension.unbound, height:minimumHeight ... Dimension.unbound)
+		init(_ target:Positionable, minimumWidth:Native = 0, minimumHeight:Native = 0) {
+			self.init(target, width:minimumWidth ... Dimension.unbound, height:minimumHeight ... Dimension.unbound)
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -807,13 +811,13 @@ struct Layout {
 		let target:Positionable
 		let size:Size
 		
-		init(target:Positionable, size:Size) {
+		init(_ target:Positionable, size:Size) {
 			self.target = target
 			self.size = size
 		}
 		
-		init(target:Positionable, limit:Limit) {
-			self.init(target:target, size:target.positionableSize(fitting:limit))
+		init(_ target:Positionable, limit:Limit) {
+			self.init(target, size:target.positionableSize(fitting:limit))
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
@@ -831,11 +835,11 @@ struct Layout {
 		/// The aspect ratio.
 		var ratio:CGSize
 		
-		init(target:Positionable, ratio:Native, position:Native = 0.5) {
-			self.init(target:target, ratio:CGSize(width:ratio, height:1), position:CGPoint(x:position, y:position))
+		init(_ target:Positionable, ratio:Native, position:Native = 0.5) {
+			self.init(target, ratio:CGSize(width:ratio, height:1), position:CGPoint(x:position, y:position))
 		}
 		
-		init(target:Positionable, ratio:CGSize, position:CGPoint = CGPoint(x:0.5, y:0.5)) {
+		init(_ target:Positionable, ratio:CGSize, position:CGPoint = CGPoint(x:0.5, y:0.5)) {
 			self.target = target
 			self.ratio = ratio
 			self.position = position
@@ -1532,7 +1536,7 @@ struct Layout {
 			let x, y, width, height:CGFloat
 			
 			if let value = vertical.value(axis:.vertical, environment:context.environment) {
-				height = min(CGFloat(size.height.resolve(box.size.height.native)), box.size.height)
+				height = min(CGFloat(size.height.resolve(box.size.height.native, maximize:true)), box.size.height)
 				y = (box.size.height - height) * CGFloat(value)
 			} else {
 				height = box.size.height
@@ -1540,7 +1544,7 @@ struct Layout {
 			}
 			
 			if let value = horizontal.value(axis:.horizontal, environment:context.environment) {
-				width = min(CGFloat(size.width.resolve(box.size.width.native)), box.size.width)
+				width = min(CGFloat(size.width.resolve(box.size.width.native, maximize:true)), box.size.width)
 				x = (box.size.width - width) * CGFloat(value)
 			} else {
 				width = box.size.width
@@ -1911,7 +1915,7 @@ struct Layout {
 				}
 				
 				if let value = alignment {
-					let height = min(sizes[index].height.resolve(size), size)
+					let height = min(sizes[index].height.resolve(size, maximize:true), size)
 					
 					box.size.height.native = height
 					box.origin.y.native = (size - height) * value
@@ -1921,7 +1925,7 @@ struct Layout {
 				}
 				
 				if let value = uniformAlign {
-					let inner = sizes[index].width.resolve(bounds.size.width.native)
+					let inner = sizes[index].width.resolve(bounds.size.width.native, maximize:true)
 					
 					if inner < box.size.width.native {
 						box.origin.x.native += (width - inner) * value
@@ -1963,7 +1967,7 @@ struct Layout {
 				}
 				
 				if let value = alignment {
-					let width = min(sizes[index].width.resolve(size), size)
+					let width = min(sizes[index].width.resolve(size, maximize:true), size)
 					
 					box.size.width.native = width
 					box.origin.x.native = (size - width) * value
@@ -1973,7 +1977,7 @@ struct Layout {
 				}
 				
 				if let value = uniformAlign {
-					let inner = sizes[index].height.resolve(bounds.size.height.native)
+					let inner = sizes[index].height.resolve(bounds.size.height.native, maximize:true)
 					
 					if inner < box.size.height.native {
 						box.origin.y.native += (height - inner) * value
@@ -2150,7 +2154,7 @@ struct Layout {
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			let isPositive = direction.isPositive(axis:axis, environment:context.environment)
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			var measured = targets.map { Measured(target:$0, limit:limit) }
+			var measured = targets.map { Measured($0, limit:limit) }
 			var vertical = columnTemplate
 			var horizontal = rowTemplate
 			
@@ -2210,41 +2214,126 @@ struct Layout {
 			return ordered.flatMap { $0.orderablePositionables(environment:environment, order:order) }
 		}
 	}
+	
+	struct Circle: Positionable {
+		var targets:[Positionable]
+		var radius:Native
+		var scalar:Native
+		var turned:Native
+		var clockwise:Bool
+		
+		var frame:CGRect {
+			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return .zero
+		}
+		
+		init(targets:[Positionable], scalar:Native = 1, radius:Native = 0, turned:Native = -0.25, clockwise:Bool = true) {
+			self.targets = targets
+			self.scalar = scalar
+			self.radius = radius
+			self.turned = turned
+			self.clockwise = clockwise
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			let count = targets.count
+			
+			guard count > 1 else { return targets.first?.positionableSize(fitting:limit) ?? .zero }
+			
+			if radius > 0 {
+				let dimension = Dimension(value:radius * 2)
+				
+				return Layout.Size(width:dimension, height:dimension)
+			}
+			
+			var result:Layout.Size = .zero
+			let ratio = 1.0 + 1.0 / (scalar * sin(.pi / Native(count)))
+			
+			for target in targets {
+				let size = target.positionableSize(fitting:limit)
+				
+				result.width.increase(size.width)
+				result.height.increase(size.height)
+			}
+			
+			result.width.multiply(ratio)
+			result.height.multiply(ratio)
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			let count = targets.count
+			
+			guard count > 1 else { targets.first?.applyPositionableFrame(box, context:context); return }
+			
+			let diameter = box.size.minimum.native
+			let fraction = scalar * sin(.pi / Native(count))
+			let radius = 0.5 * diameter / (1 + fraction)
+			let center = box.center
+			let size = CGSize(square:CGFloat(radius * fraction * 2))
+			
+			for index in 0 ..< count {
+				let turn = turned + Native(clockwise ? index : count - index) / Native(count)
+				let sc = __sincospi_stret(turn * 2)
+				let cx = CGFloat(radius * sc.__cosval)
+				let cy = CGFloat(radius * sc.__sinval)
+				let frame = CGRect(center:CGPoint(x:center.x + cx, y:center.y + cy), size:size)
+				
+				targets[index].applyPositionableFrame(frame, context:context)
+			}
+		}
+		
+		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
+			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
+		}
+	}
 }
 
 //	MARK: -
 
 extension Positionable {
 	func ignoringSafeBounds() -> Positionable {
-		return Layout.IgnoreSafeBounds(target:self)
+		return Layout.IgnoreSafeBounds(self)
 	}
 	
 	func padding(_ insets:Layout.EdgeInsets) -> Positionable {
-		return Layout.Padding(target:self, insets:insets)
+		return Layout.Padding(self, insets:insets)
 	}
 	
 	func padding(_ uniform:Layout.Native = 8) -> Positionable {
-		return Layout.Padding(target:self, uniform:uniform)
+		return Layout.Padding(self, uniform:uniform)
 	}
 	
 	func padding(horizontal:Layout.Native, vertical:Layout.Native) -> Positionable {
-		return Layout.Padding(target:self, insets:Layout.EdgeInsets(horizontal:horizontal, vertical:vertical))
+		return Layout.Padding(self, insets:Layout.EdgeInsets(horizontal:horizontal, vertical:vertical))
 	}
 	
 	func fixed(width:Layout.Native? = nil, height:Layout.Native? = nil) -> Positionable {
-		return Layout.Sizing(target:self, width:width, height:height)
+		return Layout.Sizing(self, width:width, height:height)
+	}
+	
+	func fraction(width:Layout.Native, minimumWidth:Layout.Native = 0, maximumWidth:Layout.Native = Layout.Dimension.unbound, height:Layout.Native, minimumHeight:Layout.Native = 0, maximumHeight:Layout.Native = Layout.Dimension.unbound) -> Positionable {
+		return Layout.Sizing(
+			self,
+			width:Layout.Dimension(constant:0, range:minimumWidth ... maximumWidth, fraction:width),
+			height:Layout.Dimension(constant:0, range:minimumHeight ... maximumHeight, fraction:height)
+		)
 	}
 	
 	func minimum(width:Layout.Native = 0, height:Layout.Native = 0) -> Positionable {
-		return Layout.Limiting(target:self, minimumWidth:width, minimumHeight:height)
+		return Layout.Limiting(self, minimumWidth:width, minimumHeight:height)
 	}
 	
 	func limiting(width:Layout.NativeRange = Layout.Dimension.unlimited, height:Layout.NativeRange = Layout.Dimension.unlimited) -> Positionable {
-		return Layout.Limiting(target:self, width:width, height:height)
+		return Layout.Limiting(self, width:width, height:height)
 	}
 	
 	func useAvailableSpace() -> Positionable {
-		return Layout.Sizing(target:self, width:Layout.Dimension(minimum:0), height:Layout.Dimension(minimum:0))
+		return Layout.Sizing(self, width:Layout.Dimension(minimum:0), height:Layout.Dimension(minimum:0))
 	}
 	
 	func align(horizontal:Layout.Alignment = .center, vertical:Layout.Alignment = .center) -> Positionable {
@@ -2252,7 +2341,7 @@ extension Positionable {
 	}
 	
 	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {
-		return Layout.Aspect(target:self, ratio:ratio, position:position)
+		return Layout.Aspect(self, ratio:ratio, position:position)
 	}
 }
 

@@ -118,6 +118,11 @@ public enum CHCL {
 		}
 	}
 	
+	public struct Adjustment {
+		public let contrast:Scalar
+		public let chroma:Scalar
+	}
+	
 	/// A color in the linear RGB space reached via the CHCLT.
 	/// # Range
 	/// The range of the color components is 0 ... 1 and colors outside this range can be brought within the range using normalize
@@ -127,8 +132,21 @@ public enum CHCL {
 	/// Changing the luminance will not change the hue unless color information is lost at the extrema, but it may change the chroma value.
 	/// Changing the contrast is equivalent to changing the luminance.
 	public struct LinearRGB {
-		public static let black = DisplayRGB(.zero)
-		public static let white = DisplayRGB(.one)
+		public static let black = LinearRGB(.zero)
+		public static let white = LinearRGB(.one)
+		
+		public static let red = LinearRGB(1, 0, 0)
+		public static let orange = LinearRGB(1, 0.5, 0)
+		public static let yellow = LinearRGB(1, 1, 0)
+		public static let chartreuse = LinearRGB(0.5, 1, 0)
+		public static let green = LinearRGB(0, 1, 0)
+		public static let spring = LinearRGB(0, 1, 0.5)
+		public static let cyan = LinearRGB(0, 1, 1)
+		public static let azure = LinearRGB(0, 0.5, 1)
+		public static let blue = LinearRGB(0, 0, 1)
+		public static let violet = LinearRGB(0.5, 0, 1)
+		public static let magenta = LinearRGB(1, 0, 1)
+		public static let rose = LinearRGB(1, 0, 0.5)
 		
 		public let vector:CHCLT.Vector3
 		public var clamped:LinearRGB { return LinearRGB(simd_min(simd_max(.zero, vector), .one)) }
@@ -268,6 +286,14 @@ public enum CHCL {
 			return LinearRGB(vector / vector.max())
 		}
 		
+		public func matchLuminance(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
+			let n = 1 - value
+			let v = luminance(chclt)
+			let u = color.luminance(chclt)
+			
+			return applyLuminance(chclt, value:v * n + u * value)
+		}
+		
 		//	MARK: - Contrast
 		
 		/// True if the luminance is below the medium luminance of the color space.
@@ -355,6 +381,18 @@ public enum CHCL {
 			return applyLuminance(chclt, value:u)
 		}
 		
+		public func matchContrast(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
+			let p = chclt.contrast()
+			let m = p.mediumLuminance
+			let v = luminance(chclt)
+			let u = color.luminance(chclt)
+			let n = 1 - value
+			let c = contrast(chclt) * n + color.contrast(chclt) * value
+			let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
+			
+			return applyContrast(chclt, value:c * s)
+		}
+		
 		//	MARK: - Chroma
 		
 		/// The maximum amount that the chroma can be scaled without denormalizing the color.
@@ -427,6 +465,16 @@ public enum CHCL {
 			return interpolated(from:v, by:s)
 		}
 		
+		public func matchChroma(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
+			let c = chroma(chclt)
+			let d = color.chroma(chclt)
+			let n = 1 - value
+			
+			return applyChroma(chclt, value:c * n + d * value)
+		}
+		
+		//	MARK: - Saturation
+		
 		public func saturation(_ chclt:CHCLT) -> Scalar {
 			let v = chclt.luminance(vector)
 			let hueSaturation = vector - v
@@ -438,6 +486,14 @@ public enum CHCL {
 			let s = saturation(chclt)
 			
 			return s > 0 ? scaleChroma(chclt, by: value / s) : self
+		}
+		
+		public func matchSaturation(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
+			let s = saturation(chclt)
+			let t = color.saturation(chclt)
+			let n = 1 - value
+			
+			return applySaturation(chclt, value:s * n + t * value)
 		}
 		
 		//	MARK: - Hue
@@ -485,6 +541,21 @@ public enum CHCL {
 		/// - Returns: The adjusted color.
 		public func hueShifted(_ chclt:CHCLT, by shift:Linear) -> LinearRGB {
 			return hueShifted(chclt, by:shift, luminance:luminance(chclt))
+		}
+		
+		public func huePushed(_ chclt:CHCLT, from color:LinearRGB, minimumShift shift:Linear) -> LinearRGB {
+			guard color.chroma(chclt) > 1/32 else { return self }
+			
+			let h = hue(chclt)
+			let g = color.hue(chclt)
+			let d = h - g
+			let e = d.magnitude > 0.5 ? d < 0 ? d + 1 : d - 1 : d
+			let s = shift.magnitude.integerFraction.1
+			let t = s > 0.5 ? 1 - s : s
+			
+			guard e.magnitude < t else { return self }
+			
+			return hueShifted(chclt, by:e < 0 ? -e - t : t - e)
 		}
 		
 		public static func rotate(vector:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
