@@ -941,8 +941,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.balance-software.ChocolateUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Chocolate;
+				TEST_TARGET_NAME = "Chocolate (macOS)";
 			};
 			name = Debug;
 		};
@@ -961,8 +962,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.balance-software.ChocolateUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = Chocolate;
+				TEST_TARGET_NAME = "Chocolate (macOS)";
 			};
 			name = Release;
 		};
@@ -1073,10 +1075,11 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.balance-software.ChocolateUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Chocolate;
+				TEST_TARGET_NAME = "Chocolate (iOS)";
 			};
 			name = Debug;
 		};
@@ -1095,10 +1098,11 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.balance-software.ChocolateUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Chocolate;
+				TEST_TARGET_NAME = "Chocolate (iOS)";
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

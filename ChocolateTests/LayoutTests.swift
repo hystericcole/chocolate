@@ -11,6 +11,7 @@ import XCTest
 class TestablePositionable: Positionable, CustomStringConvertible {
 	var tag:Int
 	var intrinsicContentSize:CGSize
+	var compressionResistance:CGPoint
 	var frame:CGRect
 	
 	var isRTL:Bool
@@ -38,6 +39,7 @@ class TestablePositionable: Positionable, CustomStringConvertible {
 		self.isRTL = false
 		self.isDownPositive = true
 		self.safeAreaInsets = .zero
+		self.compressionResistance = .zero
 	}
 	
 	func positionableSize(fitting limit: Layout.Limit) -> Layout.Size {
@@ -48,7 +50,7 @@ class TestablePositionable: Positionable, CustomStringConvertible {
 		self.frame = frame
 	}
 	
-	func orderablePositionables(environment:Layout.Environment, attachable:Bool) -> [Positionable] {
+	func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
 		return [self]
 	}
 }

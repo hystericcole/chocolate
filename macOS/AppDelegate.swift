@@ -71,6 +71,13 @@ extension AppDelegate {
 		return outerMutable.image
 	}
 	
+	static func generateIconPNG(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCL.Scalar, file:URL) {
+		guard let image = generateIcon(chclt:chclt, dimension:dimension, axis:axis, value:value) else { return }
+		guard let data = NSBitmapImageRep(cgImage:image).representation(using:.png, properties:[:]) else { return }
+		
+		do { try data.write(to:file) } catch { print(error) }
+	}
+	
 	static func generateIcons() {
 		let sizes:[CGFloat] = [120, 180, 76, 152, 167, 16, 32, 64, 128, 256, 512, 1024]
 		let axisValue:[(Int, Double)] = [(1, 0.75)]
@@ -79,36 +86,33 @@ extension AppDelegate {
 		let folder = URL(fileURLWithPath:path)
 		let manager = FileManager.default
 		var isDirectory:ObjCBool = false
-		let prefix = "icon"
 		
 		if !manager.fileExists(atPath:path, isDirectory:&isDirectory) {
 			do {
 				try manager.createDirectory(at:folder, withIntermediateDirectories:false, attributes:nil)
 			} catch {
-				print("Remove App Sandbox capability from macOS target")
 				print(error)
 				return
 			}
 		} else if !isDirectory.boolValue {
+			print("File exists at " + path)
 			return
 		}
 		
 		for dimension in sizes {
-			DispatchQueue.userInitiated.async {
-				for (axis, value) in axisValue {
-					for (chclt, name) in spaceName {
-						guard let image = generateIcon(chclt:chclt, dimension:dimension, axis:axis, value:value) else { return }
-						guard let data = NSBitmapImageRep(cgImage:image).representation(using:.png, properties:[:]) else { return }
+			let dimensionName = sizes.count > 1 ? "_" + String(Int(dimension)) : ""
+			
+			for (axis, value) in axisValue {
+				let axisName = axisValue.count > 1 ? "_" + (axis < 0 ? "p" : "c") + String(axis.magnitude) : ""
+				
+				for (chclt, name) in spaceName {
+					let spaceName = spaceName.count > 1 ? "_" + name : ""
+					let fileName = "icon" + axisName + spaceName + dimensionName + ".png"
+					
+					DispatchQueue.userInitiated.async {
+						let file = folder.appendingPathComponent(fileName)
 						
-						var suffix = ""
-						
-						if axisValue.count > 1 { suffix += "_" + (axis < 0 ? "p" : "c") + String(axis.magnitude) }
-						if spaceName.count > 1 { suffix += "_" + name }
-						if sizes.count > 1 { suffix += "_" + String(Int(dimension)) }
-						
-						let file = folder.appendingPathComponent(prefix + suffix + ".png")
-						
-						do { try data.write(to:file) } catch { print(error) }
+						generateIconPNG(chclt:chclt, dimension:dimension, axis:axis, value:value, file:file)
 					}
 				}
 			}
