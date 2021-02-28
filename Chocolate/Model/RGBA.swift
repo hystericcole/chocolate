@@ -413,6 +413,37 @@ extension CHCLT.LinearRGB {
 
 //	MARK: -
 
+extension CHCLT {
+	public static func named(_ name:CFString) -> CHCLT? {
+		if name == CGColorSpace.sRGB { return CHCLT_sRGB.standard }
+		if name == CGColorSpace.genericRGBLinear { return CHCLT.sRGB_linear }
+		if name == CGColorSpace.adobeRGB1998 { return CHCLT_Pure.adobeRGB }
+		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.itur_709 { return CHCLT_BT.y709 }
+		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.itur_2020 { return CHCLT_BT.y2020 }
+		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.dcip3 { return CHCLT_Pure.dciP3 }
+		if #available(macOS 10.11.2, iOS 9.3, *), name == CGColorSpace.displayP3 { return CHCLT_sRGB.displayP3 }
+		if #available(macOS 10.12, iOS 10.0, *), name == CGColorSpace.extendedSRGB { return CHCLT_sRGB.standard }
+		if #available(macOS 10.12, iOS 10.0, *), name == CGColorSpace.linearSRGB { return CHCLT.sRGB_linear }
+		if #available(macOS 10.12, iOS 10.0, *), name == CGColorSpace.extendedLinearSRGB { return CHCLT.sRGB_linear }
+		if #available(macOS 11.0, iOS 14.0, *), name == CGColorSpace.extendedITUR_2020 { return CHCLT_BT.y2020 }
+		if #available(macOS 11.0, iOS 14.0, *), name == CGColorSpace.extendedDisplayP3 { return CHCLT_sRGB.displayP3 }
+		
+		return nil
+	}
+}
+
+//	MARK: -
+
+extension CGColorSpace {
+	public var chclt:CHCLT? {
+		guard let name = name else { return nil }
+		
+		return CHCLT.named(name)
+	}
+}
+
+//	MARK: -
+
 public struct CHCLTShading {
 	public struct ColorLocation {
 		public let color:CHCLT.LinearRGB

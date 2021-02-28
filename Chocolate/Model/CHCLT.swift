@@ -25,7 +25,7 @@ public class CHCLT {
 	}
 	
 	public func linear(_ value:Scalar) -> Linear {
-		return value * value.magnitude
+		return value
 	}
 	
 	/// Convert the components from compressed display space to linear space.
@@ -47,7 +47,7 @@ public class CHCLT {
 	/// Convert a single component from linear space to compressed display space
 	/// - Parameter scalar: The linear component
 	public func transfer(_ value:Linear) -> Scalar {
-		return value.squareRoot()
+		return value
 	}
 	
 	public func transferSigned(_ value:Linear) -> Scalar {
@@ -69,13 +69,6 @@ public class CHCLT {
 	public func inverseLuminance(_ vector:Vector3) -> Vector3 {
 		return vector / coefficients
 	}
-}
-
-//	MARK: -
-
-extension CHCLT {
-	public static let y240 = CHCLT(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_smpte240m_d65), contrast:CHCLT.Contrast(0.25))
-	public static var `default` = CHCLT_sRGB.standard
 }
 
 //	MARK: -
@@ -712,8 +705,10 @@ extension CHCLT {
 		public static let f8_d50:CHCLT.Vector3 = tristimulus(x:0.34588, y:0.35875)
 		public static let ansi65:CHCLT.Vector3 = tristimulus(x:0.313, y:0.337)
 		public static let dci:CHCLT.Vector3 = tristimulus(x:0.314, y:0.351)
+		public static let aces:CHCLT.Vector3 = tristimulus(x:0.32168, y:0.33767)
 		
 		public static let rgb_to_xyz = CHCLT.Linear.Matrix3x3([0.49, 0.17697, 0.0] / 0.17697, [0.31, 0.8124, 0.01] / 0.17697, [0.2, 0.01063, 0.99] / 0.17697)
+		public static let rgb_to_xyz_romm_d50 = rgb_to_xyz_with_chromaticities(xWhite:0.3457, yWhite:0.3585, xRed:0.7347, yRed:0.2653, xGreen:0.1596, yGreen:0.8404, xBlue:0.0366, yBlue:0.0001)
 		public static let rgb_to_xyz_smpte240m_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3291, xRed:0.630, yRed:0.340, xGreen:0.310, yGreen:0.595, xBlue:0.155, yBlue:0.070)
 		public static let rgb_to_xyz_bt601_625_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3290, xRed:0.640, yRed:0.330, xGreen:0.290, yGreen:0.600, xBlue:0.150, yBlue:0.060)
 		public static let rgb_to_xyz_bt601_525_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3290, xRed:0.630, yRed:0.340, xGreen:0.310, yGreen:0.595, xBlue:0.155, yBlue:0.070)
@@ -724,6 +719,8 @@ extension CHCLT {
 		public static let rgb_to_xyz_adobeRGB_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3290, xRed:0.640, yRed:0.330, xGreen:0.210, yGreen:0.710, xBlue:0.150, yBlue:0.060)
 		public static let rgb_to_xyz_displayP3_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3290, xRed:0.680, yRed:0.320, xGreen:0.265, yGreen:0.690, xBlue:0.150, yBlue:0.060)
 		public static let rgb_to_xyz_theaterP3_dci = rgb_to_xyz_with_chromaticities(xWhite:0.314, yWhite:0.351, xRed:0.680, yRed:0.320, xGreen:0.265, yGreen:0.690, xBlue:0.150, yBlue:0.060)
+		public static let rgb_to_xyz_aces2065 = rgb_to_xyz_with_chromaticities(xWhite:0.32168, yWhite:0.33767, xRed:0.7347, yRed:0.2653, xGreen:0.0, yGreen:1.0, xBlue:0.0001, yBlue:-0.077)
+		public static let rgb_to_xyz_acescg = rgb_to_xyz_with_chromaticities(xWhite:0.32168, yWhite:0.33767, xRed:0.713, yRed:0.293, xGreen:0.165, yGreen:0.830, xBlue:0.128, yBlue:0.044)
 		
 		public static func tristimulus(x:CHCLT.Linear, y:CHCLT.Linear) -> CHCLT.Linear.Vector3 {
 			return CHCLT.Linear.vector3(x / y, 1, (1 - x - y) / y)
@@ -810,7 +807,15 @@ extension CHCLT {
 
 //	MARK: -
 
+extension CHCLT {
+	public static var `default` = CHCLT_sRGB.standard
+	public static let sRGB_linear = CHCLT(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_sRGB_d65), contrast:CHCLT_sRGB.contrast)
+}
+
+//	MARK: -
+
 public class CHCLT_Pure: CHCLT {
+	public static let y240 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_smpte240m_d65), exponent:2)
 	public static let y601 = CHCLT_Pure(CHCLT_BT.y601.coefficients, exponent:19 / 10)
 	public static let y709 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_bt709_d65), exponent:19 / 10)
 	public static let y2020 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_bt2020_d65), exponent:19 / 10)
