@@ -1753,8 +1753,13 @@ struct Layout {
 		}
 		
 		static func sizeHorizontal(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
+			var limit = limit
 			var result:Layout.Size = .zero
 			var spaceCount = -1
+			
+			if let width = limit.width, width < Limit.unlimited {
+				limit = Layout.Limit(width:width / Native(targets.count), height:limit.height)
+			}
 			
 			switch position {
 			case .uniform, .uniformAlign, .uniformWithEnds:
@@ -1785,8 +1790,13 @@ struct Layout {
 		}
 		
 		static func sizeVertical(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
+			var limit = limit
 			var result:Layout.Size = .zero
 			var spaceCount = -1
+			
+			if let height = limit.height, height < Limit.unlimited {
+				limit = Layout.Limit(width:limit.width, height:height / Native(targets.count))
+			}
 			
 			switch position {
 			case .uniform, .uniformAlign, .uniformWithEnds:
@@ -2125,6 +2135,10 @@ struct Layout {
 						let size = target.positionableSize(fitting:limit)
 						var sum = rowSize.width
 						
+						if size.width.maximum + sum.maximum > width {
+							rowSize.height.increase(target.positionableSize(fitting:Limit(width:min(width, size.width.resolve(width)), height:limit.height)).height)
+						}
+						
 						sum.add(size.width)
 						
 						if itemCount > 0 && sum.resolve(width) > width {
@@ -2160,6 +2174,10 @@ struct Layout {
 					for target in targets {
 						let size = target.positionableSize(fitting:limit)
 						var sum = columnSize.height
+						
+						if size.height.maximum + sum.maximum > height {
+							columnSize.width.increase(target.positionableSize(fitting:Limit(width:limit.width, height:min(height, size.height.resolve(height)))).width)
+						}
 						
 						sum.add(size.height)
 						
@@ -2221,7 +2239,7 @@ struct Layout {
 						width = element.size.width
 					}
 					
-					horizontal.targets.append(element)
+					horizontal.targets.append(element.target)
 					width.add(value:horizontal.spacing)
 				}
 				
@@ -2239,7 +2257,7 @@ struct Layout {
 						height = element.size.height
 					}
 					
-					vertical.targets.append(element)
+					vertical.targets.append(element.target)
 					height.add(value:vertical.spacing)
 				}
 				

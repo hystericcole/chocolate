@@ -339,7 +339,7 @@ enum Viewable {
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting: limit) ?? model.positionableSize(fitting: limit)
+			return view?.positionableSize(fitting:limit) ?? model.positionableSize(fitting:limit)
 		}
 	}
 	

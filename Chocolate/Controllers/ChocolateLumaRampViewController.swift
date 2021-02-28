@@ -31,7 +31,6 @@ class ChocolateLumaRampViewController: BaseViewController {
 		
 		prepareLayout()
 		applyColorInput(.unknown, value:0)
-		gradient.view?.display()
 	}
 	
 	func prepareLayout() {
@@ -168,7 +167,7 @@ class ChocolateGradientView: PlatformTaggableView {
 #if os(macOS)
 	override func makeBackingLayer() -> CALayer { return ChocolateGradientLayer() }
 #else
-	override class var layerClass: AnyClass { return ChocolateLumaRampLayer.self }
+	override class var layerClass: AnyClass { return ChocolateGradientLayer.self }
 #endif
 	
 	var gradientLayer:ChocolateGradientLayer! { return layer as? ChocolateGradientLayer }
