@@ -187,7 +187,7 @@ extension PlatformImageView {
 	func prepareViewableImage(image:PlatformImage?, color:PlatformColor?) {
 		self.image = image
 		
-		if #available(OSX 10.14, *), let color = color {
+		if #available(macOS 10.14, *), let color = color {
 			contentTintColor = color
 		}
 	}
@@ -200,7 +200,7 @@ extension PlatformLabel {
 	
 	var maximumLines:Int {
 		get {
-			if #available(OSX 10.11, *) {
+			if #available(macOS 10.11, *) {
 				return maximumNumberOfLines
 			} else {
 				return usesSingleLineMode ? 1 : 0
@@ -224,7 +224,7 @@ extension PlatformLabel {
 		cell?.wraps = maximumLines == 1 ? false : true
 		lineBreakMode = maximumLines == 1 ? .byTruncatingMiddle : .byWordWrapping
 		
-		if #available(OSX 10.11, *) {
+		if #available(macOS 10.11, *) {
 			maximumNumberOfLines = maximumLines
 		}
 	}
@@ -299,11 +299,11 @@ extension PlatformSlider {
 	func prepareViewableSlider(target:AnyObject?, action:Selector?, minimumTrackColor:PlatformColor?) {
 		sliderType = .linear
 		
-		if #available(OSX 10.12.2, *), let color = minimumTrackColor {
+		if #available(macOS 10.12.2, *), let color = minimumTrackColor {
 			trackFillColor = color
 		}
 		
-		if #available(OSX 11.0, *) {
+		if #available(macOS 11.0, *) {
 			controlSize = .large
 		} else {
 			controlSize = .regular
@@ -585,7 +585,7 @@ enum Common {
 #if os(macOS)
 				let appearance:NSAppearance?
 				
-				if #available(OSX 11.0, *) {
+				if #available(macOS 11.0, *) {
 					appearance = NSAppearance.currentDrawing()
 				} else {
 					appearance = NSAppearance.current

@@ -337,6 +337,7 @@ extension CAGradientLayer {
 	}
 	
 	struct Gradient {
+		var colorSpace:CGColorSpace?
 		var colors:[CGColor]
 		var locations:[NSNumber]?
 		var start:CGPoint
@@ -378,8 +379,9 @@ extension CAGradientLayer {
 			guard !colors.isEmpty else { return nil }
 			
 			let locations = self.locations?.map { CGFloat($0.doubleValue) }
+			let space = colorSpace ?? colors.first?.colorSpace
 			
-			return CGGradient(colorsSpace:colors.first?.colorSpace, colors:colors as CFArray, locations:locations)
+			return CGGradient(colorsSpace:space, colors:colors as CFArray, locations:locations)
 		}
 		
 		func drawInContext(_ context:CGContext) {

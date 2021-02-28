@@ -23,7 +23,7 @@ extension PlatformView {
 	
 	var safeBounds:CGRect {
 #if os(macOS)
-		if #available(OSX 11.0, *) {
+		if #available(macOS 11.0, *) {
 			let insets = safeAreaInsets
 			let size = bounds.size
 			

@@ -15,6 +15,10 @@ extension BinaryFloatingPoint {
 	func interpolate(towards:Self, by:Self) -> Self { let n = 1.0 - by; return self * n + towards * by }
 }
 
+extension ClosedRange where Bound: AdditiveArithmetic {
+	var length:Bound { return upperBound - lowerBound }
+}
+
 extension DispatchQueue {
 	static var background:DispatchQueue { return global(qos:.background) }
 	static var utility:DispatchQueue { return global(qos:.utility) }

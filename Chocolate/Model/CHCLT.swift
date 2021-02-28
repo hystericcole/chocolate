@@ -266,6 +266,10 @@ extension CHCLT {
 			return LinearRGB(LinearRGB.normalize(vector:vector, luminance:luminance(chclt), leavePositive:false))
 		}
 		
+		public func isNormal() -> Bool {
+			return vector.min() >= 0.0 && vector.max() <= 1.0
+		}
+		
 		//	MARK: - Luminance
 		
 		/// The luminance of this color in the given color space
@@ -664,6 +668,29 @@ extension CHCLT {
 					
 					buffer[index] = LinearRGB(normalized / normalized.max())
 					hue += shift
+				}
+				
+				initialized = count
+			}
+		}
+		
+		public static func luminanceRamp(_ chclt:CHCLT, hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance:ClosedRange<Scalar>, count:Int) -> [LinearRGB] {
+			let v = 0.25
+			let reference = hueReference(chclt, luminance:v)
+			let hueSaturation = reference - v
+			let axis = hueAxis(chclt)
+			
+			return Array<LinearRGB>(unsafeUninitializedCapacity:count) { buffer, initialized in
+				var hue = hueStart
+				
+				for index in 0 ..< count {
+					let u = luminance.lowerBound + luminance.length * Scalar(index) / Scalar(count - 1)
+					let rotated = rotate(vector:hueSaturation, axis:axis, turns:hue)
+					let normalized = LinearRGB.normalize(vector:rotated + v, luminance:v, leavePositive:false)
+					let color = LinearRGB(normalized).applyLuminance(chclt, value:u).applyChroma(chclt, value:chroma)
+					
+					buffer[index] = color
+					hue += hueShift
 				}
 				
 				initialized = count

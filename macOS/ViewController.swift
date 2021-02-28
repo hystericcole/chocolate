@@ -31,6 +31,7 @@ class ViewController: BaseViewController {
 		view.window?.title = DisplayStrings.Chocolate.title
 		
 		let viewController = NSEvent.modifierFlags.contains(.control) ? ChocolateLayerViewController() : ChocolateViewController()
+		//let viewController = ChocolateLumaRampViewController()
 		
 		replaceChild(with:viewController)
 		applyMinimumSizeToWindow(from:viewController)
@@ -44,7 +45,7 @@ class ViewController: BaseViewController {
 		let size = viewController.view.positionableSize(fitting:Layout.Limit(size:limit))
 		var minimum = size.minimum
 		
-		if #available(OSX 11.0, *) {
+		if #available(macOS 11.0, *) {
 			let insets = view.safeAreaInsets
 			
 			minimum.width += insets.left + insets.right

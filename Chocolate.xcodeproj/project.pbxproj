@@ -34,6 +34,8 @@
 		07D28D3125C3B928008347A4 /* Style.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D2F25C3B927008347A4 /* Style.swift */; };
 		07D28D4625C3BB1D008347A4 /* Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D4525C3BB1D008347A4 /* Styles.swift */; };
 		07D28D4725C3BB1D008347A4 /* Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D4525C3BB1D008347A4 /* Styles.swift */; };
+		07F7852E25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */; };
+		07F7852F25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */; };
 		07FA9EE425C20785005C439B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9EE325C20785005C439B /* AppDelegate.swift */; };
 		07FA9EE625C20785005C439B /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9EE525C20785005C439B /* ViewController.swift */; };
 		07FA9EE825C20786005C439B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 07FA9EE725C20786005C439B /* Assets.xcassets */; };
@@ -110,6 +112,7 @@
 		07D28D2025C2A80C008347A4 /* BaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseView.swift; sourceTree = "<group>"; };
 		07D28D2F25C3B927008347A4 /* Style.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Style.swift; sourceTree = "<group>"; };
 		07D28D4525C3BB1D008347A4 /* Styles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Styles.swift; sourceTree = "<group>"; };
+		07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChocolateLumaRampViewController.swift; sourceTree = "<group>"; };
 		07FA9EE025C20785005C439B /* Chocolate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Chocolate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		07FA9EE325C20785005C439B /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		07FA9EE525C20785005C439B /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -198,6 +201,7 @@
 				07D28D1725C2620B008347A4 /* DisplayStrings.swift */,
 				07FA9F8E25C2129C005C439B /* ChocolateViewController.swift */,
 				075DEB9025C3C57C002F9B6C /* ChocolateLayer.swift */,
+				07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */,
 				07D28D4525C3BB1D008347A4 /* Styles.swift */,
 			);
 			path = Controllers;
@@ -595,6 +599,7 @@
 				07D28D4625C3BB1D008347A4 /* Styles.swift in Sources */,
 				07FA9F7C25C20A90005C439B /* ColorExtensions.swift in Sources */,
 				07D28D2125C2A80C008347A4 /* BaseView.swift in Sources */,
+				07F7852E25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */,
 				07FA9F8F25C2129C005C439B /* ChocolateViewController.swift in Sources */,
 				079FDCAE25C81685008A2DF1 /* Viewable.swift in Sources */,
 				07D28D1825C2620B008347A4 /* DisplayStrings.swift in Sources */,
@@ -624,6 +629,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				07F7852F25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */,
 				07FA9F7725C20A90005C439B /* Extensions.swift in Sources */,
 				07FA9F6925C20A25005C439B /* Common.swift in Sources */,
 				071FD44625E85A31002A69DF /* Palette.swift in Sources */,

@@ -129,6 +129,7 @@ struct Layout {
 		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.
 		/// Equivalent to fillEqually in a stackView.
 		case uniform
+		case uniformWithEnds(Native)
 		/// Fill available bounds by aligning each element within a uniform space.
 		/// Equivalent to equalCentering in a stack view, when value is 0.5.
 		case uniformAlign(Native)
@@ -153,22 +154,13 @@ struct Layout {
 			}
 		}
 		
-		var fit:Axial.Fit {
-			switch self {
-			case .stretch: return .stretch
-			case .uniform, .uniformAlign: return .uniform
-			case .distribute: return .distribute
-			default: return .position
-			}
-		}
-		
 		var alignment:Alignment {
 			switch self {
 			case .fraction(let value): return .fraction(value)
 			case .adaptiveFraction(let value): return .adaptiveFraction(value)
 			case .uniformAlign(let value): return .adaptiveFraction(value)
 			case .float: return .center
-			case .stretch, .uniform, .distribute: return .fill
+			case .stretch, .uniform, .uniformWithEnds, .distribute: return .fill
 			}
 		}
 		
@@ -965,8 +957,8 @@ struct Layout {
 			let isFloating = self.isFloating
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
-			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
-			var axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, fit:position.fit)
+			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			var axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, position:position)
 			
 			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
@@ -1068,8 +1060,8 @@ struct Layout {
 			let isFloating = self.isFloating
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
-			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
-			var axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, fit:position.fit)
+			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			var axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, position:position)
 			
 			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
@@ -1176,7 +1168,7 @@ struct Layout {
 			guard columnCount > 1 else { return singleColumn.applyPositionableFrame(box, context:context) }
 			
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
+			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
 			
 			let itemLimit = targets.count - 1
 			let rowCount = 1 + itemLimit / columnCount
@@ -1200,8 +1192,8 @@ struct Layout {
 			let isPositive = direction.isPositive(axis:.vertical, environment:context.environment)
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
 			let rowAvailable = box.size.width.native
-			let axial = Axial(rowHeights, available:available, spacing:spacing, fit:position.fit)
-			var rowAxial = Axial(columnWidths, available:rowAvailable, spacing:row.spacing, fit:row.position.fit)
+			let axial = Axial(rowHeights, available:available, spacing:spacing, position:position)
+			var rowAxial = Axial(columnWidths, available:rowAvailable, spacing:row.spacing, position:row.position)
 			let spacing = axial.space
 			let primaryRow:Int
 			
@@ -1368,7 +1360,7 @@ struct Layout {
 			guard rowCount > 1 else { return singleRow.applyPositionableFrame(box, context:context) }
 			
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			let sizes = isUniform ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
+			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
 			
 			let itemLimit = targets.count - 1
 			let columnCount = 1 + itemLimit / rowCount
@@ -1392,8 +1384,8 @@ struct Layout {
 			let isPositive = direction.isPositive(axis:.horizontal, environment:context.environment)
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
 			let columnAvailable = box.size.height.native
-			let axial = Axial(columnWidths, available:available, spacing:spacing, fit:position.fit)
-			var columnAxial = Axial(rowHeights, available:columnAvailable, spacing:column.spacing, fit:column.position.fit)
+			let axial = Axial(columnWidths, available:available, spacing:spacing, position:position)
+			var columnAxial = Axial(rowHeights, available:columnAvailable, spacing:column.spacing, position:column.position)
 			let spacing = axial.space
 			let primaryColumn:Int
 			
@@ -1591,8 +1583,6 @@ struct Layout {
 			case position
 			/// Fill available space by expanding or compressing content
 			case stretch
-			/// Fill available space by making all content a uniform size
-			case uniform
 			/// Fill available space by expanding or compressing spacing
 			case distribute
 		}
@@ -1606,20 +1596,37 @@ struct Layout {
 		/// Computed frames
 		var frames:[CGRect]
 		
-		init(_ dimensions:[Dimension], available:Native, spacing:Native, fit:Fit) {
-			self.frames = []
+		init(uniformCount:Int, available:Native, spacing:Native) {
+			let count = Native(uniformCount)
+			let spaceCount = count - 1
+			let space = spacing * spaceCount
+			let uniformSize = max(1, (available - space) / count)
 			
-			if fit == .uniform {
-				let count = Native(dimensions.count)
-				let spaceCount = count - 1
-				let space = spacing * spaceCount
-				let uniformSize = max(1, (available - space) / count)
-				
-				self.empty = 0
-				self.space = available < space + count ? max(0, (available - count) / spaceCount) : spacing
-				self.spans = Array(repeating:uniformSize, count:dimensions.count)
-				
+			self.frames = []
+			self.empty = 0
+			self.space = available < space + count ? max(0, (available - count) / spaceCount) : spacing
+			self.spans = Array(repeating:uniformSize, count:uniformCount)
+		}
+		
+		init(_ dimensions:[Dimension], available:Native, spacing:Native, position:Position) {
+			let count = dimensions.count
+			let fit:Fit
+			
+			switch position {
+			case .uniformWithEnds(let weight) where count > 2:
+				var weights = Array(repeating:1.0, count:count)
+				weights[0] = weight
+				weights[count - 1] = weight
+				self.init(weights:weights, available:available, spacing:spacing)
 				return
+			
+			case .uniform, .uniformAlign, .uniformWithEnds:
+				self.init(uniformCount:count, available:available, spacing:spacing)
+				return
+			
+			case .stretch: fit = .stretch
+			case .distribute: fit = .distribute
+			case .fraction, .adaptiveFraction, .float: fit = .position
 			}
 			
 			var minimum = 0.0, maximum = 0.0, prefer = 0.0
@@ -1638,6 +1645,14 @@ struct Layout {
 				if dimension.maximum > 0 { visibleCount += 1 }
 			}
 			
+			let aggregate = Dimension(minimum:minimum, prefer:prefer, maximum:maximum)
+			
+			self.init(dimensions, aggregate:aggregate, visibleCount:visibleCount, available:available, spacing:spacing, fit:fit)
+		}
+		
+		init(_ dimensions:[Dimension], aggregate:Dimension, visibleCount:Int, available:Native, spacing:Native, fit:Fit) {
+			self.frames = []
+			
 			guard visibleCount > 0 else {
 				self.empty = available
 				self.space = 0
@@ -1654,36 +1669,36 @@ struct Layout {
 			let space:Native
 			var spans:[Native]
 			
-			if available < minimum + aggregateSpacing {
-				if available < minimum || fit == .stretch {
+			if available < aggregate.minimum + aggregateSpacing {
+				if available < aggregate.minimum || fit == .stretch {
 					let reduceSpacing = fit == .stretch ? aggregateSpacing : 0
-					let reduction = minimum - max(0, available - reduceSpacing)
-					let denominator = minimum
+					let reduction = aggregate.minimum - max(0, available - reduceSpacing)
+					let denominator = aggregate.minimum
 					
 					empty = 0
 					space = fit == .stretch ? min(spacing, available / spaceCount) : 0
 					spans = dimensions.map { $0.minimum - $0.minimum * reduction / denominator }
 				} else {
 					empty = 0
-					space = (available - minimum) / spaceCount
+					space = (available - aggregate.minimum) / spaceCount
 					spans = dimensions.map { $0.minimum }
 				}
-			} else if available < prefer + aggregateSpacing {
-				let reduction = prefer + aggregateSpacing - available
-				let denominator = prefer - minimum
+			} else if available < aggregate.constant + aggregateSpacing {
+				let reduction = aggregate.constant + aggregateSpacing - available
+				let denominator = aggregate.constant - aggregate.minimum
 				
 				empty = 0
 				space = spacing
 				spans = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
-			} else if available < maximum + aggregateSpacing {
-				let expansion = available - prefer - aggregateSpacing
-				let denominator = maximum - prefer
+			} else if available < aggregate.maximum + aggregateSpacing {
+				let expansion = available - aggregate.constant - aggregateSpacing
+				let denominator = aggregate.maximum - aggregate.constant
 				
 				empty = 0
 				space = spacing
 				spans = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
 			} else if fit == .stretch {
-				let expansion = available - maximum - aggregateSpacing
+				let expansion = available - aggregate.maximum - aggregateSpacing
 				let denominator = count
 				
 				empty = 0
@@ -1691,11 +1706,11 @@ struct Layout {
 				spans = dimensions.map { $0.maximum + expansion / denominator }
 			} else {
 				if fit == .position {
-					empty = available - maximum - aggregateSpacing
+					empty = available - aggregate.maximum - aggregateSpacing
 					space = spacing
 				} else {
 					empty = 0
-					space = (available - maximum) / spaceCount
+					space = (available - aggregate.maximum) / spaceCount
 				}
 				
 				spans = dimensions.map { $0.maximum }
@@ -1712,12 +1727,37 @@ struct Layout {
 			self.spans = spans
 		}
 		
+		init(weights:[Native], available:Native, spacing:Native) {
+			let sum = weights.reduce(0) { $0 + ($1 > 0 ? $1 : 0) }
+			let visibleCount = weights.reduce(0) { $0 + ($1 > 0 ? 1 : 0) }
+			let count = Native(visibleCount)
+			let spaceCount = count - 1
+			let space = spacing * spaceCount
+			let content = available - space
+			let emptyWithNoSpacing = -1.0
+			
+			self.frames = []
+			self.empty = 0
+			
+			if content > count && sum > 0 {
+				self.space = spacing
+				self.spans = weights.map { $0 > 0 ? content * $0 / sum : emptyWithNoSpacing }
+			} else {
+				self.space = max(0, available - count) / spaceCount
+				self.spans = weights.map { $0 > 0 ? 1 : emptyWithNoSpacing }
+			}
+		}
+		
+		static func sizes(targets:[Positionable], fitting limit:Layout.Limit, isUnused:Bool) -> [Layout.Size] {
+			return isUnused ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
+		}
+		
 		static func sizeHorizontal(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
 			var result:Layout.Size = .zero
 			var spaceCount = -1
 			
 			switch position {
-			case .uniform, .uniformAlign:
+			case .uniform, .uniformAlign, .uniformWithEnds:
 				for target in targets {
 					let size = target.positionableSize(fitting:limit)
 					
@@ -1727,7 +1767,7 @@ struct Layout {
 				
 				spaceCount += targets.count
 				result.width.multiply(Native(targets.count))
-			default:
+			case .float, .stretch, .distribute, .fraction, .adaptiveFraction:
 				for target in targets {
 					let size = target.positionableSize(fitting:limit)
 					
@@ -1749,7 +1789,7 @@ struct Layout {
 			var spaceCount = -1
 			
 			switch position {
-			case .uniform, .uniformAlign:
+			case .uniform, .uniformAlign, .uniformWithEnds:
 				for target in targets {
 					let size = target.positionableSize(fitting: limit)
 					
@@ -1759,7 +1799,7 @@ struct Layout {
 				
 				spaceCount += targets.count
 				result.height.multiply(Native(targets.count))
-			default:
+			case .float, .stretch, .distribute, .fraction, .adaptiveFraction:
 				for target in targets {
 					let size = target.positionableSize(fitting: limit)
 					
@@ -2014,7 +2054,7 @@ struct Layout {
 	/// The flow is best suited to limited space in the direction of the axis and unlimited space in the other direction.
 	/// Each target will be affected by both the row template and column template.
 	/// Nesting a Flow in another Flow is not generally supported.
-	struct Flow: Positionable {
+	struct Flow: PositionableWithTargets {
 		/// The elements to arrange into a row of columns or a column of rows
 		var targets:[Positionable]
 		/// When axis is vertical, the row template is used to arrange columns of targets.
