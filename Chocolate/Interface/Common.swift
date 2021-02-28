@@ -258,6 +258,11 @@ extension PlatformPicker {
 //	MARK: -
 
 extension PlatformScrollingView {
+	var interfaceStyle:Common.Interface.Style {
+		get { return scrollerKnobStyle.interfaceStyle }
+		set { scrollerKnobStyle.interfaceStyle = newValue }
+	}
+	
 	var isAxisLockEnabled:Bool {
 		get { return usesPredominantAxisScrolling }
 		set { usesPredominantAxisScrolling = newValue }
@@ -276,6 +281,27 @@ extension PlatformScrollingView {
 			minMagnification = newValue.lowerBound
 			maxMagnification = newValue.upperBound
 			allowsMagnification = newValue.lowerBound < newValue.upperBound
+		}
+	}
+}
+
+//	MARK: -
+
+extension PlatformScroller.KnobStyle {
+	var interfaceStyle:Common.Interface.Style {
+		get {
+			switch self {
+			case .light: return .dark
+			case .dark: return .light
+			default: return .unspecified
+			}
+		}
+		set {
+			switch newValue {
+			case .dark: self = .light
+			case .light: self = .dark
+			case .unspecified: self = .default
+			}
 		}
 	}
 }
@@ -425,6 +451,11 @@ extension PlatformPicker {
 //	MARK: -
 
 extension PlatformScrollingView {
+	var interfaceStyle:Common.Interface.Style {
+		get { return indicatorStyle.interfaceStyle }
+		set { indicatorStyle.interfaceStyle = newValue }
+	}
+	
 	var isAxisLockEnabled:Bool {
 		get { return isDirectionalLockEnabled }
 		set { isDirectionalLockEnabled = newValue }
@@ -442,6 +473,27 @@ extension PlatformScrollingView {
 	
 	func flashScrollers() {
 		flashScrollIndicators()
+	}
+}
+
+//	MARK: -
+
+extension PlatformScrollingView.IndicatorStyle {
+	var interfaceStyle:Common.Interface.Style {
+		get {
+			switch self {
+			case .black: return .light
+			case .white: return .dark
+			default: return .unspecified
+			}
+		}
+		set {
+			switch newValue {
+			case .dark: self = .white
+			case .light: self = .black
+			case .unspecified: self = .default
+			}
+		}
 	}
 }
 

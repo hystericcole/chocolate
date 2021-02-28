@@ -54,6 +54,7 @@ class ChocolateViewController: BaseViewController {
 	var stableChroma:Bool = true
 	
 	let group = Viewable.Group(content:Layout.EmptySpace())
+	let sampleScroll = Viewable.Scroll(content:Layout.EmptySpace())
 	let foregrounds = Viewable.Group(content:Layout.EmptySpace())
 	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, attributes:Style.medium.attributes, select:0, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
@@ -196,6 +197,7 @@ class ChocolateViewController: BaseViewController {
 		
 		applyColorToCircle(color)
 		
+		sampleScroll.view?.interfaceStyle = color.linear(chocolate).isDark(chocolate) ? .light : .dark
 		group.view?.invalidateLayout()
 	}
 	
@@ -318,12 +320,13 @@ class ChocolateViewController: BaseViewController {
 			Layout.Circle(targets:colorCircles, scalar:0.875, radius:80).rounded().padding(10)
 		)
 		
-		let exampleLayout = Viewable.Scroll(content:Layout.Flow(
+		sampleScroll.minimum = CGSize(square:200)
+		sampleScroll.content = Layout.Flow(
 			targets:samples.map { $0.layout() } + [colorCircle],
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal
-		), minimum:CGSize(square:200)).ignoringSafeBounds()
+		)
 		
 		let controlsLayout = Layout.Vertical(spacing:10, alignment:.fill, position:.start,
 			colorPicker,
@@ -334,7 +337,7 @@ class ChocolateViewController: BaseViewController {
 		group.content = Layout.Vertical(spacing:8, alignment:.fill, position:.stretch,
 			Layout.EmptySpace(width:0, height:10),
 			controlsLayout.padding(horizontal:20, vertical:0),
-			exampleLayout
+			sampleScroll.ignoringSafeBounds()
 		)
 	}
 }
