@@ -30,8 +30,10 @@ class ViewController: BaseViewController {
 		
 		view.window?.title = DisplayStrings.Chocolate.title
 		
-		let viewController = NSEvent.modifierFlags.contains(.control) ? ChocolateLayerViewController() : ChocolateViewController()
-		//let viewController = ChocolateLumaRampViewController()
+		let viewController =
+			NSEvent.modifierFlags.contains(.option) ? ChocolateLumaRampViewController() :
+			NSEvent.modifierFlags.contains(.control) ? ChocolateLayerViewController() :
+			ChocolateViewController()
 		
 		replaceChild(with:viewController)
 		applyMinimumSizeToWindow(from:viewController)

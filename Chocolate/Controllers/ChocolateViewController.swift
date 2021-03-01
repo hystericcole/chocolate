@@ -26,7 +26,7 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	enum ColorSpace: Int {
-		case sRGB, sRGBpower, displayP3, g18, y601, y601power, y709, y709power, y2020, adobeRGB, theaterP3
+		case sRGB, sRGBpower, displayP3, g18, romm, y601, y601power, y709, y709power, y2020, adobeRGB, theaterP3
 		
 		var chocolate:CHCLT {
 			switch self {
@@ -34,6 +34,7 @@ class ChocolateViewController: BaseViewController {
 			case .sRGBpower: return CHCLT_Pure.sRGB
 			case .displayP3: return CHCLT_sRGB.displayP3
 			case .g18: return CHCLT_sRGB.g18
+			case .romm: return CHCLT_ROMM.standard
 			case .y601: return CHCLT_BT.y601
 			case .y601power: return CHCLT_Pure.y601
 			case .y709: return CHCLT_BT.y709
@@ -45,7 +46,7 @@ class ChocolateViewController: BaseViewController {
 		}
 		
 		static let `default` = sRGB
-		static var titles:[String] = ["sRGB", "sRGBⁿ", "apple", "G18", "y601", "y601ⁿ", "y709", "y709ⁿ", "y2020", "adobe", "dciP3"]
+		static var titles:[String] = ["sRGB", "sRGBⁿ", "apple", "G18", "romm", "y601", "y601ⁿ", "y709", "y709ⁿ", "y2020", "adobe", "dciP3"]
 	}
 	
 	var model = Model()

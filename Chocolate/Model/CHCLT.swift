@@ -339,8 +339,8 @@ extension CHCLT {
 		}
 		
 		/// The contrast of a color is a measure of the distance from medium luminance.
-		/// Both black and white have a contrast of 1.
-		/// The contrast is computed such that light and dark color pairs with contrasts that add to at least 1.0 satisfy the minimum recommended contrast.
+		/// Both black and white have a contrast of 1 and colors with medium luminance have a contrast of 0.
+		/// The contrast is computed such that liminal color pairs with contrasts that add to at least 1.0 satisfy the minimum recommended contrast.
 		/// - Parameter chclt: The color space
 		/// - Returns: The contrast
 		public func contrast(_ chclt:CHCLT) -> Linear {
@@ -368,7 +368,7 @@ extension CHCLT {
 		
 		/// Adjust the luminance to create a color that contrasts against the same colors as this color.
 		/// 
-		/// Use a value less than `contrast(chclt) - 1` for a color with the suggested minimum contrast.
+		/// Use a value less than `contrast(chclt) - 1` for a contrasting color with the suggested minimum contrast.
 		/// - Parameters:
 		///   - chclt: The color space
 		///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
@@ -397,9 +397,9 @@ extension CHCLT {
 		/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
 		/// 
 		/// A light and dark color pair with contrasts that add to at least 1.0 satisfy the minimum suggested contrast.
-		/// This method will generate the second color of that contrasting color pair.
+		/// This method will generate the second color of that liminal color pair.
 		/// A value of zero will apply the minimum suggested contrast between the colors.
-		/// Positive values are the fraction of maximum possible contrast, up to 1.0 which result in black or white and have the maximum contrast.
+		/// Positive values are the fraction of maximum possible contrast, up to 1.0 which will result in black or white and have the maximum contrast.
 		/// Negative values are a fraction of the range below the minimum suggested contrast towards medium luminance.
 		/// - Parameters:
 		///   - chclt: The color space
@@ -570,8 +570,8 @@ extension CHCLT {
 		}
 		
 		/// Rotate the color around the normal axis, changing the ratio of the components.
-		/// Shifting the hue will preserve the luminance, and changes the chroma value.
-		/// The perceptual chroma is preserved unless the color needs to be normalized after rotation.
+		/// Shifting the hue preserves the luminance, and changes the chroma value.
+		/// The saturation is preserved unless the color needs to be normalized after rotation.
 		/// - Parameters:
 		///   - chclt: The color space.
 		///   - shift: The amount to shift.  Shifting by zero or one has no effect.  Shifting by half gives the same hue as negating chroma.
@@ -708,7 +708,7 @@ extension CHCLT {
 		public static let aces:CHCLT.Vector3 = tristimulus(x:0.32168, y:0.33767)
 		
 		public static let rgb_to_xyz = CHCLT.Linear.Matrix3x3([0.49, 0.17697, 0.0] / 0.17697, [0.31, 0.8124, 0.01] / 0.17697, [0.2, 0.01063, 0.99] / 0.17697)
-		public static let rgb_to_xyz_romm_d50 = rgb_to_xyz_with_chromaticities(xWhite:0.3457, yWhite:0.3585, xRed:0.7347, yRed:0.2653, xGreen:0.1596, yGreen:0.8404, xBlue:0.0366, yBlue:0.0001)
+		public static let rgb_to_xyz_romm_d50 = rgb_to_xyz_with_chromaticities(xWhite:0.345704, yWhite:0.35854, xRed:0.734699, yRed:0.265301, xGreen:0.159597, yGreen:0.840403, xBlue:0.036598, yBlue:0.000105)
 		public static let rgb_to_xyz_smpte240m_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3291, xRed:0.630, yRed:0.340, xGreen:0.310, yGreen:0.595, xBlue:0.155, yBlue:0.070)
 		public static let rgb_to_xyz_bt601_625_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3290, xRed:0.640, yRed:0.330, xGreen:0.290, yGreen:0.600, xBlue:0.150, yBlue:0.060)
 		public static let rgb_to_xyz_bt601_525_d65 = rgb_to_xyz_with_chromaticities(xWhite:0.3127, yWhite:0.3290, xRed:0.630, yRed:0.340, xGreen:0.310, yGreen:0.595, xBlue:0.155, yBlue:0.070)
@@ -901,5 +901,33 @@ public class CHCLT_BT: CHCLT {
 	
 	public override func transfer(_ value:Linear) -> Scalar {
 		return CHCLT_BT.transfer(value)
+	}
+}
+
+//	MARK: -
+
+public class CHCLT_ROMM: CHCLT {
+	public static let standard = CHCLT_ROMM(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_romm_d50))
+	
+	public static let contrast = CHCLT.Contrast(CHCLT_ROMM.linear(0.5))
+	
+	public override init(_ coefficients:Vector3, contrast:CHCLT.Contrast = CHCLT_ROMM.contrast) {
+		super.init(coefficients, contrast:contrast)
+	}
+	
+	public static func linear(_ value:Scalar) -> Linear {
+		return value > 0x1p-5 ? pow(value, 9.0 / 5.0) : value / 16.0
+	}
+	
+	public static func transfer(_ value:Linear) -> Scalar {
+		return value > 0x1p-9 ? pow(value, 5.0 / 9.0) : value * 16.0
+	}
+	
+	public override func linear(_ value:Scalar) -> Linear {
+		return CHCLT_ROMM.linear(value)
+	}
+	
+	public override func transfer(_ value:Linear) -> Scalar {
+		return CHCLT_ROMM.transfer(value)
 	}
 }

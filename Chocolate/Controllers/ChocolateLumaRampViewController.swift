@@ -79,10 +79,6 @@ class ChocolateLumaRampViewController: BaseViewController {
 		for index in 0 ..< count {
 			colorStops[index].color = colors[index].color()?.platformColor
 		}
-		
-		let chocolate = CHCLT.default
-		let names = colors.map { $0.display(chocolate).web() }
-		print(names.joined(separator:" "))
 	}
 	
 	func applyColorInput(_ input:Input, value:Double) {
