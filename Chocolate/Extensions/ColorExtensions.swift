@@ -45,21 +45,25 @@ extension CGColor {
 	static var chocolate = CHCLT_sRGB.standard
 	
 	var displayRGB:DisplayRGB? { return DisplayRGB(self) }
+	var linearRGB:CHCLT.LinearRGB? { return CHCLT.LinearRGB(self) }
 	
+	var chocolate:CHCLT { return colorSpace?.chclt ?? CGColor.chocolate }
 	var chocolateHue:Double { return displayRGB?.vectorHue(CGColor.chocolate) ?? 0 }
 	var chocolateChroma:Double { return displayRGB?.chroma(CGColor.chocolate) ?? 0 }
 	var chocolateLuma:Double { return displayRGB?.luma(CGColor.chocolate) ?? 0 }
 	var chocolateContrast:Double { return displayRGB?.contrast(CGColor.chocolate) ?? 0 }
 	
-	func chocolateTransform(transform:(DisplayRGB?) -> DisplayRGB?) -> CGColor? { return transform(displayRGB)?.color(colorSpace:colorSpace) }
-	func chocolateHueShifted(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(CGColor.chocolate, by:value) } ?? self }
-	func chocolateHue(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(CGColor.chocolate, by:($0?.vectorHue(CGColor.chocolate) ?? 0) - value) } ?? self }
-	func chocolateScaleChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleChroma(CGColor.chocolate, by:value) } ?? self }
-	func chocolateChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyChroma(CGColor.chocolate, value:value) } ?? self }
-	func chocolateScaleLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleLuma(CGColor.chocolate, by:value) } ?? self }
-	func chocolateLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyLuma(CGColor.chocolate, value:value) } ?? self }
-	func chocolateScaleContrast(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleContrast(CGColor.chocolate, by:value) } ?? self }
-	func chocolateContrasting(_ value:Double) -> CGColor { return chocolateTransform { $0?.contrasting(CGColor.chocolate, value:value) } ?? self }
+	func chocolateTransform(transform:(CHCLT.LinearRGB?) -> CHCLT.LinearRGB?) -> CGColor? { return transform(linearRGB)?.color(colorSpace:colorSpace) }
+	func chocolateHueShifted(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(chocolate, by:value) } ?? self }
+	func chocolateHue(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(chocolate, by:($0?.hue(chocolate) ?? 0) - value) } ?? self }
+	func chocolateScaleChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleChroma(chocolate, by:value) } ?? self }
+	func chocolateChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyChroma(chocolate, value:value) } ?? self }
+	func chocolateScaleLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleLuminance(by:value) } ?? self }
+	func chocolateLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyLuminance(chocolate, value:value) } ?? self }
+	func chocolateScaleContrast(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleContrast(chocolate, by:value) } ?? self }
+	func chocolateContrasting(_ value:Double) -> CGColor { return chocolateTransform { $0?.contrasting(chocolate, value:value) } ?? self }
+	
+	func chocolateTransform(_ transform:CHCLT.Transform, chclt:CHCLT? = nil) -> CGColor? { return linearRGB?.transform(chclt ?? chocolate, transform:transform).color(colorSpace:colorSpace, alpha:alpha) }
 }
 
 extension SystemColor {
@@ -68,5 +72,9 @@ extension SystemColor {
 		let vector = color.vector
 		
 		self.init(red:CGFloat(vector.x), green:CGFloat(vector.y), blue:CGFloat(vector.z), alpha:CGFloat(vector.w))
+	}
+	
+	func chocolateTransform(_ transform:CHCLT.Transform, chclt:CHCLT? = nil) -> PlatformColor? {
+		return cgColor.chocolateTransform(transform, chclt:chclt)?.platformColor
 	}
 }

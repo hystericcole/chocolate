@@ -50,13 +50,19 @@ protocol PositionableContainer {
 
 //	MARK: -
 
-protocol PositionableWithTarget: Positionable {
+protocol PositionableNode: Positionable {
+	var positionables:[Positionable] { get }
+}
+
+//	MARK: -
+
+protocol PositionableWithTarget: PositionableNode {
 	var target:Positionable { get }
 }
 
 //	MARK: -
 
-protocol PositionableWithTargets: Positionable {
+protocol PositionableWithTargets: PositionableNode {
 	var targets:[Positionable] { get }
 }
 
@@ -866,7 +872,7 @@ struct Layout {
 	}
 	
 	/// Arrange a group of elements in a vertical stack.
-	struct Vertical: Positionable {
+	struct Vertical: PositionableWithTargets {
 		/// The elements to arrange.
 		var targets:[Positionable]
 		/// The horizontal alignment of elements.
@@ -972,7 +978,7 @@ struct Layout {
 	}
 	
 	/// Arrange a group of elements in a horizontal stack.
-	struct Horizontal: Positionable {
+	struct Horizontal: PositionableWithTargets {
 		/// The elements to arrange.
 		var targets:[Positionable]
 		/// The vertical alignment of elements.
@@ -1075,7 +1081,7 @@ struct Layout {
 	}
 	
 	/// Arrange a group of elements in vertical columns.
-	struct Columns: Positionable {
+	struct Columns: PositionableWithTargets {
 		/// The elements to arrange.
 		var targets:[Positionable]
 		/// The number of columns to create.
@@ -1271,7 +1277,7 @@ struct Layout {
 	}
 	
 	/// Arrange a group of elements in horizontal rows.
-	struct Rows: Positionable {
+	struct Rows: PositionableWithTargets {
 		/// The elements to arrange.
 		var targets:[Positionable]
 		/// The number of rows to create.
@@ -1476,7 +1482,7 @@ struct Layout {
 	/// - put a background behind an element
 	/// - put an overlay above an element
 	/// - have independent layouts share the same space
-	struct Overlay: Positionable {
+	struct Overlay: PositionableWithTargets {
 		/// The elements to arrange
 		var targets:[Positionable]
 		/// The vertical alignment.  Defaults to fill.
@@ -2274,7 +2280,7 @@ struct Layout {
 		}
 	}
 	
-	struct Circle: Positionable {
+	struct Circle: PositionableWithTargets {
 		var targets:[Positionable]
 		var radius:Native
 		var scalar:Native
@@ -2407,6 +2413,7 @@ extension Positionable {
 //	MARK: -
 
 extension PositionableWithTarget {
+	var positionables:[Positionable] { return [target] }
 	var frame:CGRect { return target.frame }
 	var compressionResistance:CGPoint { return target.compressionResistance }
 	
@@ -2426,6 +2433,7 @@ extension PositionableWithTarget {
 //	MARK: -
 
 extension PositionableWithTargets {
+	var positionables:[Positionable] { return targets }
 	var frame:CGRect { return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) } }
 	var compressionResistance:CGPoint { return .zero }
 }

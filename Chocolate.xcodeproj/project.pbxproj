@@ -9,6 +9,10 @@
 /* Begin PBXBuildFile section */
 		071FD44525E85A31002A69DF /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FD44425E85A31002A69DF /* Palette.swift */; };
 		071FD44625E85A31002A69DF /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FD44425E85A31002A69DF /* Palette.swift */; };
+		0737BC6125EE1F2600511B47 /* Destination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6025EE1F2600511B47 /* Destination.swift */; };
+		0737BC6225EE1F2600511B47 /* Destination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6025EE1F2600511B47 /* Destination.swift */; };
+		0737BC7025EE732E00511B47 /* ColorTransformable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6F25EE732E00511B47 /* ColorTransformable.swift */; };
+		0737BC7125EE732E00511B47 /* ColorTransformable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6F25EE732E00511B47 /* ColorTransformable.swift */; };
 		07589C3B25CE37D900465F9A /* StringExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07589C3A25CE37D900465F9A /* StringExtensions.swift */; };
 		07589C3C25CE37D900465F9A /* StringExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07589C3A25CE37D900465F9A /* StringExtensions.swift */; };
 		075B847725E0E6E100C2D1F6 /* VectorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 075B847625E0E6E100C2D1F6 /* VectorExtensions.swift */; };
@@ -99,6 +103,8 @@
 
 /* Begin PBXFileReference section */
 		071FD44425E85A31002A69DF /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
+		0737BC6025EE1F2600511B47 /* Destination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Destination.swift; sourceTree = "<group>"; };
+		0737BC6F25EE732E00511B47 /* ColorTransformable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTransformable.swift; sourceTree = "<group>"; };
 		07589C3A25CE37D900465F9A /* StringExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringExtensions.swift; sourceTree = "<group>"; };
 		075B847625E0E6E100C2D1F6 /* VectorExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VectorExtensions.swift; sourceTree = "<group>"; };
 		075DEB9025C3C57C002F9B6C /* ChocolateLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChocolateLayer.swift; sourceTree = "<group>"; };
@@ -355,9 +361,11 @@
 			children = (
 				07D28D2025C2A80C008347A4 /* BaseView.swift */,
 				07FA9F6725C20A25005C439B /* Common.swift */,
+				0737BC6025EE1F2600511B47 /* Destination.swift */,
 				07D28D0E25C2277A008347A4 /* Layout.swift */,
 				079FDC9325C81652008A2DF1 /* Viewable.swift */,
 				07D28D2F25C3B927008347A4 /* Style.swift */,
+				0737BC6F25EE732E00511B47 /* ColorTransformable.swift */,
 			);
 			path = Interface;
 			sourceTree = "<group>";
@@ -593,9 +601,11 @@
 				07D28D0F25C2277A008347A4 /* Layout.swift in Sources */,
 				07FA9F7625C20A90005C439B /* Extensions.swift in Sources */,
 				07FA9F7A25C20A90005C439B /* RGBA.swift in Sources */,
+				0737BC7025EE732E00511B47 /* ColorTransformable.swift in Sources */,
 				07FA9F8025C20A90005C439B /* CHCLT.swift in Sources */,
 				075DEB9125C3C57C002F9B6C /* ChocolateLayer.swift in Sources */,
 				075B847725E0E6E100C2D1F6 /* VectorExtensions.swift in Sources */,
+				0737BC6125EE1F2600511B47 /* Destination.swift in Sources */,
 				07D28D4625C3BB1D008347A4 /* Styles.swift in Sources */,
 				07FA9F7C25C20A90005C439B /* ColorExtensions.swift in Sources */,
 				07D28D2125C2A80C008347A4 /* BaseView.swift in Sources */,
@@ -637,6 +647,7 @@
 				07FA9F9025C2129C005C439B /* ChocolateViewController.swift in Sources */,
 				07D28D1025C2277A008347A4 /* Layout.swift in Sources */,
 				075DEB9225C3C57C002F9B6C /* ChocolateLayer.swift in Sources */,
+				0737BC7125EE732E00511B47 /* ColorTransformable.swift in Sources */,
 				07FA9F2625C208B0005C439B /* AppDelegate.swift in Sources */,
 				07D28D3125C3B928008347A4 /* Style.swift in Sources */,
 				07FA9F2825C208B0005C439B /* SceneDelegate.swift in Sources */,
@@ -646,6 +657,7 @@
 				07FA9F7925C20A90005C439B /* GeometryExtensions.swift in Sources */,
 				07589C3C25CE37D900465F9A /* StringExtensions.swift in Sources */,
 				07D28D4725C3BB1D008347A4 /* Styles.swift in Sources */,
+				0737BC6225EE1F2600511B47 /* Destination.swift in Sources */,
 				079FDCBD25C8CC11008A2DF1 /* CALayerExtensions.swift in Sources */,
 				07FA9F7B25C20A90005C439B /* RGBA.swift in Sources */,
 				07D28D2225C2A80C008347A4 /* BaseView.swift in Sources */,

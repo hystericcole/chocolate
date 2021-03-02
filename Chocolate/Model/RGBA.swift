@@ -314,28 +314,39 @@ extension CHCLT.LinearRGB {
 	}
 	
 	public init?(_ color:CGColor?) {
-		guard
+		if
 			#available(macOS 10.11, iOS 9.0, *),
 			let space = CHCLT.LinearRGB.colorSpace,
 			let color = color?.converted(to:space, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
 			let components = color.components
-		else { return nil }
-		
-		self.init(components[0].native, components[1].native, components[2].native)
+		{
+			self.init(components[0].native, components[1].native, components[2].native)
+		} else if
+			let color = color,
+			let chclt = color.colorSpace?.chclt,
+			let components = color.components
+		{
+			self.init(chclt.linear(CHCLT.Scalar.vector3(components[0].native, components[1].native, components[2].native)))
+		} else {
+			return nil
+		}
 	}
 	
 	public func color(colorSpace:CGColorSpace? = nil, alpha:CGFloat = 1) -> CGColor? {
 		let space:CGColorSpace
+		let rgb:CHCLT.Vector3
 		
 		if let colorSpace = colorSpace, colorSpace.model == .rgb {
+			rgb = colorSpace.chclt?.display(vector) ?? vector
 			space = colorSpace
 		} else if let linear = CHCLT.LinearRGB.colorSpace {
+			rgb = vector
 			space = linear
 		} else {
 			return nil
 		}
 		
-		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), alpha]
+		var components:[CGFloat] = [CGFloat(rgb.x), CGFloat(rgb.y), CGFloat(rgb.z), alpha]
 		
 		return CGColor(colorSpace:space, components:&components)
 	}
@@ -436,7 +447,7 @@ extension CHCLT {
 
 extension CGColorSpace {
 	public var chclt:CHCLT? {
-		guard let name = name else { return nil }
+		guard let name = name, model == .rgb else { return nil }
 		
 		return CHCLT.named(name)
 	}

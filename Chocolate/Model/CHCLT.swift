@@ -147,6 +147,41 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
+	public struct Transform {
+		public struct Effect {
+			public enum Mode { case relative, absolute }
+			
+			public let scalar:Scalar
+			public let mode:Mode
+			
+			public init(_ scalar:Scalar, mode:Mode = .absolute) {
+				self.scalar = scalar
+				self.mode = mode
+			}
+		}
+		
+		public let contrast:Effect?
+		public let hue:Effect?
+		public let chroma:Effect?
+		public let luminance:Effect?
+		
+		public init(contrast:Effect? = nil, hue:Effect? = nil, chroma:Effect? = nil, luminance:Effect? = nil) {
+			self.contrast = contrast
+			self.hue = hue
+			self.chroma = chroma
+			self.luminance = luminance
+		}
+		
+		public static func applyContrast(_ value:Scalar) -> Transform { return Transform(contrast:Effect(value, mode:.absolute)) }
+		public static func scaleContrast(_ value:Scalar) -> Transform { return Transform(contrast:Effect(value, mode:.relative)) }
+		
+		public static func applyHue(_ value:Scalar) -> Transform { return Transform(hue:Effect(value, mode:.absolute)) }
+		public static func hueShift(_ value:Scalar) -> Transform { return Transform(hue:Effect(value, mode:.relative)) }
+		
+		public static func applyChroma(_ value:Scalar) -> Transform { return Transform(chroma:Effect(value, mode:.absolute)) }
+		public static func scaleChroma(_ value:Scalar) -> Transform { return Transform(chroma:Effect(value, mode:.relative)) }
+	}
+	
 	public struct Adjustment {
 		public let contrast:Scalar
 		public let chroma:Scalar
@@ -688,6 +723,56 @@ extension CHCLT {
 				
 				initialized = count
 			}
+		}
+		
+		//	MARK: - Transform
+		
+		public func transformContrast(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
+			switch transform.mode {
+			case .relative: return scaleContrast(chclt, by:transform.scalar)
+			case .absolute: return applyContrast(chclt, value:transform.scalar)
+			}
+		}
+		
+		public func transformHue(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
+			switch transform.mode {
+			case .relative: return hueShifted(chclt, by:transform.scalar)
+			case .absolute: return hueShifted(chclt, by:transform.scalar - hue(chclt))
+			}
+		}
+		
+		public func transformChroma(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
+			switch transform.mode {
+			case .relative: return scaleChroma(chclt, by:transform.scalar)
+			case .absolute: return applyChroma(chclt, value:transform.scalar)
+			}
+		}
+		
+		public func transformLuminance(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
+			switch transform.mode {
+			case .relative: return scaleLuminance(by:transform.scalar)
+			case .absolute: return applyLuminance(chclt, value:transform.scalar)
+			}
+		}
+		
+		public func transform(_ chclt:CHCLT, transform:Transform) -> LinearRGB {
+			var result = self
+			
+			if let effect = transform.contrast {
+				result = transformContrast(chclt, transform:effect)
+			} else if let effect = transform.luminance {
+				result = transformLuminance(chclt, transform:effect)
+			}
+			
+			if let effect = transform.hue {
+				result = transformHue(chclt, transform:effect)
+			}
+			
+			if let effect = transform.chroma {
+				result = transformChroma(chclt, transform:effect)
+			}
+			
+			return result
 		}
 	}
 }
