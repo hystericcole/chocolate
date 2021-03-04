@@ -56,7 +56,9 @@ public class CHCLT {
 	
 	/// Compute the perceptual luminance of the linear components.
 	///
-	/// Usually rgb⋅c
+	/// Usually `rgb⋅c` where c is the weighting coefficients.
+	///
+	/// This is often equivalent to computing the Y value of the XYZ color space.
 	/// - Parameter vector: The linear components
 	public func luminance(_ vector:Vector3) -> Scalar {
 		return simd_dot(vector, coefficients)
@@ -181,7 +183,11 @@ extension CHCLT {
 		public static func applyChroma(_ value:Scalar) -> Transform { return Transform(chroma:Effect(value, mode:.absolute)) }
 		public static func scaleChroma(_ value:Scalar) -> Transform { return Transform(chroma:Effect(value, mode:.relative)) }
 	}
-	
+}
+
+//	MARK: -
+
+extension CHCLT {
 	public struct Adjustment {
 		public let contrast:Scalar
 		public let chroma:Scalar
@@ -191,9 +197,463 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
-	/// A color in the linear RGB space reached via the CHCLT.
+	/// Bring each component of vector within the 0 ... 1 range by desaturating
+	public static func normalize(_ vector:Linear.Vector3, luminance v:Linear, leavePositive:Bool) -> Linear.Vector3 {
+		var vector = vector
+		let negative = vector.min()
+		
+		if negative < 0 {
+			let desaturate = v / (v - negative)
+			let t = 1 - desaturate
+			
+			vector = desaturate * vector + t * v
+		}
+		
+		if leavePositive {
+			return simd_max(vector, .zero)
+		}
+		
+		let positive = vector.max()
+		
+		if positive > 1 {
+			let desaturate = (v - 1) / (v - positive)
+			let t = 1 - desaturate
+			
+			vector = desaturate * vector + t * v
+		}
+		
+		vector.clamp(lowerBound:.zero, upperBound:.one)
+		
+		return vector
+	}
+	
+	//	MARK: Luminance
+	
+	/// Create a new color with the same hue and given luminance.
+	/// Increasing the luminance to the point where the color would be denormalized will instead desaturate the color.
+	/// When the color is desaturated, the chroma value is maximized and applying the original luminance will not produce the original color.
+	/// When the color is not desaturated, the chroma value may change but the perceptual saturation is preserved.
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	///   - u: Value from 0 ... 1 to apply to color.  Zero is black, one is white.
+	/// - Returns: The adjusted color
+	public func applyLuminance(_ vector:Linear.Vector3, luminance v:Linear, apply u:Linear) -> Linear.Vector3 {
+		guard u > 0 else { return Vector3.zero }
+		guard u < 1 else { return Vector3.one }
+		guard v > 0 else { return Linear.vector3(u, u, u) }
+		
+		let n = CHCLT.normalize(vector, luminance:v, leavePositive:true)
+		let rgb = display(n)
+		let s = u / v
+		let t = transfer(s)
+		let d = rgb.max()
+		
+		guard t * d > 1 else { return n * s }
+		
+		let maximumPreservingHue = rgb / d
+		let m = linear(maximumPreservingHue)
+		let w = luminance(m)
+		let distanceFromWhite = (1 - u) / (1 - w)
+		
+		return 1 - distanceFromWhite + m * distanceFromWhite
+	}
+	
+	public func matchLuminance(_ vector:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
+		let n = 1 - value
+		let v = luminance(vector)
+		let u = luminance(color)
+		
+		return applyLuminance(vector, luminance:v, apply:v * n + u * value)
+	}
+	
+	/// Apply the maximum luminance that preserves the ratio of the components.
+	public static func illuminate(_ vector:Linear.Vector3) -> Linear.Vector3 {
+		let maximum = vector.max()
+		
+		return maximum.magnitude > 0 ? vector / maximum : .one
+	}
+	
+	//	MARK: Contrast
+	
+	/// True if luminance is below the medium luminance.
+	public func isDark(_ vector:Linear.Vector3) -> Bool {
+		return luminance(vector) < contrast.mediumLuminance
+	}
+	
+	/// The contrast of a color is a measure of the distance from medium luminance.
+	/// Both black and white have a contrast of 1 and colors with medium luminance have a contrast of 0.
+	/// The contrast is computed such that liminal color pairs with contrasts that add to at least 1.0 satisfy the minimum recommended contrast.
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	/// - Returns: The contrast of color.
+	public func contrast(_ vector:Linear.Vector3, luminance v:Linear) -> Linear {
+		let m = contrast.mediumLuminance
+		let c = v > m ? (v - m) / (1 - m) : 1 - v / m
+		
+		return pow(c.magnitude, contrast.power)
+	}
+	
+	/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
+	/// For example, scale by 0.5 to produce a color that contrasts half as much against the same background.
+	/// Scaling to 0 will result in a color with medium luminance.
+	/// Scaling to negative will result in a contrasting color.
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	///   - scalar: The scaling factor.
+	/// - Returns: The adjusted color.
+	public func scaleContrast(_ vector:Linear.Vector3, luminance v:Linear, by scalar:Scalar) -> Linear.Vector3 {
+		let m = contrast.mediumLuminance
+		let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : -1
+		let u = m + pow(scalar.magnitude, 1 / contrast.power) * (m - v) * t
+		
+		return applyLuminance(vector, luminance:v, apply:u)
+	}
+	
+	/// Adjust the luminance to create a color that contrasts against the same colors as this color.  Negative values create contrasting colors.
+	///
+	/// Use a value less than `contrast(chclt) - 1` for a contrasting color with the suggested minimum contrast.
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
+	/// - Returns: The adjusted color
+	public func applyContrast(_ vector:Linear.Vector3, luminance v:Linear, apply value:Linear) -> Linear.Vector3 {
+		let m = contrast.mediumLuminance
+		let t = pow(value.magnitude, 1 / contrast.power)
+		let u = (v < m) == (value < 0) ? (1 - m) * t + m : m * (1 - t)
+		
+		return applyLuminance(vector, luminance:v, apply:u)
+	}
+	
+	public func matchContrast(_ vector:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
+		let m = contrast.mediumLuminance
+		let v = luminance(vector)
+		let u = luminance(color)
+		let n = 1 - value
+		let c = contrast(vector, luminance:v) * n + contrast(color, luminance:u) * value
+		let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
+		
+		return applyContrast(vector, luminance:v, apply:c * s)
+	}
+	
+	/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
+	///
+	/// A light and dark color pair with contrasts that add to at least 1.0 satisfies the minimum suggested contrast.
+	/// This method will generate the second color of that liminal color pair.
+	/// A value of zero will apply the minimum suggested contrast between the colors.
+	/// Positive values are the fraction of maximum possible contrast, up to 1.0 which will result in black or white and have the maximum contrast.
+	/// Negative values are a fraction of the range below the minimum suggested contrast towards medium luminance.
+	///
+	/// - contrasting(1) == applyLuminance(-1) == black or white
+	/// - contrasting(0) == applyLuminance(contrast() - 1) == minimum suggested contrast
+	/// - contrasting(-1)== applyLuminance(0) == medium luminance
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
+	/// - Returns: The adjusted color
+	public func contrasting(_ vector:Linear.Vector3, luminance v:Linear, value:Linear) -> Linear.Vector3 {
+		let m = contrast.mediumLuminance
+		let cc = v > m ? (v - m) / (1 - m) : 1 - v / m
+		let c = pow(cc, contrast.power)
+		let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
+		let t = pow(tt, 1 / contrast.power)
+		let u = v > m ? m * (1 - t) : (1 - m) * t + m
+		
+		return applyLuminance(vector, luminance:v, apply:u)
+	}
+	
+	//	MARK: Hue
+	
+	public static func rotate(_ vector:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
+		//	use rodrigues rotation to rotate vector around normalized axis
+		let sc = __sincospi_stret(turns * 2)
+		let v1 = vector * sc.__cosval
+		let v2 = simd_cross(axis, vector) * sc.__sinval
+		let v3 = axis * simd_dot(axis, vector) * (1 - sc.__cosval)
+		let sum = v1 + v2 + v3
+		
+		return sum
+	}
+	
+	public func hueReference(luminance v:Linear) -> Linear.Vector3 {
+		return inverseLuminance(Linear.vector3(v, 0, 0))
+	}
+	
+	public func hueAxis() -> Linear.Vector3 {
+		let inverse = inverseLuminance(.one)
+		let red_cross_green = Linear.vector3(inverse.y, inverse.x, inverse.x * inverse.y - inverse.x - inverse.y)
+		
+		return simd_normalize(red_cross_green)
+	}
+	
+	/// Hue is the angle between the color and red, normalized to the 0 ... 1 range.
+	/// Reds are near 0 or 1, greens are near ⅓, and blues are near ⅔ but the actual angles vary.
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	/// - Returns: The hue
+	public func hue(_ vector:Linear.Vector3, luminance v:Linear) -> Linear {
+		let hueSaturation = vector - v
+		let hueSaturationLengthSquared = simd_length_squared(hueSaturation)
+		
+		guard hueSaturationLengthSquared > 0.0 else { return 0.0 }
+		
+		let hueSaturationUnit = hueSaturation / hueSaturationLengthSquared.squareRoot()
+		let reference = hueReference(luminance:1)
+		let referenceUnit = simd_normalize(reference - 1)
+		
+		let dot = min(max(-1.0, simd_dot(hueSaturationUnit, referenceUnit)), 1.0)
+		let turns = acos(dot) * 0.5 / .pi
+		
+		return vector.y < vector.z ? 1.0 - turns : turns
+	}
+	
+	/// Rotate the color around the normal axis, changing the ratio of the components.
+	/// Shifting the hue preserves the luminance, and changes the chroma value.
+	/// The saturation is preserved unless the color needs to be normalized after rotation.
+	/// - Parameters:
+	///   - vector: The color.
+	///   - v: The luminance of color.
+	///   - shift: The amount to shift.  Shifting by zero or one has no effect.  Shifting by half gives the same hue as negating chroma.
+	/// - Returns: The adjusted color.
+	public func hueShift(_ vector:Linear.Vector3, luminance v:Linear, by shift:Linear) -> Linear.Vector3 {
+		let hueSaturation = vector - v
+		
+		guard simd_length_squared(hueSaturation) > 0 else { return vector }
+		
+		let shifted = CHCLT.rotate(hueSaturation, axis:hueAxis(), turns:shift)
+		let normalized = CHCLT.normalize(shifted + v, luminance:v, leavePositive:false)
+		
+		return normalized
+	}
+	
+	public func huePush(_ vector:Linear.Vector3, from color:Linear.Vector3, minimumShift shift:Linear) -> Linear.Vector3 {
+		let v = luminance(vector)
+		let w = luminance(color)
+		
+		guard chroma(color, luminance:w) > 1/32 else { return vector }
+		
+		let h = hue(vector, luminance:v)
+		let g = hue(color, luminance:w)
+		let d = h - g
+		let e = d.magnitude > 0.5 ? d < 0 ? d + 1 : d - 1 : d
+		let s = shift.magnitude.integerFraction.1
+		let t = s > 0.5 ? 1 - s : s
+		
+		guard e.magnitude < t else { return vector }
+		
+		return hueShift(vector, luminance:v, by:e < 0 ? -e - t : t - e)
+	}
+	
+	public func hueRange(start:Scalar = 0, shift:Scalar, count:Int) -> [Linear.Vector3] {
+		let v = 1.0
+		let reference = hueReference(luminance:v)
+		let hueSaturation = reference - v
+		let axis = hueAxis()
+		
+		return Array<Linear.Vector3>(unsafeUninitializedCapacity:count) { buffer, initialized in
+			var hue = start
+			
+			for index in 0 ..< count {
+				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
+				let normalized = CHCLT.normalize(rotated + v, luminance:v, leavePositive:true)
+				
+				buffer[index] = normalized / normalized.max()
+				hue += shift
+			}
+			
+			initialized = count
+		}
+	}
+	
+	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance:ClosedRange<Scalar>, count:Int) -> [Linear.Vector3] {
+		let v = 0.25
+		let reference = hueReference(luminance:v)
+		let hueSaturation = reference - v
+		let axis = hueAxis()
+		
+		return Array<Linear.Vector3>(unsafeUninitializedCapacity:count) { buffer, initialized in
+			var hue = hueStart
+			
+			for index in 0 ..< count {
+				let u = luminance.lowerBound + luminance.length * Scalar(index) / Scalar(count - 1)
+				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
+				let normalized = CHCLT.normalize(rotated + v, luminance:v, leavePositive:false)
+				let luminated = applyLuminance(normalized, luminance:v, apply:u)
+				let vector = applyChroma(luminated, luminance:u, apply:chroma)
+				
+				buffer[index] = vector
+				hue += hueShift
+			}
+			
+			initialized = count
+		}
+	}
+	
+	public func pure(hue:Scalar) -> Linear.Vector3 {
+		let u = 1.0
+		let axis = hueAxis()
+		let reference = hueReference(luminance:u)
+		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
+		let normalized = CHCLT.normalize(rotated + u, luminance:u, leavePositive:true)
+		
+		return normalized / normalized.max()
+	}
+	
+	public func pure(hue:Scalar, luminance u:Linear) -> Linear.Vector3 {
+		guard u > 0 else { return .zero }
+		guard u < 1 else { return .one }
+		
+		let axis = hueAxis()
+		let reference = hueReference(luminance:u)
+		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
+		let normalized = CHCLT.normalize(rotated + u, luminance:u, leavePositive:false)
+		
+		return normalized
+	}
+	
+	//	MARK: Chroma
+	
+	/// The maximum amount that the chroma can be scaled without denormalizing the color.
+	public static func maximumChroma(_ vector:Linear.Vector3, luminance v:Linear) -> Linear {
+		guard v > 0 else { return .infinity }
+		
+		let l = vector
+		let w = 1 - v
+		let x = v - l.x
+		let y = v - l.y
+		let z = v - l.z
+		let r = x.magnitude > 0x1p-30 ? x < 0 ? w / -x : v / x : .infinity
+		let g = y.magnitude > 0x1p-30 ? y < 0 ? w / -y : v / y : .infinity
+		let b = z.magnitude > 0x1p-30 ? z < 0 ? w / -z : v / z : .infinity
+		
+		return min(r, g, b)
+	}
+	
+	/// The maximum amount that the chroma can be scaled in the negative direction without denormalizing the color.
+	public static func minimumChroma(_ vector:Linear.Vector3, luminance v:Linear) -> Linear {
+		guard v > 0 else { return -.infinity }
+		
+		let l = vector
+		let w = 1 - v
+		let x = v - l.x
+		let y = v - l.y
+		let z = v - l.z
+		let r = x.magnitude > 0x1p-30 ? x > 0 ? w / -x : v / x : -.infinity
+		let g = y.magnitude > 0x1p-30 ? y > 0 ? w / -y : v / y : -.infinity
+		let b = z.magnitude > 0x1p-30 ? z > 0 ? w / -z : v / z : -.infinity
+		
+		return max(r, g, b)
+	}
+	
+	///	A color with all components equal is desaturated and has a chroma of zero.
+	///	A color with a component at 0 or 1 cannot have the saturation increased without denormalizing the color and has a chroma of one.
+	///	The chroma of a color is the desaturation scale that would be applied to the maximum color to reach this color.
+	/// - Parameter chclt: The color space
+	/// - Returns: The croma
+	public func chroma(_ vector:Linear.Vector3, luminance v:Linear) -> Scalar {
+		let m = CHCLT.maximumChroma(vector, luminance:v)
+		let c = m.isFinite ? 1 / m : 0
+		
+		return c
+	}
+	
+	/// Scale the chroma of the color.
+	/// The color approaches gray as the value approaches zero.
+	/// Values greater than one increase vibrancy and may denormalize the color.
+	/// The hue is preserved for positive, inverted for nagative, and lost at zero.
+	/// The luminance is preserved.
+	public func scaleChroma(_ vector:Linear.Vector3, luminance v:Linear, by scalar:Scalar) -> Linear.Vector3 {
+		let t = 1 - scalar
+		
+		return vector * scalar + v * t
+	}
+	
+	/// Adjust the chroma to create a color with the given relative color intensity.
+	/// The color approaches gray as the value approaches zero.
+	/// The hue is preserved for positive, inverted for nagative, and lost at zero.
+	/// The luminance is preserved.
+	public func applyChroma(_ vector:Linear.Vector3, luminance v:Linear, apply value:Scalar) -> Linear.Vector3 {
+		let m = value < 0 ? CHCLT.minimumChroma(vector, luminance:v) : CHCLT.maximumChroma(vector, luminance:v)
+		let s = m.isFinite ? value.magnitude * m : 0
+		
+		return scaleChroma(vector, luminance:v, by:s)
+	}
+	
+	public func matchChroma(_ vector:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
+		let v = luminance(vector)
+		let w = luminance(color)
+		let c = chroma(vector, luminance:v)
+		let d = chroma(color, luminance:w)
+		let n = 1 - value
+		
+		return applyChroma(vector, luminance:v, apply:c * n + d * value)
+	}
+	
+	// MARK: Transform
+	
+	public func transformContrast(_ vector:Linear.Vector3, luminance v:Linear, transform:Transform.Effect) -> Linear.Vector3 {
+		switch transform.mode {
+		case .relative: return scaleContrast(vector, luminance:v, by:transform.scalar)
+		case .absolute: return applyContrast(vector, luminance:v, apply:transform.scalar)
+		}
+	}
+	
+	public func transformHue(_ vector:Linear.Vector3, luminance v:Linear, transform:Transform.Effect) -> Linear.Vector3 {
+		switch transform.mode {
+		case .relative: return hueShift(vector, luminance:v, by:transform.scalar)
+		case .absolute: return hueShift(vector, luminance:v, by:transform.scalar - hue(vector, luminance:v))
+		}
+	}
+	
+	public func transformChroma(_ vector:Linear.Vector3, luminance v:Linear, transform:Transform.Effect) -> Linear.Vector3 {
+		switch transform.mode {
+		case .relative: return scaleChroma(vector, luminance:v, by:transform.scalar)
+		case .absolute: return applyChroma(vector, luminance:v, apply:transform.scalar)
+		}
+	}
+	
+	public func transformLuminance(_ vector:Linear.Vector3, luminance v:Linear, transform:Transform.Effect) -> Linear.Vector3 {
+		switch transform.mode {
+		case .relative: return vector * transform.scalar
+		case .absolute: return applyLuminance(vector, luminance:v, apply:transform.scalar)
+		}
+	}
+	
+	public func transform(_ vector:Linear.Vector3, luminance v:Linear, transform:Transform) -> Linear.Vector3 {
+		var result = vector
+		var v = v
+		
+		if let effect = transform.contrast {
+			result = transformContrast(result, luminance:v, transform:effect)
+			v = luminance(result)
+		} else if let effect = transform.luminance {
+			result = transformLuminance(result, luminance:v, transform:effect)
+			v = luminance(result)
+		}
+		
+		if let effect = transform.hue {
+			result = transformHue(result, luminance:v, transform:effect)
+		}
+		
+		if let effect = transform.chroma {
+			result = transformChroma(result, luminance:v, transform:effect)
+		}
+		
+		return result
+	}
+}
+
+//	MARK: -
+
+extension CHCLT {
+	/// A color in the linear RGB space reached via CHCLT.
 	/// # Range
-	/// The range of the color components is 0 ... 1 and colors outside this range can be brought within the range using normalize
+	/// The range of the color components is 0 ... 1 and colors outside this range can be brought within the range using normalize.
 	/// # Stability
 	/// Shifting the hue will not change the luminance, and will only change the saturation if the colors becomes denormalized, but it will usually change the chroma value.
 	/// Changing the chroma will not change the luminance and will not change the hue if chroma remains positive.
@@ -224,33 +684,23 @@ extension CHCLT {
 		}
 		
 		public init(_ red:Linear, _ green:Linear, _ blue:Linear) {
-			vector = Linear.vector3(red, green, blue)
+			self.init(Linear.vector3(red, green, blue))
 		}
 		
 		public init(gray:Linear) {
-			vector = Linear.vector3(gray, gray, gray)
+			self.init(Linear.vector3(gray, gray, gray))
 		}
 		
 		public init(_ chclt:CHCLT, hue:Scalar) {
-			let u = 1.0
-			let axis = LinearRGB.hueAxis(chclt)
-			let reference = LinearRGB.hueReference(chclt, luminance:u)
-			let rotated = LinearRGB.rotate(vector:reference - u, axis:axis, turns:hue)
-			let normalized = LinearRGB.normalize(vector:rotated + u, luminance:u, leavePositive:true)
-			
-			vector = normalized / normalized.max()
+			self.init(chclt.pure(hue:hue))
 		}
 		
 		public init(_ chclt:CHCLT, hue:Scalar, luminance u:Linear) {
-			guard u > 0 else { self.init(.zero); return }
-			guard u < 1 else { self.init(.one); return }
-			
-			let axis = LinearRGB.hueAxis(chclt)
-			let reference = LinearRGB.hueReference(chclt, luminance:u)
-			let rotated = LinearRGB.rotate(vector:reference - u, axis:axis, turns:hue)
-			let normalized = LinearRGB.normalize(vector:rotated + u, luminance:u, leavePositive:false)
-			
-			self.init(normalized)
+			self.init(chclt.pure(hue:hue, luminance:u))
+		}
+		
+		public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luminance u:Linear) {
+			self.init(chclt.applyChroma(chclt.pure(hue:hue, luminance:u), luminance:u, apply:chroma))
 		}
 		
 		public func pixel() -> UInt32 {
@@ -280,272 +730,92 @@ extension CHCLT {
 			return LinearRGB(a + b)
 		}
 		
-		/// Interpolate each component from gray towards the component in this color
-		public func interpolated(from:Linear, by scalar:Scalar) -> LinearRGB {
-			let t = 1 - scalar
-			let a = from * t
-			let b = vector * scalar
-			
-			return LinearRGB(a + b)
-		}
-		
-		/// Bring each component within the 0 ... 1 range by desaturating
 		public func normalized(_ chclt:CHCLT) -> LinearRGB {
-			return LinearRGB(LinearRGB.normalize(vector:vector, luminance:luminance(chclt), leavePositive:false))
+			return LinearRGB(CHCLT.normalize(vector, luminance:luminance(chclt), leavePositive:false))
 		}
 		
 		public func isNormal() -> Bool {
 			return vector.min() >= 0.0 && vector.max() <= 1.0
 		}
 		
-		//	MARK: - Luminance
+		//	MARK: Luminance
 		
-		/// The luminance of this color in the given color space
-		/// 
-		/// Computed as the dot product of the linear components with the weighting coefficients of the color space.
-		/// This is typically equivalent to conversion to the XYZ color space, where Y is the luminance.
-		/// - Parameter chclt: The color space
-		/// - Returns: The luminance
 		public func luminance(_ chclt:CHCLT) -> Linear {
 			return chclt.luminance(vector)
 		}
 		
-		/// Apply a uniform scale to each component.  The color may become denormalized.
 		public func scaleLuminance(by scalar:Linear) -> LinearRGB {
 			return LinearRGB(vector * scalar)
 		}
 		
-		/// Create a new color with the same hue and given luminance.
-		/// Increasing the luminance to the point where it would be denormalized will instead desaturate the color, in which case decreasing the luminance to the original value will not produce the original color.
-		/// The chroma value may change while the perceptual chroma is preserved.
-		/// - Parameters:
-		///   - chclt: The color space
-		///   - u: Value from 0 ... 1 to apply.  Zero is black, one is white.
-		/// - Returns: The adjusted color
 		public func applyLuminance(_ chclt:CHCLT, value u:Linear) -> LinearRGB {
-			guard u > 0 else { return LinearRGB(.zero) }
-			guard u < 1 else { return LinearRGB(.one) }
-			
-			let v = chclt.luminance(vector)
-			
-			guard v > 0 else { return LinearRGB(gray:u) }
-			
-			let n = LinearRGB.normalize(vector:vector, luminance:v, leavePositive:true)
-			let rgb = chclt.display(n)
-			let s = u / v
-			let t = chclt.transfer(s)
-			let d = rgb.max()
-			
-			guard t * d > 1 else { return LinearRGB(n).scaleLuminance(by:s) }
-			
-			let maximumPreservingHue = rgb / d
-			let m = chclt.linear(maximumPreservingHue)
-			let w = chclt.luminance(m)
-			let distanceFromWhite = (1 - u) / (1 - w)
-			
-			return LinearRGB(1 - distanceFromWhite + m * distanceFromWhite)
+			return LinearRGB(chclt.applyLuminance(vector, luminance:chclt.luminance(vector), apply:u))
 		}
 		
-		/// The maximum luminance value that can be applied without changing the ratio of the components and desaturating the color.
+		/// Maximum luminance that may be applied without affecting ratio of components.
 		public func maximumLuminancePreservingRatio(_ chclt:CHCLT) -> Linear {
 			let d = vector.max()
 			
 			return d > 0 ? luminance(chclt) / d : 1
 		}
 		
-		/// Applies the maximum luminance that preserves the ratio of the components.
 		public func illuminated() -> LinearRGB {
-			return LinearRGB(vector / vector.max())
+			return LinearRGB(CHCLT.illuminate(vector))
 		}
 		
 		public func matchLuminance(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
-			let n = 1 - value
-			let v = luminance(chclt)
-			let u = color.luminance(chclt)
-			
-			return applyLuminance(chclt, value:v * n + u * value)
+			return LinearRGB(chclt.matchLuminance(vector, to:color.vector, by:value))
 		}
 		
-		//	MARK: - Contrast
+		//	MARK: Contrast
 		
-		/// True if the luminance is below the medium luminance of the color space.
 		public func isDark(_ chclt:CHCLT) -> Bool {
 			return luminance(chclt) < chclt.contrast.mediumLuminance
 		}
 		
-		/// The contrast of a color is a measure of the distance from medium luminance.
-		/// Both black and white have a contrast of 1 and colors with medium luminance have a contrast of 0.
-		/// The contrast is computed such that liminal color pairs with contrasts that add to at least 1.0 satisfy the minimum recommended contrast.
-		/// - Parameter chclt: The color space
-		/// - Returns: The contrast
 		public func contrast(_ chclt:CHCLT) -> Linear {
-			let p = chclt.contrast
-			let m = p.mediumLuminance
-			let v = luminance(chclt)
-			let c = v > m ? (v - m) / (1 - m) : 1 - v / m
-			
-			return pow(c.magnitude, p.power)
+			return chclt.contrast(vector, luminance:luminance(chclt))
 		}
 		
-		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
-		/// For example, scale by 0.5 to produce a color that contrasts half as much against the same background.
-		/// Scaling to 0 will result in a color with medium luminance.
-		/// Scaling to negative will result in a contrasting color.
 		public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
-			let p = chclt.contrast
-			let m = p.mediumLuminance
-			let v = luminance(chclt)
-			let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : -1
-			let u = m + pow(scalar.magnitude, 1 / p.power) * (m - v) * t
-			
-			return applyLuminance(chclt, value:u)
+			return LinearRGB(chclt.scaleContrast(vector, luminance:luminance(chclt), by:scalar))
 		}
 		
-		/// Adjust the luminance to create a color that contrasts against the same colors as this color.  Negative values create contrasting colors.
-		/// 
-		/// Use a value less than `contrast(chclt) - 1` for a contrasting color with the suggested minimum contrast.
-		/// - Parameters:
-		///   - chclt: The color space
-		///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
-		/// - Returns: The adjusted color
 		public func applyContrast(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			let p = chclt.contrast
-			let m = p.mediumLuminance
-			let v = luminance(chclt)
-			let t = pow(value.magnitude, 1 / p.power)
-			let u = (v < m) == (value < 0) ? (1 - m) * t + m : m * (1 - t)
-			
-			return applyLuminance(chclt, value:u)
+			return LinearRGB(chclt.applyContrast(vector, luminance:luminance(chclt), apply:value))
 		}
 		
-		/// Adjust the luminance to create a color that contrasts well against this color.  Negative values create colors that do not contrast with this color.
-		/// 
-		/// Use a value greater than `1 - contrast(chclt)` for a color with the suggested minimum contrast.
-		/// - Parameters:
-		///   - chclt: The color space
-		///   - value: The contrast of the adjusted color.  Values near zero contrast poorly.  Values near one contrast well.
-		/// - Returns: The adjusted color
 		public func opposing(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
 			return applyContrast(chclt, value:-value)
 		}
 		
-		/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
-		/// 
-		/// A light and dark color pair with contrasts that add to at least 1.0 satisfies the minimum suggested contrast.
-		/// This method will generate the second color of that liminal color pair.
-		/// A value of zero will apply the minimum suggested contrast between the colors.
-		/// Positive values are the fraction of maximum possible contrast, up to 1.0 which will result in black or white and have the maximum contrast.
-		/// Negative values are a fraction of the range below the minimum suggested contrast towards medium luminance.
-		/// - Parameters:
-		///   - chclt: The color space
-		///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
-		/// - Returns: The adjusted color
 		public func contrasting(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			let p = chclt.contrast
-			let m = p.mediumLuminance
-			let v = luminance(chclt)
-			let cc = v > m ? (v - m) / (1 - m) : 1 - v / m
-			let c = pow(cc, p.power)
-			let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
-			let t = pow(tt, 1 / p.power)
-			let u = v > m ? m * (1 - t) : (1 - m) * t + m
-			
-			return applyLuminance(chclt, value:u)
+			return LinearRGB(chclt.contrasting(vector, luminance:luminance(chclt), value:value))
 		}
 		
 		public func matchContrast(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
-			let p = chclt.contrast
-			let m = p.mediumLuminance
-			let v = luminance(chclt)
-			let u = color.luminance(chclt)
-			let n = 1 - value
-			let c = contrast(chclt) * n + color.contrast(chclt) * value
-			let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
-			
-			return applyContrast(chclt, value:c * s)
+			return LinearRGB(chclt.matchContrast(vector, to:color.vector, by:value))
 		}
 		
-		//	MARK: - Chroma
+		//	MARK: Chroma
 		
-		/// The maximum amount that the chroma can be scaled without denormalizing the color.
-		public func maximumChroma(luminance v:Linear) -> Linear {
-			guard v > 0 else { return .infinity }
-			
-			let l = vector
-			let w = 1 - v
-			let x = v - l.x
-			let y = v - l.y
-			let z = v - l.z
-			let r = x.magnitude > 0x1p-30 ? x < 0 ? w / -x : v / x : .infinity
-			let g = y.magnitude > 0x1p-30 ? y < 0 ? w / -y : v / y : .infinity
-			let b = z.magnitude > 0x1p-30 ? z < 0 ? w / -z : v / z : .infinity
-			
-			return min(r, g, b)
-		}
-		
-		/// The maximum amount that the chroma can be scaled in the negative direction without denormalizing the color.
-		public func minimumChroma(luminance v:Linear) -> Linear {
-			guard v > 0 else { return .infinity }
-			
-			let l = vector
-			let w = 1 - v
-			let x = v - l.x
-			let y = v - l.y
-			let z = v - l.z
-			let r = x.magnitude > 0x1p-30 ? x > 0 ? w / -x : v / x : -.infinity
-			let g = y.magnitude > 0x1p-30 ? y > 0 ? w / -y : v / y : -.infinity
-			let b = z.magnitude > 0x1p-30 ? z > 0 ? w / -z : v / z : -.infinity
-			
-			return max(r, g, b)
-		}
-		
-		///	A color with all components equal is desaturated and has a chroma of zero.
-		///	A color with a component at 0 or 1 cannot have the saturation increased without denormalizing the color and has a chroma of one.
-		///	The chroma of a color is the desaturation scale that would be applied to the maximum color to reach this color.
-		/// - Parameter chclt: The color space
-		/// - Returns: The croma
 		public func chroma(_ chclt:CHCLT) -> Scalar {
-			let v = chclt.luminance(vector)
-			let m = maximumChroma(luminance:v)
-			let c = m.isFinite ? 1 / m : 0
-			
-			return c
+			return chclt.chroma(vector, luminance:chclt.luminance(vector))
 		}
 		
-		/// Scale the chroma of the color.
-		/// The color approaches gray as the value approaches zero.
-		/// Values greater than one increase vibrancy and may denormalize the color.
-		/// The hue is preserved for positive, inverted for nagative, and lost at zero.
-		/// The luminance is preserved.
 		public func scaleChroma(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
-			let v = chclt.luminance(vector)
-			let s = scalar
-			
-			return interpolated(from:v, by:s)
+			return LinearRGB(chclt.scaleChroma(vector, luminance:luminance(chclt), by:scalar))
 		}
 		
-		/// Adjust the chroma to create a color with the given relative color intensity.
 		public func applyChroma(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
-			return applyChroma(chclt, value:value, luminance:luminance(chclt))
-		}
-		
-		public func applyChroma(_ chclt:CHCLT, value:Scalar, luminance v:Linear) -> LinearRGB {
-			let m = value < 0 ? minimumChroma(luminance:v) : maximumChroma(luminance:v)
-			let value = value.magnitude
-			let s = m.isFinite ? value * m : 0
-			
-			return interpolated(from:v, by:s)
+			return LinearRGB(chclt.applyChroma(vector, luminance:luminance(chclt), apply:value))
 		}
 		
 		public func matchChroma(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
-			let c = chroma(chclt)
-			let d = color.chroma(chclt)
-			let n = 1 - value
-			
-			return applyChroma(chclt, value:c * n + d * value)
+			return LinearRGB(chclt.matchChroma(vector, to:color.vector, by:value))
 		}
 		
-		//	MARK: - Saturation
+		//	MARK: Saturation
 		
 		public func saturation(_ chclt:CHCLT) -> Scalar {
 			let v = chclt.luminance(vector)
@@ -557,7 +827,7 @@ extension CHCLT {
 		public func applySaturation(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
 			let s = saturation(chclt)
 			
-			return s > 0 ? scaleChroma(chclt, by: value / s) : self
+			return s > 0 ? scaleChroma(chclt, by:value / s) : self
 		}
 		
 		public func matchSaturation(_ chclt:CHCLT, to color:LinearRGB, by value:Scalar) -> LinearRGB {
@@ -568,211 +838,24 @@ extension CHCLT {
 			return applySaturation(chclt, value:s * n + t * value)
 		}
 		
-		//	MARK: - Hue
+		//	MARK: Hue
 		
-		/// Hue is the angle between the color and red, normalized to the 0 ... 1 range.
-		/// Reds are near 0 or 1, greens are near ⅓, and blues are near ⅔ but the actual angles vary by color space.
-		/// - Parameter chclt: The color space
-		/// - Returns: The hue
 		public func hue(_ chclt:CHCLT) -> Linear {
-			let v = chclt.luminance(vector)
-			
-			let hueSaturation = vector - v
-			let hueSaturationLengthSquared = simd_length_squared(hueSaturation)
-			
-			guard hueSaturationLengthSquared > 0.0 else { return 0.0 }
-			
-			let hueSaturationUnit = hueSaturation / hueSaturationLengthSquared.squareRoot()
-			let reference = LinearRGB.hueReference(chclt, luminance:1)
-			let referenceUnit = simd_normalize(reference - 1)
-			
-			let dot = min(max(-1.0, simd_dot(hueSaturationUnit, referenceUnit)), 1.0)
-			let turns = acos(dot) * 0.5 / .pi
-			
-			return vector.y < vector.z ? 1.0 - turns : turns
+			return chclt.hue(vector, luminance:chclt.luminance(vector))
 		}
 		
-		/// Rotate the deluminated color vector around the normal.
-		public func hueShifted(_ chclt:CHCLT, by shift:Scalar, luminance v:Linear) -> LinearRGB {
-			let hueSaturation = vector - v
-			
-			guard simd_length_squared(hueSaturation) > 0 else { return self }
-			
-			let shifted = LinearRGB.rotate(vector:hueSaturation, axis:LinearRGB.hueAxis(chclt), turns:shift)
-			let normalized = LinearRGB.normalize(vector:shifted + v, luminance:v, leavePositive:false)
-			
-			return LinearRGB(normalized)
-		}
-		
-		/// Rotate the color around the normal axis, changing the ratio of the components.
-		/// Shifting the hue preserves the luminance, and changes the chroma value.
-		/// The saturation is preserved unless the color needs to be normalized after rotation.
-		/// - Parameters:
-		///   - chclt: The color space.
-		///   - shift: The amount to shift.  Shifting by zero or one has no effect.  Shifting by half gives the same hue as negating chroma.
-		/// - Returns: The adjusted color.
 		public func hueShifted(_ chclt:CHCLT, by shift:Linear) -> LinearRGB {
-			return hueShifted(chclt, by:shift, luminance:luminance(chclt))
+			return LinearRGB(chclt.hueShift(vector, luminance:luminance(chclt), by:shift))
 		}
 		
 		public func huePushed(_ chclt:CHCLT, from color:LinearRGB, minimumShift shift:Linear) -> LinearRGB {
-			guard color.chroma(chclt) > 1/32 else { return self }
-			
-			let h = hue(chclt)
-			let g = color.hue(chclt)
-			let d = h - g
-			let e = d.magnitude > 0.5 ? d < 0 ? d + 1 : d - 1 : d
-			let s = shift.magnitude.integerFraction.1
-			let t = s > 0.5 ? 1 - s : s
-			
-			guard e.magnitude < t else { return self }
-			
-			return hueShifted(chclt, by:e < 0 ? -e - t : t - e)
+			return LinearRGB(chclt.huePush(vector, from:color.vector, minimumShift:shift))
 		}
 		
-		public static func rotate(vector:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
-			//	use rodrigues rotation to rotate vector around normalized axis
-			let sc = __sincospi_stret(turns * 2)
-			let v1 = vector * sc.__cosval
-			let v2 = simd_cross(axis, vector) * sc.__sinval
-			let v3 = axis * simd_dot(axis, vector) * (1 - sc.__cosval)
-			let sum = v1 + v2 + v3
-			
-			return sum
-		}
-		
-		public static func normalize(vector:Linear.Vector3, luminance v:Linear, leavePositive:Bool) -> Linear.Vector3 {
-			var vector = vector
-			let negative = vector.min()
-			
-			if negative < 0 {
-				let desaturate = v / (v - negative)
-				let t = 1 - desaturate
-				
-				vector = desaturate * vector + t * v
-			}
-			
-			if leavePositive {
-				return simd_max(vector, .zero)
-			}
-			
-			let positive = vector.max()
-			
-			if positive > 1 {
-				let desaturate = (v - 1) / (v - positive)
-				let t = 1 - desaturate
-				
-				vector = desaturate * vector + t * v
-			}
-			
-			vector.clamp(lowerBound:.zero, upperBound:.one)
-			
-			return vector
-		}
-		
-		public static func hueReference(_ chclt:CHCLT, luminance v:Linear) -> Linear.Vector3 {
-			return chclt.inverseLuminance(Linear.vector3(v, 0, 0))
-		}
-		
-		public static func hueAxis(_ chclt:CHCLT) -> Linear.Vector3 {
-			let inverse = chclt.inverseLuminance(.one)
-			let red_cross_green = Linear.vector3(inverse.y, inverse.x, inverse.x * inverse.y - inverse.x - inverse.y)
-			
-			return simd_normalize(red_cross_green)
-		}
-		
-		public static func hueRange(_ chclt:CHCLT, start:Scalar = 0, shift:Scalar, count:Int) -> [LinearRGB] {
-			let v = 1.0
-			let reference = hueReference(chclt, luminance:v)
-			let hueSaturation = reference - v
-			let axis = hueAxis(chclt)
-			
-			return Array<LinearRGB>(unsafeUninitializedCapacity:count) { buffer, initialized in
-				var hue = start
-				
-				for index in 0 ..< count {
-					let rotated = rotate(vector:hueSaturation, axis:axis, turns:hue)
-					let normalized = LinearRGB.normalize(vector:rotated + v, luminance:v, leavePositive:true)
-					
-					buffer[index] = LinearRGB(normalized / normalized.max())
-					hue += shift
-				}
-				
-				initialized = count
-			}
-		}
-		
-		public static func luminanceRamp(_ chclt:CHCLT, hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance:ClosedRange<Scalar>, count:Int) -> [LinearRGB] {
-			let v = 0.25
-			let reference = hueReference(chclt, luminance:v)
-			let hueSaturation = reference - v
-			let axis = hueAxis(chclt)
-			
-			return Array<LinearRGB>(unsafeUninitializedCapacity:count) { buffer, initialized in
-				var hue = hueStart
-				
-				for index in 0 ..< count {
-					let u = luminance.lowerBound + luminance.length * Scalar(index) / Scalar(count - 1)
-					let rotated = rotate(vector:hueSaturation, axis:axis, turns:hue)
-					let normalized = LinearRGB.normalize(vector:rotated + v, luminance:v, leavePositive:false)
-					let color = LinearRGB(normalized).applyLuminance(chclt, value:u).applyChroma(chclt, value:chroma)
-					
-					buffer[index] = color
-					hue += hueShift
-				}
-				
-				initialized = count
-			}
-		}
-		
-		//	MARK: - Transform
-		
-		public func transformContrast(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
-			switch transform.mode {
-			case .relative: return scaleContrast(chclt, by:transform.scalar)
-			case .absolute: return applyContrast(chclt, value:transform.scalar)
-			}
-		}
-		
-		public func transformHue(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
-			switch transform.mode {
-			case .relative: return hueShifted(chclt, by:transform.scalar)
-			case .absolute: return hueShifted(chclt, by:transform.scalar - hue(chclt))
-			}
-		}
-		
-		public func transformChroma(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
-			switch transform.mode {
-			case .relative: return scaleChroma(chclt, by:transform.scalar)
-			case .absolute: return applyChroma(chclt, value:transform.scalar)
-			}
-		}
-		
-		public func transformLuminance(_ chclt:CHCLT, transform:Transform.Effect) -> LinearRGB {
-			switch transform.mode {
-			case .relative: return scaleLuminance(by:transform.scalar)
-			case .absolute: return applyLuminance(chclt, value:transform.scalar)
-			}
-		}
+		//	MARK: Transform
 		
 		public func transform(_ chclt:CHCLT, transform:Transform) -> LinearRGB {
-			var result = self
-			
-			if let effect = transform.contrast {
-				result = transformContrast(chclt, transform:effect)
-			} else if let effect = transform.luminance {
-				result = transformLuminance(chclt, transform:effect)
-			}
-			
-			if let effect = transform.hue {
-				result = transformHue(chclt, transform:effect)
-			}
-			
-			if let effect = transform.chroma {
-				result = transformChroma(chclt, transform:effect)
-			}
-			
-			return result
+			return LinearRGB(chclt.transform(vector, luminance:luminance(chclt), transform:transform))
 		}
 	}
 }
@@ -908,10 +991,10 @@ public class CHCLT_Pure: CHCLT {
 	public static let dciP3 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_theaterP3_dci), exponent:13 / 5)
 	public static let adobeRGB = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_adobeRGB_d65), exponent:563 / 256)
 	
-	public let linearExponent:Linear
+	public let exponent:Linear
 	
 	public init(_ coefficients:Vector3, exponent:Linear, contrast:CHCLT.Contrast) {
-		self.linearExponent = exponent
+		self.exponent = exponent
 		super.init(coefficients, contrast:contrast)
 	}
 	
@@ -920,11 +1003,11 @@ public class CHCLT_Pure: CHCLT {
 	}
 	
 	public override func linear(_ value:Scalar) -> Linear {
-		return pow(value.magnitude, linearExponent - 1.0) * value
+		return pow(value.magnitude, exponent - 1.0) * value
 	}
 	
 	public override func transfer(_ value:Linear) -> Scalar {
-		return pow(value, 1.0 / linearExponent)
+		return pow(value, 1.0 / exponent)
 	}
 }
 

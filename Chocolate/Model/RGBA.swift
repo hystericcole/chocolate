@@ -163,7 +163,7 @@ public struct DisplayRGB {
 		
 		guard v > 0 else { return DisplayRGB(gray:chclt.transfer(u), vector.w) }
 		
-		let n = CHCLT.LinearRGB.normalize(vector:l, luminance:v, leavePositive:true)
+		let n = CHCLT.normalize(l, luminance:v, leavePositive:true)
 		let rgb = chclt.display(n)
 		let s = chclt.transfer(u / v)
 		let d = rgb.max()
@@ -370,7 +370,7 @@ extension CHCLT.LinearRGB {
 				default: h = r; c = 1 - t.magnitude * 2; l = value
 				}
 				
-				let color = CHCLT.LinearRGB(chclt, hue:h, luminance:l).applyChroma(chclt, value:c, luminance:l)
+				let color = CHCLT.LinearRGB(chclt, hue:h, chroma:c, luminance:l)
 				
 				pixels[y * rowLength + x] = color.pixel()
 			}
@@ -380,7 +380,7 @@ extension CHCLT.LinearRGB {
 	static func drawPlaneFromCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCLT.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {
 		let isFlipped = (axis / 3) & 1 != 0
 		let count = isFlipped ? height : width
-		let hues = axis % 3 == 0 ? [CHCLT.LinearRGB(chclt, hue:value)] : CHCLT.LinearRGB.hueRange(chclt, start:0, shift:1 / CHCLT.Scalar(count), count:count)
+		let hues = axis % 3 == 0 ? [chclt.pure(hue:value)] : chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
 		
 		for x in 0 ..< width {
 			let a = CHCLT.Scalar(x) / CHCLT.Scalar(width - 1)
@@ -398,7 +398,7 @@ extension CHCLT.LinearRGB {
 				default: h = y; c = a; l = value
 				}
 				
-				let color = hues[h].applyLuminance(chclt, value:l).applyChroma(chclt, value:c, luminance:l)
+				let color = CHCLT.LinearRGB(hues[h]).applyLuminance(chclt, value:l).applyChroma(chclt, value:c)
 				
 				pixels[y * rowLength + x] = color.pixel()
 			}

@@ -91,14 +91,13 @@ class ChocolateLumaRampViewController: BaseViewController {
 		let lumaUpper = sliderLumaUpper.value
 		let lumaRange = min(lumaLower, lumaUpper) ... max(lumaLower, lumaUpper)
 		
-		let colors = CHCLT.LinearRGB.luminanceRamp(
-			chocolate,
+		let colors = chocolate.luminanceRamp(
 			hueStart:sliderHueStart.value,
 			hueShift:count > 1 ? rotations / (colorCount - 1) : rotations,
 			chroma:chroma,
 			luminance:lumaRange,
 			count:count
-		)
+		).map(CHCLT.LinearRGB.init)
 		
 		applyColorStops(colors)
 		

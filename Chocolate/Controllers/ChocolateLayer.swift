@@ -50,22 +50,22 @@ class ChocolateLayer: CALayer {
 				context.resetClip()
 			}
 		case 1:	//	scalar is chroma
-			let hues = CHCLT.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
 			
 			for index in 0 ..< count {
 				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
 				let stripe = CGRect(origin:origin, size:size)
 				
-				guard let gradient = colorsForChroma(primary:hues[index], chroma:scalar, drawSpace:drawSpace) else { continue }
+				guard let gradient = colorsForChroma(primary:CHCLT.LinearRGB(hues[index]), chroma:scalar, drawSpace:drawSpace) else { continue }
 				
 				context.clip(to:stripe)
 				context.drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
 				context.resetClip()
 			}
 		default:	//	scalar is luminance - colors are slightly darker than intended
-			let hues = CHCLT.LinearRGB.hueRange(chocolate, start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
 			let gray = CHCLT.LinearRGB(gray:scalar)
-			let huesWithLuminance = hues.compactMap { $0.applyLuminance(chocolate, value:scalar).color(colorSpace:colorSpace, alpha:1) }
+			let huesWithLuminance = hues.compactMap { CHCLT.LinearRGB($0).applyLuminance(chocolate, value:scalar).color(colorSpace:colorSpace, alpha:1) }
 			let desaturate = [gray.color(colorSpace:colorSpace, alpha:0)!, gray.color(colorSpace:colorSpace, alpha:1)!]
 			
 			context.clip(to:box)
