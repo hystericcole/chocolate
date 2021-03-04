@@ -390,18 +390,18 @@ extension CHCLT {
 		/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
 		/// For example, scale by 0.5 to produce a color that contrasts half as much against the same background.
 		/// Scaling to 0 will result in a color with medium luminance.
-		/// Scaling to negative will result in contrasting colors.
+		/// Scaling to negative will result in a contrasting color.
 		public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
 			let p = chclt.contrast
 			let m = p.mediumLuminance
 			let v = luminance(chclt)
-			let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : 1
-			let u = m - pow(scalar.magnitude, 1 / p.power) * (m - v) * t
+			let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : -1
+			let u = m + pow(scalar.magnitude, 1 / p.power) * (m - v) * t
 			
 			return applyLuminance(chclt, value:u)
 		}
 		
-		/// Adjust the luminance to create a color that contrasts against the same colors as this color.
+		/// Adjust the luminance to create a color that contrasts against the same colors as this color.  Negative values create contrasting colors.
 		/// 
 		/// Use a value less than `contrast(chclt) - 1` for a contrasting color with the suggested minimum contrast.
 		/// - Parameters:
@@ -418,12 +418,12 @@ extension CHCLT {
 			return applyLuminance(chclt, value:u)
 		}
 		
-		/// Adjust the luminance to create a color that contrasts well against this color.
+		/// Adjust the luminance to create a color that contrasts well against this color.  Negative values create colors that do not contrast with this color.
 		/// 
 		/// Use a value greater than `1 - contrast(chclt)` for a color with the suggested minimum contrast.
 		/// - Parameters:
 		///   - chclt: The color space
-		///   - value: The contrast of the adjusted color.  Negative values create colors that do not contrast with this color.  Values near zero contrast poorly.  Values near one contrast well.
+		///   - value: The contrast of the adjusted color.  Values near zero contrast poorly.  Values near one contrast well.
 		/// - Returns: The adjusted color
 		public func opposing(_ chclt:CHCLT, value:Scalar) -> LinearRGB {
 			return applyContrast(chclt, value:-value)
@@ -431,7 +431,7 @@ extension CHCLT {
 		
 		/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
 		/// 
-		/// A light and dark color pair with contrasts that add to at least 1.0 satisfy the minimum suggested contrast.
+		/// A light and dark color pair with contrasts that add to at least 1.0 satisfies the minimum suggested contrast.
 		/// This method will generate the second color of that liminal color pair.
 		/// A value of zero will apply the minimum suggested contrast between the colors.
 		/// Positive values are the fraction of maximum possible contrast, up to 1.0 which will result in black or white and have the maximum contrast.
