@@ -130,6 +130,14 @@ extension PlatformAutoresizing {
 
 //	MARK: -
 
+extension CGImage {
+	func pngData() -> Data? {
+		return NSBitmapImageRep(cgImage:self).representation(using:.png, properties:[:])
+	}
+}
+
+//	MARK: -
+
 extension PlatformView {
 	var alpha:CGFloat {
 		get { return alphaValue }
@@ -370,6 +378,14 @@ typealias PlatformTaggableView = PlatformView
 
 extension PlatformAutoresizing {
 	static let flexibleSize:PlatformAutoresizing = [.flexibleWidth, .flexibleHeight]
+}
+
+//	MARK: -
+
+extension CGImage {
+	func pngData() -> Data? {
+		return UIImage(cgImage:self).pngData()
+	}
 }
 
 //	MARK: -

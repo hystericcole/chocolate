@@ -460,9 +460,10 @@ extension CHCLT {
 			
 			for index in 0 ..< count {
 				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
-				let normalized = CHCLT.normalize(rotated + v, luminance:v, leavePositive:true)
+				let saturated = rotated - rotated.min()
+				let normalized = saturated / saturated.max()
 				
-				buffer[index] = normalized / normalized.max()
+				buffer[index] = normalized
 				hue += shift
 			}
 			
@@ -470,7 +471,7 @@ extension CHCLT {
 		}
 	}
 	
-	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance:ClosedRange<Scalar>, count:Int) -> [Linear.Vector3] {
+	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance range:ClosedRange<Scalar>, count:Int) -> [Linear.Vector3] {
 		let v = 0.25
 		let reference = hueReference(luminance:v)
 		let hueSaturation = reference - v
@@ -480,10 +481,11 @@ extension CHCLT {
 			var hue = hueStart
 			
 			for index in 0 ..< count {
-				let u = luminance.lowerBound + luminance.length * Scalar(index) / Scalar(count - 1)
+				let u = range.lowerBound + range.length * Scalar(index) / Scalar(count - 1)
 				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
-				let normalized = CHCLT.normalize(rotated + v, luminance:v, leavePositive:false)
-				let luminated = applyLuminance(normalized, luminance:v, apply:u)
+				let saturated = rotated - rotated.min()
+				let normalized = saturated / saturated.max()
+				let luminated = applyLuminance(normalized, luminance:luminance(normalized), apply:u)
 				let vector = applyChroma(luminated, luminance:u, apply:chroma)
 				
 				buffer[index] = vector
@@ -499,9 +501,10 @@ extension CHCLT {
 		let axis = hueAxis()
 		let reference = hueReference(luminance:u)
 		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
-		let normalized = CHCLT.normalize(rotated + u, luminance:u, leavePositive:true)
+		let saturated = rotated - rotated.min()
+		let normalized = saturated / saturated.max()
 		
-		return normalized / normalized.max()
+		return normalized
 	}
 	
 	public func pure(hue:Scalar, luminance u:Linear) -> Linear.Vector3 {
@@ -514,6 +517,10 @@ extension CHCLT {
 		let normalized = CHCLT.normalize(rotated + u, luminance:u, leavePositive:false)
 		
 		return normalized
+	}
+	
+	public func saturation(_ vector:Linear.Vector3) -> Scalar {
+		return simd_length(vector - luminance(vector))
 	}
 	
 	//	MARK: Chroma

@@ -13,6 +13,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 	func applicationDidFinishLaunching(_ aNotification: Notification) {
 		positionWindow(NSApplication.shared.mainWindow)
 		//AppDelegate.generateIcons()
+		//AppDelegate.generateGraphs()
 	}
 
 	func applicationWillTerminate(_ aNotification: Notification) {
@@ -44,6 +45,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate {
+	static func generateGraph(chclt:CHCLT, box:CGRect) -> CGImage? {
+		guard let colorSpace = CGColorSpace(name:CGColorSpace.sRGB) else { return nil }
+		guard let mutable = MutableImage(size:box.size, colorSpace:colorSpace, scale:1, opaque:true) else { return nil }
+		
+		let inner = box.insetBy(dx:2, dy:2)
+		let polar = false
+		
+		mutable.context.setFillColor(gray:1, alpha:1)
+		mutable.context.fill(box)
+		
+		if !polar {
+			mutable.context.setStrokeColor(gray:0, alpha:1)
+			mutable.context.stroke(inner)
+		}
+		
+		CHCLT.LinearRGB.drawHueGraphs(chclt, count:Int(inner.size.width), context:mutable.context, box:inner, polar:polar)
+		
+		return mutable.image
+	}
+	
+	static func generateGraphs() {
+		DispatchQueue.userInitiated.async {
+			let box = CGRect(origin:.zero, size:CGSize(square:512))
+			let chclt = CHCLT.default
+			
+			guard let image = generateGraph(chclt:chclt, box:box), let data = image.pngData() else { return }
+			
+			let pasteboard = NSPasteboard.general
+			
+			pasteboard.declareTypes([.png], owner:nil)
+			pasteboard.setData(data, forType:.png)
+		}
+	}
+	
 	static func generateIcon(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCLT.Scalar) -> CGImage? {
 		guard let colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) else { return nil }
 		
@@ -74,7 +109,7 @@ extension AppDelegate {
 	
 	static func generateIconPNG(chclt:CHCLT, dimension:CGFloat, axis:Int, value:CHCLT.Scalar, file:URL) {
 		guard let image = generateIcon(chclt:chclt, dimension:dimension, axis:axis, value:value) else { return }
-		guard let data = NSBitmapImageRep(cgImage:image).representation(using:.png, properties:[:]) else { return }
+		guard let data = image.pngData() else { return }
 		
 		do { try data.write(to:file) } catch { print(error) }
 	}

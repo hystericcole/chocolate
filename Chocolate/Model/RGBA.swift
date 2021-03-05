@@ -13,8 +13,8 @@ import simd
 public struct DisplayRGB {
 	public typealias Scalar = CHCLT.Scalar
 	
-	public static let black = DisplayRGB(Scalar.vector4(.zero, 1.0))
-	public static let white = DisplayRGB(.one)
+	public static let black = DisplayRGB(Scalar.vector4(Scalar.Vector3.zero, 1.0))
+	public static let white = DisplayRGB(Scalar.Vector4.one)
 	
 	public let vector:CHCLT.Vector4
 	public var clamped:DisplayRGB { return DisplayRGB(simd_min(simd_max(.zero, vector), .one)) }
@@ -52,22 +52,13 @@ public struct DisplayRGB {
 	}
 	
 	public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luma:Scalar, alpha:Scalar = 1) {
-		let linear = CHCLT.LinearRGB.init(chclt, hue:hue, luminance:luma).applyChroma(chclt, value:chroma)
+		let linear = CHCLT.LinearRGB(chclt, hue:hue, chroma:chroma, luminance:luma)
 		
 		vector = Scalar.vector4(chclt.display(simd_max(linear.vector, simd_double3.zero)), alpha)
 	}
 	
 	public init(hexagonal hue:Scalar, saturation:Scalar, brightness:Scalar, alpha:Scalar = 1) {
-		guard brightness > 0 && saturation > 0 else { self.init(gray:brightness, alpha); return }
-		
-		let hue1 = Scalar.vector3(hue, hue - 1.0/3.0, hue - 2.0/3.0)
-		let hue2 = hue1 - hue1.rounded(.down) - 0.5
-		let hue3 = simd_abs(hue2) * 6.0 - 1.0
-		let hue4 = simd_clamp(hue3, simd_double3.zero, simd_double3.one)
-		let c = saturation * brightness
-		let m = brightness - c
-		
-		self.init(Scalar.vector4(hue4 * c + m, alpha))
+		vector = Scalar.vector4(DisplayRGB.hexagonal(hue:hue, saturation:saturation, brightness:brightness), alpha)
 	}
 	
 	public func web(allowFormat:Int = 0) -> String {
@@ -213,6 +204,21 @@ public struct DisplayRGB {
 	
 	public func hueShifted(_ chclt:CHCLT, by shift:Scalar) -> DisplayRGB {
 		return linear(chclt).hueShifted(chclt, by:shift).display(chclt, alpha:vector.w)
+	}
+	
+	//	MARK: Hexagonal
+	
+	public static func hexagonal(hue:Scalar, saturation:Scalar, brightness:Scalar) -> Scalar.Vector3 {
+		guard brightness > 0 && saturation > 0 else { return Scalar.vector3(brightness, brightness, brightness) }
+		
+		let hue1 = Scalar.vector3(hue, hue - 1.0/3.0, hue - 2.0/3.0)
+		let hue2 = hue1 - hue1.rounded(.down) - 0.5
+		let hue3 = simd_abs(hue2) * 6.0 - 1.0
+		let hue4 = simd_clamp(hue3, simd_double3.zero, simd_double3.one)
+		let c = saturation * brightness
+		let m = brightness - c
+		
+		return hue4 * c + m
 	}
 	
 	public func hsb() -> (hue:Scalar, saturation:Scalar, brightness:Scalar) {
@@ -419,6 +425,73 @@ extension CHCLT.LinearRGB {
 		} else {
 			drawPlaneFromCubeHCL(chclt, axis:axis, value:value, pixels:pixels, width:width, height:height, rowLength:rowLength)
 		}
+	}
+	
+	static func drawHueGraphs(_ chclt:CHCLT, count:Int, context:CGContext, box:CGRect, polar:Bool) {
+		let hues = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
+		let domain = (0 ..< count).map { Double($0) / Double(count - 1) }
+		let mode:CGPathDrawingMode = polar ? .fillStroke : .stroke
+		let opacity:CGFloat = 0.25
+		
+		let red:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:hues[$0].x) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(hues[$0].x)) }
+		context.setStrokeColor(red:1, green:0, blue:0, alpha:1)
+		context.setFillColor(red:1, green:0, blue:0, alpha:opacity)
+		context.addLines(between:red)
+		context.drawPath(using:mode)
+		
+		let green:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:hues[$0].y) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(hues[$0].y)) }
+		context.setStrokeColor(red:0, green:1, blue:0, alpha:1)
+		context.setFillColor(red:0, green:1, blue:0, alpha:opacity)
+		context.addLines(between:green)
+		context.drawPath(using:mode)
+		
+		let blue:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:hues[$0].z) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(hues[$0].z)) }
+		context.setStrokeColor(red:0, green:0, blue:1, alpha:1)
+		context.setFillColor(red:0, green:0, blue:1, alpha:opacity)
+		context.addLines(between:blue)
+		context.drawPath(using:mode)
+		
+		let luminances = hues.map { chclt.luminance($0) }
+		let luminance:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:luminances[$0]) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(luminances[$0])) }
+		context.setStrokeColor(red:0, green:0, blue:0, alpha:1)
+		context.setFillColor(red:0, green:0, blue:0, alpha:opacity)
+		context.addLines(between:luminance)
+		context.drawPath(using:mode)
+		
+		let chromas = hues.map { chclt.chroma($0, luminance:chclt.luminance($0)) }
+		let chroma:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:chromas[$0]) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(chromas[$0])) }
+		context.setStrokeColor(red:0.5, green:0.0, blue:0.5, alpha:1)
+		context.setFillColor(red:0.5, green:0.0, blue:0.5, alpha:opacity)
+		context.addLines(between:chroma)
+		context.drawPath(using:.stroke)
+		
+		let saturations = hues.map { chclt.saturation($0) }
+		let saturation:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:saturations[$0]) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(saturations[$0])) }
+		context.setStrokeColor(red:0.0, green:0.5, blue:0.5, alpha:1)
+		context.setFillColor(red:0.0, green:0.5, blue:0.5, alpha:opacity)
+		context.addLines(between:saturation)
+		context.drawPath(using:.stroke)
+		
+		let minimums = hues.map { chclt.applyLuminance($0, luminance:chclt.luminance($0), apply:0.5).min() }
+		let minimum:[CGPoint] = polar
+			? (0 ..< count).map { box.polar(turns:domain[$0], radius:minimums[$0]) }
+			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(minimums[$0])) }
+		context.setStrokeColor(red:0.5, green:0.0, blue:0.5, alpha:1)
+		context.setFillColor(red:0.5, green:0.0, blue:0.5, alpha:opacity)
+		context.addLines(between:minimum)
+		context.drawPath(using:.stroke)
 	}
 }
 
