@@ -10,10 +10,21 @@ import QuartzCore
 import Foundation
 
 class ChocolateLayer: CALayer {
+	enum ColorModel: Int {
+		case chclt, rgb, hsb
+	}
+	
+	struct Mode {
+		static let standard = Mode(model:.chclt, axis:0)
+		
+		var model:ColorModel
+		var axis:Int
+	}
+	
 	var chocolate:CHCLT = CHCLT.default
 	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
 	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
-	var axis = 0
+	var mode = Mode.standard { didSet { setNeedsDisplay() } }
 	
 	func colorsForChroma(primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
 		let color = primary.applyChroma(chocolate, value:chroma)
@@ -84,6 +95,15 @@ class ChocolateLayer: CALayer {
 		}
 	}
 	
+	func drawHSB(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCLT.Linear) {
+		let colorSpace = CGColorSpace(name:CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+		let drawSpace = CGColorSpace(name:CGColorSpace.sRGB) ?? colorSpace
+		
+		context.clip(to:box)
+		context.drawPlaneFromCubeHSB(box:box, axis:axis, scalar:CGFloat(scalar), colorSpace:colorSpace, drawSpace:drawSpace)
+		context.resetClip()
+	}
+	
 	func drawRGB(_ context:CGContext, box:CGRect, axis:Int, scalar:CHCLT.Linear) {
 		let colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
 		let drawSpace = CGColorSpace(name:CGColorSpace.sRGB) ?? colorSpace
@@ -96,7 +116,11 @@ class ChocolateLayer: CALayer {
 	override func draw(in ctx: CGContext) {
 		let box = CGRect(origin:.zero, size:bounds.size)
 		
-		drawCHCLT(ctx, box:box, axis:axis, scalar:scalar)
+		switch mode.model {
+		case .chclt: drawCHCLT(ctx, box:box, axis:mode.axis, scalar:scalar)
+		case .rgb: drawRGB(ctx, box:box, axis:mode.axis, scalar:scalar)
+		case .hsb: drawHSB(ctx, box:box, axis:mode.axis, scalar:scalar)
+		}
 	}
 	
 	override func render(in ctx: CGContext) {
@@ -120,7 +144,7 @@ class ChocolateLayerView: BaseView {
 	
 	var chocolateLayer:ChocolateLayer? { return layer as? ChocolateLayer }
 	
-	var axis:Int { get { return chocolateLayer?.axis ?? 0 } set { chocolateLayer?.axis = newValue; refresh() } }
+	var mode:ChocolateLayer.Mode { get { return chocolateLayer?.mode ?? .standard } set { chocolateLayer?.mode = newValue; refresh() } }
 	var scalar:CHCLT.Scalar { get { return chocolateLayer?.scalar ?? 0 } set { chocolateLayer?.scalar = newValue } }
 	
 	override func prepare() { super.prepare(); refresh() }
@@ -209,10 +233,22 @@ class ChocolateImageView: PlatformImageView {
 //	MARK: -
 
 class ChocolateLayerViewController: BaseViewController {
+	enum Axis: Int {
+		case chclt_h, chclt_c, chclt_l, rgb_r, rgb_g, rgb_b, hsb_h, hsb_s, hsb_b
+		
+		var mode:ChocolateLayer.Mode {
+			return ChocolateLayer.Mode(model:ChocolateLayer.ColorModel(rawValue:rawValue / 3) ?? .chclt, axis:rawValue % 3)
+		}
+		
+		static var titles:[String] = ["CHCLT Hue", "CHCLT Chroma", "CHCLT Luma", "RGB Red", "RGB Green", "RGB Blue", "HSB Hue", "HSB Saturation", "HSB Brightness"]
+	}
+	
 	let chocolate = ChocolateLayerView()
 	let slider = Viewable.Slider(value:0.5, action:#selector(sliderChanged))
 	let toggle = Viewable.Switch(action:#selector(switchFlipped))
+	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
 	let group = Viewable.Group(content:Layout.EmptySpace())
+	let axis:Axis = .chclt_l
 	
 	override func loadView() {
 		slider.value = chocolate.scalar
@@ -224,7 +260,7 @@ class ChocolateLayerViewController: BaseViewController {
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		
-		switchFlipped()
+		axisChanged()
 	}
 	
 	@objc
@@ -234,14 +270,24 @@ class ChocolateLayerViewController: BaseViewController {
 	
 	@objc
 	func switchFlipped() {
-		chocolate.axis = toggle.isOn ? 1 : 2
+		chocolate.mode.axis = toggle.isOn ? 1 : 2
+	}
+	
+	@objc
+	func axisChanged() {
+		chocolate.mode = Axis(rawValue:picker.select)?.mode ?? .standard
 	}
 	
 	func layout() -> Positionable {
 		return Layout.Vertical(alignment:.fill, position:.stretch,
-			Layout.Horizontal(targets: [slider, toggle], spacing:20, position:.center).padding(20),
+			Layout.Horizontal(
+				spacing:20,
+				position:.stretch,
+				slider.minimum(width:200),
+				picker.fixed(width:160).limiting(height:30 ... 80)
+			).padding(horizontal:20, vertical:10),
 			//Viewable.Color(color:.black).fixed(height:3),
-			chocolate
+			chocolate.ignoringSafeBounds()
 		)
 	}
 }
@@ -249,6 +295,49 @@ class ChocolateLayerViewController: BaseViewController {
 //	MARK: -
 
 extension CGContext {
+	func drawPlaneFromCubeHSB(box:CGRect, axis:Int, scalar:CGFloat, colorSpace:CGColorSpace, drawSpace:CGColorSpace) {
+		let overColors:[CGColor]
+		let downColors:[CGColor]
+		let mode:CGBlendMode
+		let count:Int = 360
+		
+		switch axis % 3 {
+		case 0:
+			let gray = DisplayRGB(hexagonal:scalar.native, saturation:0, brightness:1)
+			let color = DisplayRGB(hexagonal:scalar.native, saturation:1, brightness:1)
+			
+			overColors = [gray, color].compactMap { $0.color(colorSpace:colorSpace) }
+			downColors = [DisplayRGB.white, DisplayRGB.black].compactMap { $0.color(colorSpace:colorSpace) }
+			mode = .multiply
+		case 1:
+			overColors = (0 ..< count).compactMap { DisplayRGB(hexagonal:Double($0) / Double(count - 1), saturation:scalar.native, brightness:1).color(colorSpace:colorSpace) }
+			downColors = [DisplayRGB.white, DisplayRGB.black].compactMap { $0.color(colorSpace:colorSpace) }
+			mode = .multiply
+		default:
+			let gray = DisplayRGB(hexagonal:0, saturation:0, brightness:scalar.native, alpha:1)
+			let clear = DisplayRGB(hexagonal:0, saturation:0, brightness:scalar.native, alpha:0)
+			
+			overColors = (0 ..< count).compactMap { DisplayRGB(hexagonal:Double($0) / Double(count - 1), saturation:1, brightness:scalar.native).color(colorSpace:colorSpace) }
+			downColors = [clear, gray].compactMap { $0.color(colorSpace:colorSpace) }
+			mode = .normal
+		}
+		
+		let start = box.origin
+		let overEnd = CGPoint(x:box.maxX, y:box.minY)
+		let downEnd = CGPoint(x:box.minX, y:box.maxY)
+		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		
+		if let gradient = CGGradient(colorsSpace:drawSpace, colors:overColors as CFArray, locations:nil) {
+			setBlendMode(.copy)
+			drawLinearGradient(gradient, start:start, end:overEnd, options:options)
+		}
+		
+		if let gradient = CGGradient(colorsSpace:drawSpace, colors:downColors as CFArray, locations:nil) {
+			setBlendMode(mode)
+			drawLinearGradient(gradient, start:start, end:downEnd, options:options)
+		}
+	}
+	
 	func drawPlaneFromCubeRGB(box:CGRect, axis:Int, scalar:CGFloat, colorSpace:CGColorSpace, drawSpace:CGColorSpace) {
 		let s = CGFloat(scalar)
 		var c0:[CGFloat] = [0, 0, 0, 1]
