@@ -1233,8 +1233,8 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 	}
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize: NSSize) {
-		super.resizeSubviews(withOldSize:oldSize)
+	override func layout() {
+		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #else
@@ -1276,8 +1276,8 @@ class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
 	}
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize: NSSize) {
-		super.resizeSubviews(withOldSize:oldSize)
+	override func layout() {
+		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #else
@@ -1423,8 +1423,8 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 	func invalidateLayout() { priorSize = .zero }
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize: NSSize) {
-		super.resizeSubviews(withOldSize:oldSize)
+	override func layout() {
+		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #else
@@ -1667,8 +1667,8 @@ class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
 	}
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize:NSSize) {
-		super.resizeSubviews(withOldSize:oldSize)
+	override func layout() {
+		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
 #else

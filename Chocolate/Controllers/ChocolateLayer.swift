@@ -294,7 +294,7 @@ class ChocolateLayerViewController: BaseViewController {
 				picker.fixed(width:160).limiting(height:30 ... 80)
 			).padding(horizontal:20, vertical:10),
 			//Viewable.Color(color:.black).fixed(height:3),
-			chocolate.ignoringSafeBounds()
+			chocolate.ignoringSafeBounds(!isUnderTabBar)
 		)
 	}
 }

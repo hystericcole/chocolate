@@ -8,65 +8,47 @@
 
 import Cocoa
 
-class ViewController: BaseViewController {
-	override var representedObject: Any? {
-		didSet {
-		}
-	}
+class ViewController: BaseTabController {
+	var prefersWindowTabs = true
 	
 	override func prepare() {
 		super.prepare()
 		
 		title = DisplayStrings.Chocolate.title
-		//preferredContentSize = CGSize(width:400, height:800)
-	}
-	
-	override func loadView() {
-		view = PlatformView()
+		viewControllers = [ChocolateViewController(), ChocolateLayerViewController(), ChocolateLumaRampViewController()]
 	}
 	
 	override func viewWillAppear() {
 		super.viewWillAppear()
 		
-		let viewController:BaseViewController
+		applyMinimumSizeToWindow()
+		view.window?.title = DisplayStrings.Chocolate.title
 		
-		if #available(OSX 10.12, *), let window = view.window {
-			for tab in [ChocolateLumaRampViewController(), ChocolateLayerViewController()] {
-				window.addTabbedWindow(NSWindow(contentViewController:tab), ordered:.above)
+		if #available(OSX 10.12, *), prefersWindowTabs, let window = view.window {
+			let controllers = viewControllers
+			
+			for controller in controllers.dropFirst().reversed() {
+				window.addTabbedWindow(NSWindow(contentViewController:controller), ordered:.above)
 			}
 			
-			viewController = ChocolateViewController()
-		} else {
-			viewController =
-				NSEvent.modifierFlags.contains(.control) ? ChocolateLumaRampViewController() :
-				NSEvent.modifierFlags.contains(.option) ? ChocolateLayerViewController() :
-				ChocolateViewController()
+			window.contentViewController = controllers[0]
 		}
-		
-		replaceChild(with:viewController)
-		applyMinimumSizeToWindow(from:viewController)
-		
-		title = viewController.title
-		view.window?.title = DisplayStrings.Chocolate.title
 	}
 	
-	func applyMinimumSizeToWindow(from viewController:BaseViewController) {
+	func applyMinimumSizeToWindow() {
 		guard let window = view.window else { return }
 		
 		let screen = window.screen ?? NSScreen.main
 		let limit = screen?.visibleFrame.size ?? CGSize(square:640)
-		let size = viewController.view.positionableSize(fitting:Layout.Limit(size:limit))
-		var minimum = size.minimum
+		var minimum = CGSize(width:240, height:360)
 		
-		if #available(macOS 11.0, *) {
-			let insets = view.safeAreaInsets
+		for controller in viewControllers {
+			let size = controller.view.positionableSize(fitting:Layout.Limit(size:limit))
+			let require = size.minimum
 			
-			minimum.width += insets.left + insets.right
-			minimum.height += insets.top + insets.bottom
+			minimum.width = min(max(minimum.width, ceil(require.width)), limit.width)
+			minimum.height = min(max(minimum.height, ceil(require.height)), limit.height)
 		}
-		
-		minimum.width = min(max(240, ceil(minimum.width)), limit.width)
-		minimum.height = min(max(360, ceil(minimum.height)), limit.height)
 		
 		window.contentMinSize = minimum
 	}

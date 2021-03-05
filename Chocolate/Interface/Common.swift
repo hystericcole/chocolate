@@ -18,6 +18,7 @@ typealias PlatformImage = NSImage
 typealias PlatformWindow = NSWindow
 typealias PlatformResponder = NSResponder
 typealias PlatformViewController = NSViewController
+typealias PlatformTabController = NSTabViewController
 typealias PlatformView = NSView
 typealias PlatformPriority = NSLayoutConstraint.Priority
 typealias PlatformAutoresizing = NSView.AutoresizingMask
@@ -60,6 +61,7 @@ typealias PlatformImage = UIImage
 typealias PlatformWindow = UIWindow
 typealias PlatformResponder = UIResponder
 typealias PlatformViewController = UIViewController
+typealias PlatformTabController = UITabBarController
 typealias PlatformView = UIView
 typealias PlatformPriority = UILayoutPriority
 typealias PlatformAutoresizing = UIView.AutoresizingMask
@@ -372,6 +374,32 @@ extension PlatformSpinner {
 	}
 }
 
+//	MARK: -
+
+extension PlatformViewController {
+	var isUnderTabBar:Bool { return false }
+	var isUnderNavigationBar:Bool { return false }
+}
+
+//	MARK: -
+
+extension PlatformTabController {
+	var viewControllers:[PlatformViewController] {
+		get { return tabViewItems.compactMap { $0.viewController } }
+		set { tabViewItems = newValue.map(NSTabViewItem.init) }
+	}
+	
+	var selectedIndex:Int {
+		get { return selectedTabViewItemIndex }
+		set { selectedTabViewItemIndex = newValue }
+	}
+	
+	var selectedViewController:PlatformViewController? {
+		get { return tabViewItems[selectedIndex].viewController }
+		set { if let index = tabViewItems.firstIndex(where:{ $0.viewController === newValue }) { selectedIndex = index }  }
+	}
+}
+
 #else
 
 typealias PlatformTaggableView = PlatformView
@@ -590,6 +618,14 @@ extension PlatformSwitch {
 		}
 	}
 }
+
+//	MARK: -
+
+extension PlatformViewController {
+	var isUnderTabBar:Bool { return tabBarController?.tabBar.isTranslucent ?? false }
+	var isUnderNavigationBar:Bool { return navigationController?.navigationBar.isTranslucent ?? false }
+}
+
 #endif
 
 //	MARK: -

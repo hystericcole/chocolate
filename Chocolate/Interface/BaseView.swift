@@ -80,8 +80,13 @@ class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 	}
 	
 #if os(macOS)
-	override func resizeSubviews(withOldSize oldSize: NSSize) {
-		super.resizeSubviews(withOldSize:oldSize)
+//	override func resizeSubviews(withOldSize oldSize: NSSize) {
+//		super.resizeSubviews(withOldSize:oldSize)
+//		sizeMayHaveChanged(newSize:bounds.size)
+//	}
+	
+	override func layout() {
+		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
 	
@@ -194,6 +199,33 @@ class BaseViewController: PlatformViewController {
 		}
 	}
 #endif
+}
+
+class BaseTabController: PlatformTabController {
+	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
+		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
+		
+		prepare()
+	}
+	
+	required init?(coder:NSCoder) {
+		super.init(coder:coder)
+		
+		prepare()
+	}
+	
+	deinit {
+		NotificationCenter.default.removeObserver(self)
+	}
+	
+	override func viewDidLoad() {
+		super.viewDidLoad()
+		
+		view.translatesAutoresizingMaskIntoConstraints = false
+		view.backgroundColor = .white
+	}
+	
+	func prepare() {}
 }
 
 class BaseControl: PlatformControl {

@@ -52,17 +52,17 @@ class ChocolateLumaRampViewController: BaseViewController {
 			Style.caption.label("#"), sliderCount
 		)
 		
-		let stops = Layout.Vertical(targets:colorStops, spacing:2, alignment:.fill, position:.uniformWithEnds(0.5))
+		let colors = Layout.Horizontal(
+			spacing:2,
+			alignment:.fill,
+			Layout.Sizing(gradient, width:Layout.Dimension(constant:0, fraction:0.5), height:nil),
+			Layout.Vertical(targets:colorStops, spacing:2, alignment:.fill, position:.uniformWithEnds(0.5))
+		)
 		
 		group.content = Layout.Vertical(
 			alignment:.fill,
 			controls.padding(20),
-			Layout.Horizontal(
-				spacing:2,
-				alignment:.fill,
-				Layout.Sizing(gradient, width:Layout.Dimension(constant:0, fraction:0.5), height:nil),
-				stops
-			).ignoringSafeBounds()
+			colors.ignoringSafeBounds(!isUnderTabBar)
 		)
 	}
 	

@@ -8,15 +8,11 @@
 
 import UIKit
 
-class ViewController: BaseViewController {
-	override func viewDidLoad() {
-		super.viewDidLoad()
-	}
-	
-	override func viewWillAppear() {
-		super.viewWillAppear()
+class ViewController: BaseTabController {
+	override func prepare() {
+		super.prepare()
 		
-		replaceChild(with:ChocolateViewController())
-		//replaceChild(with:ChocolateLayerViewController())
+		title = DisplayStrings.Chocolate.title
+		viewControllers = [ChocolateViewController(), ChocolateLayerViewController(), ChocolateLumaRampViewController()]
 	}
 }

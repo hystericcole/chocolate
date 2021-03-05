@@ -2361,8 +2361,8 @@ struct Layout {
 //	MARK: -
 
 extension Positionable {
-	func ignoringSafeBounds() -> Positionable {
-		return Layout.IgnoreSafeBounds(self)
+	func ignoringSafeBounds(_ ignore:Bool = true) -> Positionable {
+		return ignore ? Layout.IgnoreSafeBounds(self) : self
 	}
 	
 	func padding(_ insets:Layout.EdgeInsets) -> Positionable {
