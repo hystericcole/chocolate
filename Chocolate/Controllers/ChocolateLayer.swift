@@ -73,7 +73,7 @@ class ChocolateLayer: CALayer {
 				context.drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
 				context.resetClip()
 			}
-		default:	//	scalar is luminance - colors are slightly darker than intended
+		default:	//	scalar is luminance
 			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
 			let gray = CHCLT.LinearRGB(gray:scalar)
 			let huesWithLuminance = hues.compactMap { CHCLT.LinearRGB($0).applyLuminance(chocolate, value:scalar).color(colorSpace:colorSpace, alpha:1) }
@@ -134,8 +134,9 @@ class ChocolateLayerView: BaseView {
 #if os(macOS)
 	override class var layerClass:CALayer.Type { return ChocolateLayer.self }
 	override func viewDidEndLiveResize() { super.viewDidEndLiveResize(); refresh() }
+	override var wantsUpdateLayer:Bool { return true }
 	
-	func refresh() { layer?.setNeedsDisplay() }
+	func refresh() { needsDisplay = true }
 #else
 	override class var layerClass:AnyClass { return ChocolateLayer.self }
 	
@@ -250,6 +251,12 @@ class ChocolateLayerViewController: BaseViewController {
 	let group = Viewable.Group(content:Layout.EmptySpace())
 	let axis:Axis = .chclt_l
 	
+	override func prepare() {
+		super.prepare()
+		
+		title = DisplayStrings.Picker.title
+	}
+	
 	override func loadView() {
 		slider.value = chocolate.scalar
 		group.content = layout()
@@ -257,8 +264,8 @@ class ChocolateLayerViewController: BaseViewController {
 		group.view?.attachViewController(self)
 	}
 	
-	override func viewDidLoad() {
-		super.viewDidLoad()
+	override func viewDidAppear() {
+		super.viewDidAppear()
 		
 		axisChanged()
 	}
@@ -299,7 +306,8 @@ extension CGContext {
 		let overColors:[CGColor]
 		let downColors:[CGColor]
 		let mode:CGBlendMode
-		let count:Int = 360
+		let isFlipped = (axis / 3) & 1 != 0
+		let count = Int(isFlipped ? box.size.height : box.size.width)
 		
 		switch axis % 3 {
 		case 0:
@@ -329,12 +337,12 @@ extension CGContext {
 		
 		if let gradient = CGGradient(colorsSpace:drawSpace, colors:overColors as CFArray, locations:nil) {
 			setBlendMode(.copy)
-			drawLinearGradient(gradient, start:start, end:overEnd, options:options)
+			drawLinearGradient(gradient, start:start, end:isFlipped ? downEnd : overEnd, options:options)
 		}
 		
 		if let gradient = CGGradient(colorsSpace:drawSpace, colors:downColors as CFArray, locations:nil) {
 			setBlendMode(mode)
-			drawLinearGradient(gradient, start:start, end:downEnd, options:options)
+			drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
 		}
 	}
 	

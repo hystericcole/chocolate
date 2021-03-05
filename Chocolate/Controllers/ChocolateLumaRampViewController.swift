@@ -22,6 +22,12 @@ class ChocolateLumaRampViewController: BaseViewController {
 	var colorStops:[Viewable.Color] = []
 	let gradient = ChocolateGradientViewable(colors:[])
 	
+	override func prepare() {
+		super.prepare()
+		
+		title = DisplayStrings.LumaRamp.title
+	}
+	
 	override func loadView() {
 		view = group.lazyView
 	}

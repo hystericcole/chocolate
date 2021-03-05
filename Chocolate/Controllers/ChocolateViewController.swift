@@ -85,6 +85,12 @@ class ChocolateViewController: BaseViewController {
 	let colorCircles:[Viewable.Color] = (0 ..< 12).map { _ in Viewable.Color(color:nil) }
 	var samples:[Sample] = []
 	
+	override func prepare() {
+		super.prepare()
+		
+		title = DisplayStrings.Chocolate.title
+	}
+	
 	override func loadView() {
 		applySampleCount(Model.sampleCount)
 		view = group.lazyView

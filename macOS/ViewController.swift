@@ -28,15 +28,26 @@ class ViewController: BaseViewController {
 	override func viewWillAppear() {
 		super.viewWillAppear()
 		
-		view.window?.title = DisplayStrings.Chocolate.title
+		let viewController:BaseViewController
 		
-		let viewController =
-			NSEvent.modifierFlags.contains(.option) ? ChocolateLumaRampViewController() :
-			NSEvent.modifierFlags.contains(.control) ? ChocolateLayerViewController() :
-			ChocolateViewController()
+		if #available(OSX 10.12, *), let window = view.window {
+			for tab in [ChocolateLumaRampViewController(), ChocolateLayerViewController()] {
+				window.addTabbedWindow(NSWindow(contentViewController:tab), ordered:.above)
+			}
+			
+			viewController = ChocolateViewController()
+		} else {
+			viewController =
+				NSEvent.modifierFlags.contains(.control) ? ChocolateLumaRampViewController() :
+				NSEvent.modifierFlags.contains(.option) ? ChocolateLayerViewController() :
+				ChocolateViewController()
+		}
 		
 		replaceChild(with:viewController)
 		applyMinimumSizeToWindow(from:viewController)
+		
+		title = viewController.title
+		view.window?.title = DisplayStrings.Chocolate.title
 	}
 	
 	func applyMinimumSizeToWindow(from viewController:BaseViewController) {

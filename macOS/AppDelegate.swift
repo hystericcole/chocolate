@@ -36,7 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 	@objc
 	func newDocument(_ sender:NSObject) {
 		let controller = ViewController()
-		let window = NSWindow(contentViewController: controller)
+		let window = NSWindow(contentViewController:controller)
 		
 		positionWindow(window)
 		
