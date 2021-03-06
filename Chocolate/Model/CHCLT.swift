@@ -206,7 +206,8 @@ extension CHCLT {
 			let desaturate = v / (v - negative)
 			let t = 1 - desaturate
 			
-			vector = desaturate * vector + t * v
+			vector *= desaturate
+			vector += t * v
 		}
 		
 		if leavePositive {
@@ -219,7 +220,8 @@ extension CHCLT {
 			let desaturate = (v - 1) / (v - positive)
 			let t = 1 - desaturate
 			
-			vector = desaturate * vector + t * v
+			vector *= desaturate
+			vector += t * v
 		}
 		
 		vector.clamp(lowerBound:.zero, upperBound:.one)

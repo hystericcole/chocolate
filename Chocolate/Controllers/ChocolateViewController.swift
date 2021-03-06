@@ -73,8 +73,8 @@ class ChocolateViewController: BaseViewController {
 	let stringHue = Style.small.label("")
 	let stringChroma = Style.small.label("")
 	let stringLuma = Style.small.label("")
-	let stringContrast = Style.small.label("")
-	let stringSaturation = Style.small.label("")
+	let stringDeriveContrast = Style.small.label("")
+	let stringDeriveChroma = Style.small.label("")
 	let stringPrimaryContrast = Style.medium.label("")
 	let stringPrimary = Style.caption.label(Strings.primary)
 	let stringForeground = Style.caption.label(Strings.foreground)
@@ -190,8 +190,8 @@ class ChocolateViewController: BaseViewController {
 		stringPrimaryContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◑"
 		stringWeb.text = color.web()
 		
-		stringContrast.text = formatter.string(from:sliderDeriveContrast.value as NSNumber)
-		stringSaturation.text = formatter.string(from:sliderDeriveChroma.value as NSNumber)
+		stringDeriveContrast.text = formatter.string(from:sliderDeriveContrast.value as NSNumber)
+		stringDeriveChroma.text = formatter.string(from:sliderDeriveChroma.value as NSNumber)
 		
 		formatter.maximumFractionDigits = 1
 		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"
@@ -293,7 +293,7 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	func prepareLayout() {
-		let minimumSliderWidth = 200.0
+		let minimumSliderWidth = 60.0
 		let minimumStringWidth = 48.0
 		let colorBoxSize = 80.0
 		
@@ -309,21 +309,72 @@ class ChocolateViewController: BaseViewController {
 				).fixed(width:colorBoxSize, height:colorBoxSize),
 				stringPrimaryContrast
 			),
-			Layout.Columns(columnCount:3, template:Layout.Horizontal(spacing:4),
-				Style.small.label("R"), sliderRed, stringRed.minimum(width:minimumStringWidth),
-				Style.small.label("G"), sliderGreen, stringGreen,
-				Style.small.label("B"), sliderBlue, stringBlue,
-				Style.small.label("H"), sliderHue, stringHue,
-				Style.small.label("C"), sliderChroma, stringChroma,
-				Style.small.label("L"), sliderLuma, stringLuma,
-				Layout.EmptySpace(), stringWeb, Layout.EmptySpace()
-			).minimum(width:minimumSliderWidth)
+			Layout.Horizontal(
+				spacing:4,
+				alignment:.fill,
+				Layout.Vertical(
+					alignment:.trailing,
+					position:.uniform,
+					Style.small.label("R"),
+					Style.small.label("G"),
+					Style.small.label("B"),
+					Style.small.label("H"),
+					Style.small.label("C"),
+					Style.small.label("L")
+				),
+				Layout.Vertical(
+					alignment:.fill,
+					position:.uniform,
+					sliderRed,
+					sliderGreen,
+					sliderBlue,
+					sliderHue,
+					sliderChroma,
+					sliderLuma
+				).minimum(width:minimumSliderWidth),
+				Layout.Vertical(
+					alignment:.leading,
+					position:.uniform,
+					stringRed,
+					stringGreen,
+					stringBlue,
+					stringHue,
+					stringChroma,
+					stringLuma
+				).minimum(width:minimumStringWidth)
+			)
 		], spacing:8, alignment:.center, position:.stretch)
 		
-		let colorDerivation = Layout.Columns(columnCount:2, spacing:4, template:Layout.Horizontal(spacing:4),
-			stringForeground, Layout.EmptySpace().minimum(width:minimumStringWidth),
-			sliderDeriveContrast.minimum(width:minimumSliderWidth), stringContrast,
-			sliderDeriveChroma.minimum(width:minimumSliderWidth), stringSaturation
+		let colorDerivation = Layout.Vertical(
+			stringForeground,
+			Layout.Horizontal(
+				spacing:4,
+				alignment:.fill,
+				Layout.Vertical(
+					position:.uniform,
+					sliderDeriveContrast,
+					sliderDeriveChroma
+				).minimum(width:minimumSliderWidth),
+				Layout.Vertical(
+					alignment:.leading,
+					position:.uniform,
+					stringDeriveContrast,
+					stringDeriveChroma
+				).minimum(width:minimumStringWidth)
+			)
+		)
+		
+		let controlsLayout = Layout.Orient(
+			rowTemplate:Layout.Horizontal(spacing:20, alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(spacing:10, alignment:.fill, position:.leading),
+			axis:.vertical,
+			colorPicker,
+			Layout.Vertical(
+				spacing:10,
+				alignment:.fill,
+				colorDerivation,
+				foregrounds.fixed(height:40)
+			)
 		)
 		
 		let colorCircle = Layout.Overlay(
@@ -338,19 +389,6 @@ class ChocolateViewController: BaseViewController {
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal
-		)
-		
-		let controlsLayout = Layout.Orient(
-			rowTemplate:Layout.Horizontal(spacing:20, alignment:.fill, position:.stretch),
-			columnTemplate:Layout.Vertical(spacing:10, alignment:.fill, position:.stretch),
-			axis:.vertical,
-			colorPicker,
-			Layout.Vertical(
-				spacing:10,
-				alignment:.fill,
-				colorDerivation,
-				foregrounds.fixed(height:40)
-			)
 		)
 		
 		group.content = Layout.Vertical(spacing:8, alignment:.fill, position:.stretch,

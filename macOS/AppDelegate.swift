@@ -10,8 +10,13 @@ import Cocoa
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
-	func applicationDidFinishLaunching(_ aNotification: Notification) {
-		positionWindow(NSApplication.shared.mainWindow)
+	func applicationDidFinishLaunching(_ aNotification:Notification) {
+		if let mainWindow = NSApplication.shared.mainWindow {
+			positionWindow(mainWindow)
+		} else {
+			newDocument(self)
+		}
+		
 		//AppDelegate.generateIcons()
 		//AppDelegate.generateGraphs()
 	}
@@ -24,10 +29,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		return true
 	}
 	
-	func positionWindow(_ window:NSWindow?) {
-		guard let window = window, let screen = NSScreen.main else { return }
-		
-		let screenHeight = screen.frame.size.height
+	func positionWindow(_ window:NSWindow) {
+		let screenHeight = NSScreen.main?.frame.size.height ?? 960
 		
 		window.setContentSize(CGSize(width:400, height:min(800, screenHeight * 0.75)))
 		window.center()
@@ -38,7 +41,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		let controller = ViewController()
 		let window = NSWindow(contentViewController:controller)
 		
+		controller.applyMinimumSizeToWindow()
 		positionWindow(window)
+		controller.transformIntoWindowTabs()
 		
 		window.makeKeyAndOrderFront(sender)
 	}

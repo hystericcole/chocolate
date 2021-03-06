@@ -9,8 +9,6 @@
 import Cocoa
 
 class ViewController: BaseTabController {
-	var prefersWindowTabs = true
-	
 	override func prepare() {
 		super.prepare()
 		
@@ -23,16 +21,18 @@ class ViewController: BaseTabController {
 		
 		applyMinimumSizeToWindow()
 		view.window?.title = DisplayStrings.Chocolate.title
+	}
+	
+	func transformIntoWindowTabs() {
+		guard #available(OSX 10.12, *), let window = view.window else { return }
 		
-		if #available(OSX 10.12, *), prefersWindowTabs, let window = view.window {
-			let controllers = viewControllers
-			
-			for controller in controllers.dropFirst().reversed() {
-				window.addTabbedWindow(NSWindow(contentViewController:controller), ordered:.above)
-			}
-			
-			window.contentViewController = controllers[0]
+		let controllers = viewControllers
+		
+		for controller in controllers.dropFirst().reversed() {
+			window.addTabbedWindow(NSWindow(contentViewController:controller), ordered:.above)
 		}
+		
+		window.contentViewController = controllers[0]
 	}
 	
 	func applyMinimumSizeToWindow() {
@@ -49,6 +49,8 @@ class ViewController: BaseTabController {
 			minimum.width = min(max(minimum.width, ceil(require.width)), limit.width)
 			minimum.height = min(max(minimum.height, ceil(require.height)), limit.height)
 		}
+		
+		//minimum = CGSize(square:320)
 		
 		window.contentMinSize = minimum
 	}
