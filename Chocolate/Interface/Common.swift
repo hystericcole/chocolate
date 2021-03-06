@@ -15,6 +15,7 @@ typealias PlatformFont = NSFont
 typealias PlatformFontDescriptor = NSFontDescriptor
 typealias PlatformColor = NSColor
 typealias PlatformImage = NSImage
+typealias PlatformPasteboard = NSPasteboard
 typealias PlatformWindow = NSWindow
 typealias PlatformResponder = NSResponder
 typealias PlatformViewController = NSViewController
@@ -54,11 +55,13 @@ typealias PlatformEdgeInsets = NSEdgeInsets
 
 #else
 import UIKit
+import CoreServices
 
 typealias PlatformFont = UIFont
 typealias PlatformFontDescriptor = UIFontDescriptor
 typealias PlatformColor = UIColor
 typealias PlatformImage = UIImage
+typealias PlatformPasteboard = UIPasteboard
 typealias PlatformWindow = UIWindow
 typealias PlatformResponder = UIResponder
 typealias PlatformViewController = UIViewController
@@ -145,6 +148,25 @@ extension PlatformAutoresizing {
 extension CGImage {
 	func pngData() -> Data? {
 		return NSBitmapImageRep(cgImage:self).representation(using:.png, properties:[:])
+	}
+}
+
+//	MARK: -
+
+extension PlatformPasteboard {
+	func setImage(_ image:PlatformImage) {
+		declareTypes([.png], owner:nil)
+		writeObjects([image])
+	}
+	
+	func setString(_ string:String) {
+		declareTypes([.string], owner:nil)
+		setString(string, forType:.string)
+	}
+	
+	func setPNG(_ data:Data) {
+		declareTypes([.png], owner:nil)
+		setData(data, forType:.png)
 	}
 }
 
@@ -424,6 +446,22 @@ extension PlatformAutoresizing {
 extension CGImage {
 	func pngData() -> Data? {
 		return UIImage(cgImage:self).pngData()
+	}
+}
+
+//	MARK: -
+
+extension PlatformPasteboard {
+	func setImage(_ image:PlatformImage) {
+		self.image = image
+	}
+	
+	func setString(_ string:String) {
+		self.string = string
+	}
+	
+	func setPNG(_ data:Data) {
+		setData(data, forPasteboardType:kUTTypePNG as String)
 	}
 }
 

@@ -297,6 +297,26 @@ class ChocolateLayerViewController: BaseViewController {
 			chocolate.ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
 		)
 	}
+	
+	func copyToPasteboard() {
+		guard let layer = chocolate.chocolateLayer else { return }
+		
+		let size = layer.bounds.size
+		
+		guard let mutable = MutableImage(size:size, scale:layer.contentsScale, opaque:true) else { return }
+		
+		layer.draw(in:mutable.context)
+		
+		guard let data = mutable.image.pngData() else { return }
+		
+		PlatformPasteboard.general.setPNG(data)
+	}
+	
+#if os(macOS)
+	@objc func copy(_ sender:Any?) { copyToPasteboard() }
+#else
+	override func copy(_ sender:Any?) { copyToPasteboard() }
+#endif
 }
 
 //	MARK: -

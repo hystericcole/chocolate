@@ -72,10 +72,7 @@ extension AppDelegate {
 			
 			guard let image = generateGraph(chclt:chclt, box:box), let data = image.pngData() else { return }
 			
-			let pasteboard = NSPasteboard.general
-			
-			pasteboard.declareTypes([.png], owner:nil)
-			pasteboard.setData(data, forType:.png)
+			NSPasteboard.general.setPNG(data)
 		}
 	}
 	

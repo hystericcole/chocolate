@@ -122,6 +122,20 @@ class ChocolateLumaRampViewController: BaseViewController {
 		
 		applyColorInput(input, value:slider.doubleValue)
 	}
+	
+	func copyToPasteboard() {
+		let colors = colorStops.compactMap { $0.color?.cgColor.displayRGB }
+		let web = colors.compactMap { $0.web() }.joined(separator:", ")
+		let css = colors.compactMap { $0.css() }.joined(separator:", ")
+		
+		PlatformPasteboard.general.setString([web, css].joined(separator:"\n"))
+	}
+	
+#if os(macOS)
+	@objc func copy(_ sender:Any?) { copyToPasteboard() }
+#else
+	override func copy(_ sender:Any?) { copyToPasteboard() }
+#endif
 }
 
 //	MARK: -
