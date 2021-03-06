@@ -50,6 +50,7 @@ typealias PlatformRotationGestureRecognizer = NSRotationGestureRecognizer
 typealias PlatformMagnificationGestureRecognizer = NSMagnificationGestureRecognizer
 typealias PlatformGestureRecognizerDelegate = NSGestureRecognizerDelegate
 typealias PlatformGestureRecognizerState = NSGestureRecognizer.State
+typealias PlatformEdgeInsets = NSEdgeInsets
 
 #else
 import UIKit
@@ -92,6 +93,7 @@ typealias PlatformRotationGestureRecognizer = UIRotationGestureRecognizer
 typealias PlatformMagnificationGestureRecognizer = UIPinchGestureRecognizer
 typealias PlatformGestureRecognizerDelegate = UIGestureRecognizerDelegate
 typealias PlatformGestureRecognizerState = UIGestureRecognizer.State
+typealias PlatformEdgeInsets = UIEdgeInsets
 
 @available(iOS 14.0, *)
 typealias PlatformColorWell = UIColorWell
@@ -107,6 +109,14 @@ extension CGColor {
 
 extension CTFont {
 	var platformFont:PlatformFont { return self as PlatformFont }
+}
+
+//	MARK: -
+
+extension CGRect {
+	func padded(by insets:PlatformEdgeInsets) -> CGRect {
+		return CGRect(x:origin.x - insets.left, y:origin.y - insets.top, width:size.width + insets.left + insets.right, height:size.height + insets.top + insets.bottom)
+	}
 }
 
 //	MARK: -
@@ -333,6 +343,7 @@ extension PlatformSlider {
 	}
 	
 	func prepareViewableSlider(target:AnyObject?, action:Selector?, minimumTrackColor:PlatformColor?) {
+		setContentCompressionResistancePriority(.defaultLow, for:.horizontal)
 		sliderType = .linear
 		
 		if #available(macOS 10.12.2, *), let color = minimumTrackColor {
@@ -579,6 +590,7 @@ extension PlatformSlider {
 			minimumTrackTintColor = color
 		}
 		
+		setContentCompressionResistancePriority(.defaultLow, for:.horizontal)
 		applyVieawbleAction(target:target, action:action)
 	}
 }

@@ -18,6 +18,8 @@ protocol ViewControllerAttachable: AnyObject {
 	func attachViewController(_ viewController:PlatformViewController)
 }
 
+//	MARK: -
+
 extension PlatformView {
 	var stableBounds:CGRect { return CGRect(origin:.zero, size:bounds.size) }
 	
@@ -36,6 +38,8 @@ extension PlatformView {
 #endif
 	}
 }
+
+//	MARK: -
 
 class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 #if os(macOS)
@@ -80,11 +84,6 @@ class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 	}
 	
 #if os(macOS)
-//	override func resizeSubviews(withOldSize oldSize: NSSize) {
-//		super.resizeSubviews(withOldSize:oldSize)
-//		sizeMayHaveChanged(newSize:bounds.size)
-//	}
-	
 	override func layout() {
 		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
@@ -103,6 +102,8 @@ class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 	func invalidateLayout() { priorSize = .zero }
 	func sizeChanged() {}
 }
+
+//	MARK: -
 
 class BaseViewController: PlatformViewController {
 	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
@@ -201,6 +202,8 @@ class BaseViewController: PlatformViewController {
 #endif
 }
 
+//	MARK: -
+
 class BaseTabController: PlatformTabController {
 	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
 		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
@@ -226,7 +229,19 @@ class BaseTabController: PlatformTabController {
 	}
 	
 	func prepare() {}
+	
+#if os(macOS)
+	override func tabView(_ tabView:NSTabView, didSelect tabViewItem:NSTabViewItem?) {
+		super.tabView(tabView, didSelect:tabViewItem)
+		
+		guard let controller = tabViewItem?.viewController else { return }
+		
+		tabView.window?.makeFirstResponder(controller.view)
+	}
+#endif
 }
+
+//	MARK: -
 
 class BaseControl: PlatformControl {
 	override init(frame:CGRect) {

@@ -669,17 +669,19 @@ struct Layout {
 	/// Typically used for backgrounds and full screen media.
 	struct IgnoreSafeBounds: PositionableWithTarget {
 		var target:Positionable
+		var axis:Axis?
 		
-		init(_ target:Positionable) {
+		init(_ target:Positionable, axis:Axis? = nil) {
 			self.target = target
+			self.axis = axis
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			let epsilon = 0.5 / context.scale
-			let minX = box.minX - epsilon > context.safeBounds.minX ? 0 : max(box.minX - context.bounds.minX, 0)
-			let minY = box.minY - epsilon > context.safeBounds.minY ? 0 : max(box.minY - context.bounds.minY, 0)
-			let maxX = box.maxX + epsilon < context.safeBounds.maxX ? 0 : max(context.bounds.maxX - box.maxX, 0)
-			let maxY = box.maxY + epsilon < context.safeBounds.maxY ? 0 : max(context.bounds.maxY - box.maxY, 0)
+			let minX = axis == .vertical || box.minX - epsilon > context.safeBounds.minX ? 0 : max(box.minX - context.bounds.minX, 0)
+			let minY = axis == .horizontal || box.minY - epsilon > context.safeBounds.minY ? 0 : max(box.minY - context.bounds.minY, 0)
+			let maxX = axis == .vertical || box.maxX + epsilon < context.safeBounds.maxX ? 0 : max(context.bounds.maxX - box.maxX, 0)
+			let maxY = axis == .horizontal || box.maxY + epsilon < context.safeBounds.maxY ? 0 : max(context.bounds.maxY - box.maxY, 0)
 			let box = CGRect(x:box.origin.x - minX, y:box.origin.y - minY, width:box.size.width + minX + maxX, height:box.size.height + minY + maxY)
 			
 			target.applyPositionableFrame(box, context:context)
@@ -969,6 +971,16 @@ struct Layout {
 			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
 		}
 		
+		func availableSizeAxial(_ box:CGRect, context:Context) -> AvailableSizeAxial {
+			let isFloating = self.isFloating
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
+			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
+			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			let axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, position:position)
+			
+			return AvailableSizeAxial(available:available, sizes:sizes, axial:axial)
+		}
+		
 		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
 			let isPositive = direction.isPositive(axis:.vertical, environment:environment)
 			let ordered = isPositive ? targets.reversed() : targets
@@ -1070,6 +1082,16 @@ struct Layout {
 			var axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, position:position)
 			
 			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
+		}
+		
+		func availableSizeAxial(_ box:CGRect, context:Context) -> AvailableSizeAxial {
+			let isFloating = self.isFloating
+			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
+			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
+			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			let axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, position:position)
+			
+			return AvailableSizeAxial(available:available, sizes:sizes, axial:axial)
 		}
 		
 		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
@@ -1597,6 +1619,8 @@ struct Layout {
 		let empty:Native
 		/// Uniform distance between sizes
 		let space:Native
+		/// Ratio of available to reqested space
+		let ratio:Native
 		/// Computed sizes along axis
 		let spans:[Native]
 		/// Computed frames
@@ -1606,10 +1630,12 @@ struct Layout {
 			let count = Native(uniformCount)
 			let spaceCount = count - 1
 			let space = spacing * spaceCount
-			let uniformSize = max(1, (available - space) / count)
+			let maximumSize = (available - space) / count
+			let uniformSize = max(1, maximumSize)
 			
 			self.frames = []
 			self.empty = 0
+			self.ratio = min(max(0, maximumSize), 1)
 			self.space = available < space + count ? max(0, (available - count) / spaceCount) : spacing
 			self.spans = Array(repeating:uniformSize, count:uniformCount)
 		}
@@ -1662,6 +1688,7 @@ struct Layout {
 			guard visibleCount > 0 else {
 				self.empty = available
 				self.space = 0
+				self.ratio = 1
 				self.spans = Array(repeating:-1, count:dimensions.count)
 				
 				return
@@ -1672,6 +1699,7 @@ struct Layout {
 			let spaceCount = count - 1
 			let aggregateSpacing = spacing * spaceCount
 			let empty:Native
+			let ratio:Native
 			let space:Native
 			var spans:[Native]
 			
@@ -1689,10 +1717,13 @@ struct Layout {
 					space = (available - aggregate.minimum) / spaceCount
 					spans = dimensions.map { $0.minimum }
 				}
+				
+				ratio = available / (aggregate.minimum + aggregateSpacing)
 			} else if available < aggregate.constant + aggregateSpacing {
 				let reduction = aggregate.constant + aggregateSpacing - available
 				let denominator = aggregate.constant - aggregate.minimum
 				
+				ratio = 1
 				empty = 0
 				space = spacing
 				spans = dimensions.map { $0.constant - ($0.constant - $0.minimum) * reduction / denominator }
@@ -1700,6 +1731,7 @@ struct Layout {
 				let expansion = available - aggregate.constant - aggregateSpacing
 				let denominator = aggregate.maximum - aggregate.constant
 				
+				ratio = 1
 				empty = 0
 				space = spacing
 				spans = dimensions.map { $0.constant + ($0.maximum - $0.constant) * expansion / denominator }
@@ -1709,6 +1741,7 @@ struct Layout {
 				
 				empty = 0
 				space = spacing
+				ratio = available / (aggregate.maximum + aggregateSpacing)
 				spans = dimensions.map { $0.maximum + expansion / denominator }
 			} else {
 				if fit == .position {
@@ -1719,6 +1752,7 @@ struct Layout {
 					space = (available - aggregate.maximum) / spaceCount
 				}
 				
+				ratio = 1
 				spans = dimensions.map { $0.maximum }
 			}
 			
@@ -1730,6 +1764,7 @@ struct Layout {
 			
 			self.empty = empty
 			self.space = space
+			self.ratio = ratio
 			self.spans = spans
 		}
 		
@@ -1746,9 +1781,11 @@ struct Layout {
 			self.empty = 0
 			
 			if content > count && sum > 0 {
+				self.ratio = 1
 				self.space = spacing
 				self.spans = weights.map { $0 > 0 ? content * $0 / sum : emptyWithNoSpacing }
 			} else {
+				self.ratio = count > 0 ? content / count : 0
 				self.space = max(0, available - count) / spaceCount
 				self.spans = weights.map { $0 > 0 ? 1 : emptyWithNoSpacing }
 			}
@@ -2063,6 +2100,12 @@ struct Layout {
 		}
 	}
 	
+	struct AvailableSizeAxial {
+		var available:Native
+		var sizes:[Size]
+		var axial:Axial
+	}
+	
 	/// Arrange a group of elements in a flow that uses available space along an axis then wraps to continue using available space.
 	///
 	/// The targets will be arranged into a row of columns when vertical or a column of rows when horizontal.
@@ -2280,6 +2323,135 @@ struct Layout {
 		}
 	}
 	
+	struct Orient: PositionableWithTargets {
+		var targets:[Positionable]
+		var rowTemplate:Horizontal
+		var columnTemplate:Vertical
+		var axis:Axis
+		
+		init(
+			targets:[Positionable],
+			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
+			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
+			axis:Axis = .horizontal)
+		{
+			self.targets = targets
+			self.columnTemplate = columnTemplate
+			self.rowTemplate = rowTemplate
+			self.axis = axis
+		}
+		
+		init(
+			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
+			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
+			axis:Axis = .horizontal,
+			_ targets:Positionable...)
+		{
+			self.targets = targets
+			self.columnTemplate = columnTemplate
+			self.rowTemplate = rowTemplate
+			self.axis = axis
+		}
+		
+		func template(isHorizontal:Bool) -> Positionable {
+			if isHorizontal {
+				var template = rowTemplate
+				template.targets = targets
+				return template
+			} else {
+				var template = columnTemplate
+				template.targets = targets
+				return template
+			}
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			guard !targets.isEmpty else { return .zero }
+			
+			let isHorizontal = axis == .horizontal
+			let size = template(isHorizontal:isHorizontal).positionableSize(fitting:limit)
+			let preferLimit, preferMinimum:Native
+			
+			if isHorizontal {
+				guard let width = limit.width else { return size }
+				
+				preferLimit = width
+				preferMinimum = size.width.resolve(width)
+			} else {
+				guard let height = limit.height else { return size }
+				
+				preferLimit = height
+				preferMinimum = size.height.resolve(height)
+			}
+			
+			guard preferLimit < preferMinimum else { return size }
+			
+			let cross = template(isHorizontal:!isHorizontal).positionableSize(fitting:limit)
+			let crossLimit, crossMinimum:Native
+			
+			if isHorizontal {
+				guard let height = limit.height else { return cross }
+				
+				crossLimit = height
+				crossMinimum = size.height.resolve(height)
+			} else {
+				guard let width = limit.width else { return cross }
+				
+				crossLimit = width
+				crossMinimum = size.width.resolve(width)
+			}
+			
+			guard crossLimit < crossMinimum else { return cross }
+			
+			return crossLimit * preferMinimum > preferLimit * crossMinimum ? cross : size
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			guard !targets.isEmpty else { return }
+			
+			switch axis {
+			case .horizontal:
+				var preferTemplate = rowTemplate
+				preferTemplate.targets = targets
+				var preferMeasured = preferTemplate.availableSizeAxial(box, context:context)
+				
+				if preferMeasured.axial.ratio < 1 {
+					var crossTemplate = columnTemplate
+					crossTemplate.targets = targets
+					var crossMeasured = crossTemplate.availableSizeAxial(box, context:context)
+					
+					if crossMeasured.axial.ratio > preferMeasured.axial.ratio {
+						crossTemplate.applyPositionableFrame(box, context:context, axial:&crossMeasured.axial, sizes:crossMeasured.sizes, available:crossMeasured.available, isFloating:crossTemplate.isFloating)
+						return
+					}
+				}
+				
+				preferTemplate.applyPositionableFrame(box, context:context, axial:&preferMeasured.axial, sizes:preferMeasured.sizes, available:preferMeasured.available, isFloating:preferTemplate.isFloating)
+			case .vertical:
+				var preferTemplate = columnTemplate
+				preferTemplate.targets = targets
+				var preferMeasured = preferTemplate.availableSizeAxial(box, context:context)
+				
+				if preferMeasured.axial.ratio < 1 {
+					var crossTemplate = rowTemplate
+					crossTemplate.targets = targets
+					var crossMeasured = crossTemplate.availableSizeAxial(box, context:context)
+					
+					if crossMeasured.axial.ratio > preferMeasured.axial.ratio {
+						crossTemplate.applyPositionableFrame(box, context:context, axial:&crossMeasured.axial, sizes:crossMeasured.sizes, available:crossMeasured.available, isFloating:crossTemplate.isFloating)
+						return
+					}
+				}
+				
+				preferTemplate.applyPositionableFrame(box, context:context, axial:&preferMeasured.axial, sizes:preferMeasured.sizes, available:preferMeasured.available, isFloating:preferTemplate.isFloating)
+			}
+		}
+		
+		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
+			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
+		}
+	}
+	
 	struct Circle: PositionableWithTargets {
 		var targets:[Positionable]
 		var radius:Native
@@ -2361,8 +2533,8 @@ struct Layout {
 //	MARK: -
 
 extension Positionable {
-	func ignoringSafeBounds(_ ignore:Bool = true) -> Positionable {
-		return ignore ? Layout.IgnoreSafeBounds(self) : self
+	func ignoringSafeBounds(_ axis:Layout.Axis? = nil) -> Positionable {
+		return Layout.IgnoreSafeBounds(self, axis:axis)
 	}
 	
 	func padding(_ insets:Layout.EdgeInsets) -> Positionable {

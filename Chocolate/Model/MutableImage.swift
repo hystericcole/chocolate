@@ -77,10 +77,10 @@ struct MutableImage {
 		if parameters.scale == 0 {
 			guard size == parameters.size else { return false }
 		} else {
-			let width = Int(ceil(parameters.size.width * parameters.scale))
-			let height = Int(ceil(parameters.size.height * parameters.scale))
+			let width = ceil(parameters.size.width * parameters.scale)
+			let height = ceil(parameters.size.height * parameters.scale)
 			
-			guard width == image.width && height == image.height else { return false }
+			guard Int(width) == image.width && Int(height) == image.height else { return false }
 		}
 		
 		return true

@@ -1237,6 +1237,11 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
+	
+	override func viewDidMoveToWindow() {
+		super.viewDidMoveToWindow()
+		invalidateLayout()
+	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
@@ -1427,6 +1432,11 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 		super.layout()
 		sizeMayHaveChanged(newSize:bounds.size)
 	}
+	
+	override func viewDidMoveToWindow() {
+		super.viewDidMoveToWindow()
+		invalidateLayout()
+	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
@@ -1517,7 +1527,7 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 		let size = CGSize(width:max(resolved.width, limit.width), height:max(resolved.height, limit.height))
 		let displaySize = size.display(scale:positionableScale)
 		
-		containerView.frame = CGRect(origin:.zero, size:displaySize)
+		containerView.frame = CGRect(origin:.zero, size:displaySize).padded(by:insets)
 		contentSize = displaySize
 #endif
 		

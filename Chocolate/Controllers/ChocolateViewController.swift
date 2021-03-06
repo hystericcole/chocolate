@@ -317,7 +317,7 @@ class ChocolateViewController: BaseViewController {
 				Style.small.label("C"), sliderChroma, stringChroma,
 				Style.small.label("L"), sliderLuma, stringLuma,
 				Layout.EmptySpace(), stringWeb, Layout.EmptySpace()
-			)
+			).minimum(width:minimumSliderWidth)
 		], spacing:8, alignment:.center, position:.stretch)
 		
 		let colorDerivation = Layout.Columns(columnCount:2, spacing:4, template:Layout.Horizontal(spacing:4),
@@ -332,7 +332,7 @@ class ChocolateViewController: BaseViewController {
 			Layout.Circle(targets:colorCircles, scalar:0.875, radius:80).rounded().padding(10)
 		)
 		
-		sampleScroll.minimum = CGSize(square:200)
+		sampleScroll.minimum = CGSize(width:240, height:160)
 		sampleScroll.content = Layout.Flow(
 			targets:samples.map { $0.layout() } + [colorCircle],
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
@@ -340,10 +340,17 @@ class ChocolateViewController: BaseViewController {
 			axis:.horizontal
 		)
 		
-		let controlsLayout = Layout.Vertical(spacing:10, alignment:.fill, position:.start,
+		let controlsLayout = Layout.Orient(
+			rowTemplate:Layout.Horizontal(spacing:20, alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(spacing:10, alignment:.fill, position:.stretch),
+			axis:.vertical,
 			colorPicker,
-			colorDerivation,
-			foregrounds.fixed(height:40)
+			Layout.Vertical(
+				spacing:10,
+				alignment:.fill,
+				colorDerivation,
+				foregrounds.fixed(height:40)
+			)
 		)
 		
 		group.content = Layout.Vertical(spacing:8, alignment:.fill, position:.stretch,

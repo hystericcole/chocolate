@@ -59,10 +59,12 @@ class ChocolateLumaRampViewController: BaseViewController {
 			Layout.Vertical(targets:colorStops, spacing:2, alignment:.fill, position:.uniformWithEnds(0.5))
 		)
 		
-		group.content = Layout.Vertical(
-			alignment:.fill,
-			controls.padding(20),
-			colors.ignoringSafeBounds(!isUnderTabBar)
+		group.content = Layout.Flow(
+			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
+			axis:.vertical,
+			controls.limiting(width:300 ... 300).padding(20),
+			colors.minimum(width:200, height:240).ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
 		)
 	}
 	

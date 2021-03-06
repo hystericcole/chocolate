@@ -6,7 +6,6 @@
 //	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
-import CoreGraphics
 import Foundation
 
 extension BinaryFloatingPoint {

@@ -290,11 +290,11 @@ class ChocolateLayerViewController: BaseViewController {
 			Layout.Horizontal(
 				spacing:20,
 				position:.stretch,
-				slider.minimum(width:200),
+				slider.minimum(width:60),
 				picker.fixed(width:160).limiting(height:30 ... 80)
 			).padding(horizontal:20, vertical:10),
 			//Viewable.Color(color:.black).fixed(height:3),
-			chocolate.ignoringSafeBounds(!isUnderTabBar)
+			chocolate.ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
 		)
 	}
 }
