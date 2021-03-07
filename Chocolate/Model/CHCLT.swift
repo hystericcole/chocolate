@@ -473,7 +473,7 @@ extension CHCLT {
 		}
 	}
 	
-	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance range:ClosedRange<Scalar>, count:Int) -> [Linear.Vector3] {
+	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance from:Scalar, _ to:Scalar, count:Int) -> [Linear.Vector3] {
 		let v = 0.25
 		let reference = hueReference(luminance:v)
 		let hueSaturation = reference - v
@@ -483,7 +483,7 @@ extension CHCLT {
 			var hue = hueStart
 			
 			for index in 0 ..< count {
-				let u = range.lowerBound + range.length * Scalar(index) / Scalar(count - 1)
+				let u = from + (to - from) * Scalar(index) / Scalar(count - 1)
 				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
 				let saturated = rotated - rotated.min()
 				let normalized = saturated / saturated.max()

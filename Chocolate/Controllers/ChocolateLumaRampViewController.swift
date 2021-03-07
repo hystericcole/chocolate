@@ -18,7 +18,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 	let sliderLumaLower = Viewable.Slider(tag:Input.lumaLower.rawValue, value:1/16, action:#selector(colorSliderChanged))
 	let sliderLumaUpper = Viewable.Slider(tag:Input.lumaUpper.rawValue, value:15/16, action:#selector(colorSliderChanged))
 	let sliderChroma = Viewable.Slider(tag:Input.chroma.rawValue, value:1, action:#selector(colorSliderChanged))
-	let sliderCount = Viewable.Slider(tag:Input.chroma.rawValue, value:32, range:2 ... 128, action:#selector(colorSliderChanged))
+	let sliderCount = Viewable.Slider(tag:Input.chroma.rawValue, value:16, range:2 ... 128, action:#selector(colorSliderChanged))
 	var colorStops:[Viewable.Color] = []
 	let gradient = ChocolateGradientViewable(colors:[])
 	
@@ -97,13 +97,12 @@ class ChocolateLumaRampViewController: BaseViewController {
 		let chroma = sliderChroma.value
 		let lumaLower = sliderLumaLower.value
 		let lumaUpper = sliderLumaUpper.value
-		let lumaRange = min(lumaLower, lumaUpper) ... max(lumaLower, lumaUpper)
 		
 		let colors = chocolate.luminanceRamp(
 			hueStart:sliderHueStart.value,
 			hueShift:count > 1 ? rotations / (colorCount - 1) : rotations,
 			chroma:chroma,
-			luminance:lumaRange,
+			luminance:lumaLower, lumaUpper,
 			count:count
 		).map(CHCLT.LinearRGB.init)
 		
