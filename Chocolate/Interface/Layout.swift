@@ -2328,29 +2328,34 @@ struct Layout {
 		var rowTemplate:Horizontal
 		var columnTemplate:Vertical
 		var axis:Axis
+		var ratio:Native
 		
 		init(
 			targets:[Positionable],
 			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
 			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
-			axis:Axis = .horizontal)
+			axis:Axis = .horizontal,
+			ratio:Native = 0)
 		{
 			self.targets = targets
 			self.columnTemplate = columnTemplate
 			self.rowTemplate = rowTemplate
 			self.axis = axis
+			self.ratio = ratio
 		}
 		
 		init(
 			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
 			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
 			axis:Axis = .horizontal,
+			ratio:Native = 0,
 			_ targets:Positionable...)
 		{
 			self.targets = targets
 			self.columnTemplate = columnTemplate
 			self.rowTemplate = rowTemplate
 			self.axis = axis
+			self.ratio = ratio
 		}
 		
 		func template(isHorizontal:Bool) -> Positionable {
@@ -2368,42 +2373,35 @@ struct Layout {
 		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			
+			if ratio > 0, let width = limit.width, width < Limit.unlimited, let height = limit.height, height < Limit.unlimited {
+				let isHorizontal:Bool
+				
+				switch axis {
+				case .horizontal: isHorizontal = width > height * ratio
+				case .vertical: isHorizontal = !(height > width * ratio)
+				}
+				
+				return template(isHorizontal:isHorizontal).positionableSize(fitting:limit)
+			}
+			
 			let isHorizontal = axis == .horizontal
-			let size = template(isHorizontal:isHorizontal).positionableSize(fitting:limit)
-			let preferLimit, preferMinimum:Native
+			let mainSize = template(isHorizontal:isHorizontal).positionableSize(fitting:limit)
 			
-			if isHorizontal {
-				guard let width = limit.width else { return size }
-				
-				preferLimit = width
-				preferMinimum = size.width.resolve(width)
-			} else {
-				guard let height = limit.height else { return size }
-				
-				preferLimit = height
-				preferMinimum = size.height.resolve(height)
-			}
+			guard let mainLimit = isHorizontal ? limit.width : limit.height, mainLimit < Limit.unlimited else { return mainSize }
 			
-			guard preferLimit < preferMinimum else { return size }
+			let mainRequire = isHorizontal ? mainSize.width.resolve(mainLimit) : mainSize.height.resolve(mainLimit)
 			
-			let cross = template(isHorizontal:!isHorizontal).positionableSize(fitting:limit)
-			let crossLimit, crossMinimum:Native
+			guard mainLimit < mainRequire else { return mainSize }
 			
-			if isHorizontal {
-				guard let height = limit.height else { return cross }
-				
-				crossLimit = height
-				crossMinimum = size.height.resolve(height)
-			} else {
-				guard let width = limit.width else { return cross }
-				
-				crossLimit = width
-				crossMinimum = size.width.resolve(width)
-			}
+			let turnSize = template(isHorizontal:!isHorizontal).positionableSize(fitting:limit)
 			
-			guard crossLimit < crossMinimum else { return cross }
+			guard let turnLimit = isHorizontal ? limit.height : limit.width, turnLimit < Limit.unlimited else { return turnSize }
 			
-			return crossLimit * preferMinimum > preferLimit * crossMinimum ? cross : size
+			let turnRequire = isHorizontal ? mainSize.height.resolve(turnLimit) : mainSize.width.resolve(turnLimit)
+			
+			guard turnLimit < turnRequire else { return turnSize }
+			
+			return turnLimit * mainRequire > mainLimit * turnRequire ? turnSize : mainSize
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {

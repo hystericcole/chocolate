@@ -186,7 +186,7 @@ class ChocolateViewController: BaseViewController {
 		stringGreen.text = formatter.string(from:color.green as NSNumber)
 		stringBlue.text = formatter.string(from:color.blue as NSNumber)
 		stringChroma.text = formatter.string(from:sliderChroma.value as NSNumber)
-		stringLuma.text = (formatter.string(from:sliderLuma.value as NSNumber) ?? "") + "❂"
+		stringLuma.text = (formatter.string(from:sliderLuma.value as NSNumber) ?? "") + "☼"
 		stringPrimaryContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◑"
 		stringWeb.text = color.web()
 		
@@ -333,7 +333,7 @@ class ChocolateViewController: BaseViewController {
 					sliderLuma
 				).minimum(width:minimumSliderWidth),
 				Layout.Vertical(
-					alignment:.leading,
+					alignment:.fill,
 					position:.uniform,
 					stringRed,
 					stringGreen,
@@ -356,7 +356,7 @@ class ChocolateViewController: BaseViewController {
 					sliderDeriveChroma
 				).minimum(width:minimumSliderWidth),
 				Layout.Vertical(
-					alignment:.leading,
+					alignment:.fill,
 					position:.uniform,
 					stringDeriveContrast,
 					stringDeriveChroma
@@ -368,6 +368,7 @@ class ChocolateViewController: BaseViewController {
 			rowTemplate:Layout.Horizontal(spacing:20, alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(spacing:10, alignment:.fill, position:.leading),
 			axis:.vertical,
+			ratio:1.2,
 			colorPicker,
 			Layout.Vertical(
 				spacing:10,
