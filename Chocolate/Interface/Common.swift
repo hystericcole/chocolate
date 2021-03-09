@@ -771,11 +771,21 @@ enum Common {
 	
 	struct Recognizer {
 		enum Gesture {
-		case pan(Bool)
-		case tap(Bool, Int)
-		case press(Bool, TimeInterval?, CGFloat?)
-		case rotation
-		case magnification
+			case pan(Bool)
+			case tap(Bool, Int)
+			case press(Bool, TimeInterval?, CGFloat?)
+			case rotation
+			case magnification
+			
+			func isKind(_ recognizer:PlatformGestureRecognizer) -> Bool {
+				switch self {
+				case .pan: return recognizer is PlatformPanGestureRecognizer
+				case .tap: return recognizer is PlatformTapGestureRecognizer
+				case .press: return recognizer is PlatformPressGestureRecognizer
+				case .rotation: return recognizer is PlatformRotationGestureRecognizer
+				case .magnification: return recognizer is PlatformMagnificationGestureRecognizer
+				}
+			}
 		}
 		
 		let gesture:Gesture
@@ -857,15 +867,39 @@ enum Common {
 			self.action = action
 		}
 		
-		static func attachRecognizers(_ recognizers:[Recognizer], to view:PlatformView) {
-			for recognizer in recognizers where recognizer.target != nil {
-				view.addGestureRecognizer(recognizer.recognizer)
-			}
+		func isEquivalent(_ recognizer:PlatformGestureRecognizer) -> Bool {
+#if os(macOS)
+			guard recognizer.action == action && recognizer.target === target else { return false }
+#endif
+			
+			return gesture.isKind(recognizer)
+		}
+		
+		func attachToView(_ view:PlatformView) {
+			view.addGestureRecognizer(recognizer)
 			
 #if os(macOS)
 #else
 			view.isUserInteractionEnabled = true
 #endif
+		}
+		
+		func detachFromView(_ view:PlatformView) {
+#if os(macOS)
+			let recognizers = view.gestureRecognizers
+#else
+			guard let recognizers = view.gestureRecognizers else { return }
+#endif
+			
+			for recognizer in recognizers where isEquivalent(recognizer) {
+				view.removeGestureRecognizer(recognizer)
+			}
+		}
+		
+		static func attachRecognizers(_ recognizers:[Recognizer], to view:PlatformView) {
+			for recognizer in recognizers where recognizer.target != nil {
+				recognizer.attachToView(view)
+			}
 		}
 	}
 }

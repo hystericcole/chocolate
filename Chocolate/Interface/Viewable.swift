@@ -1778,6 +1778,17 @@ extension Viewable {
 		var target:Positionable
 		var recognizers:[Common.Recognizer]
 		
+		init(target:Positionable, recognizers:[Common.Recognizer]) {
+			self.target = target
+			self.recognizers = recognizers
+			
+			for view in target.orderablePositionables(environment:.current, order:.existing) {
+				guard let view = view as? PlatformView else { continue }
+				
+				Common.Recognizer.attachRecognizers(recognizers, to:view)
+			}
+		}
+		
 		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
 			let unordered = order == .create && !recognizers.isEmpty ? target.orderablePositionables(environment:environment, order:.attach)
 				.compactMap { $0 as? LazyViewable }.filter { $0.existingView == nil } : []
