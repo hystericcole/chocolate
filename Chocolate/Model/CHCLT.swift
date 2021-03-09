@@ -462,8 +462,7 @@ extension CHCLT {
 			
 			for index in 0 ..< count {
 				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
-				let saturated = rotated - rotated.min()
-				let normalized = saturated / saturated.max()
+				let normalized = CHCLT.saturate(rotated)
 				
 				buffer[index] = normalized
 				hue += shift
@@ -485,8 +484,7 @@ extension CHCLT {
 			for index in 0 ..< count {
 				let u = from + (to - from) * Scalar(index) / Scalar(count - 1)
 				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
-				let saturated = rotated - rotated.min()
-				let normalized = saturated / saturated.max()
+				let normalized = CHCLT.saturate(rotated)
 				let luminated = applyLuminance(normalized, luminance:luminance(normalized), apply:u)
 				let vector = applyChroma(luminated, luminance:u, apply:chroma)
 				
@@ -503,8 +501,7 @@ extension CHCLT {
 		let axis = hueAxis()
 		let reference = hueReference(luminance:u)
 		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
-		let saturated = rotated - rotated.min()
-		let normalized = saturated / saturated.max()
+		let normalized = CHCLT.saturate(rotated)
 		
 		return normalized
 	}
@@ -523,6 +520,11 @@ extension CHCLT {
 	
 	public func saturation(_ vector:Linear.Vector3) -> Scalar {
 		return simd_length(vector - luminance(vector))
+	}
+	
+	/// Apply the maximum saturation that preserves the hue of the color.
+	public static func saturate(_ vector:Linear.Vector3) -> Linear.Vector3 {
+		return illuminate(vector - vector.min())
 	}
 	
 	//	MARK: Chroma
@@ -845,6 +847,10 @@ extension CHCLT {
 			let n = 1 - value
 			
 			return applySaturation(chclt, value:s * n + t * value)
+		}
+		
+		public func saturated() -> LinearRGB {
+			return LinearRGB(CHCLT.saturate(vector))
 		}
 		
 		//	MARK: Hue
