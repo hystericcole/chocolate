@@ -115,6 +115,30 @@ struct Layout {
 			default: return nil
 			}
 		}
+		
+		static func frame(for size:Size, box:CGRect, horizontal:Alignment, vertical:Alignment, environment:Environment) -> CGRect {
+			let x, y, width, height:CGFloat
+			
+			if let value = vertical.value(axis:.vertical, environment:environment) {
+				height = min(CGFloat(size.height.resolve(box.size.height.native, maximize:true)), box.size.height)
+				y = (box.size.height - height) * CGFloat(value)
+			} else {
+				height = box.size.height
+				y = 0
+			}
+			
+			if let value = horizontal.value(axis:.horizontal, environment:environment) {
+				width = min(CGFloat(size.width.resolve(box.size.width.native, maximize:true)), box.size.width)
+				x = (box.size.width - width) * CGFloat(value)
+			} else {
+				width = box.size.width
+				x = 0
+			}
+			
+			let frame = CGRect(x:box.origin.x + x, y:box.origin.y + y, width:width, height:height)
+			
+			return frame
+		}
 	}
 	
 	/// Position of a group of elements along an axis within a container.
@@ -873,6 +897,134 @@ struct Layout {
 		}
 	}
 	
+	/// Arrange an element within available space
+	struct Align: PositionableWithTarget {
+		var target:Positionable
+		var vertical:Alignment
+		var horizontal:Alignment
+		
+		init(_ target:Positionable, horizontal:Alignment = .center, vertical:Alignment = .center) {
+			self.target = target
+			self.vertical = vertical
+			self.horizontal = horizontal
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			let isFilling = vertical.isFill && horizontal.isFill
+			let limit = Layout.Limit(width:box.size.width.native, height:box.size.height.native)
+			let size = isFilling ? Layout.Size.zero : target.positionableSize(fitting:limit)
+			let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
+			
+			target.applyPositionableFrame(frame, context:context)
+		}
+	}
+	
+	struct ThumbTrackHorizontal:PositionableWithTarget {
+		var thumb:Positionable
+		var trackBelow:Positionable
+		var trackAbove:Positionable
+		var trackWhole:Positionable
+		var thumbPosition:Native
+		var trackInset:EdgeInsets
+		
+		var target:Positionable {
+			let position = min(max(0, thumbPosition), 1)
+			
+			return Overlay(
+				horizontal:.fill,
+				vertical:.fill,
+				primary:3,
+				trackWhole.padding(trackInset),
+				trackAbove.fraction(width:1 - position, height:1).align(horizontal:.end, vertical:.fill).padding(trackInset),
+				trackBelow.fraction(width:position, height:1).align(horizontal:.start, vertical:.fill).padding(trackInset),
+				thumb.align(horizontal:.fraction(position), vertical:.center)
+			)
+		}
+	}
+	
+	/// Arrange a group of elements into the same space with the same alignment.
+	///
+	/// Use an overlay to
+	/// - align a single element within available space
+	/// - put a background behind an element
+	/// - put an overlay above an element
+	/// - have independent layouts share the same space
+	struct Overlay: PositionableWithTargets {
+		/// The elements to arrange
+		var targets:[Positionable]
+		/// The vertical alignment.  Defaults to fill.
+		var vertical:Alignment
+		/// The horizontal alignment.  Defaults to fill.
+		var horizontal:Alignment
+		/// When specified, the primary element is measured and aligned then the same frame is applied to all elements.
+		var primaryIndex:Int
+		
+		var frame:CGRect {
+			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].frame }
+			
+			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+		}
+		
+		var compressionResistance:CGPoint {
+			return targets.indices.contains(primaryIndex) ? targets[primaryIndex].compressionResistance : .zero
+		}
+		
+		init(targets:[Positionable], horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1) {
+			self.targets = targets
+			self.vertical = vertical
+			self.horizontal = horizontal
+			self.primaryIndex = primary
+		}
+		
+		init(horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1, _ targets:Positionable...) {
+			self.targets = targets
+			self.vertical = vertical
+			self.horizontal = horizontal
+			self.primaryIndex = primary
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].positionableSize(fitting:limit) }
+			
+			var result:Layout.Size = .zero
+			
+			for target in targets {
+				let size = target.positionableSize(fitting:limit)
+				
+				result.width.increase(size.width)
+				result.height.increase(size.height)
+			}
+			
+			return result
+		}
+		
+		func applyPositionableFrame(_ box:CGRect, context:Context) {
+			let isFilling = vertical.isFill && horizontal.isFill
+			let limit = Layout.Limit(width:box.size.width.native, height:box.size.height.native)
+			let zero = Layout.Size.zero
+			
+			if targets.indices.contains(primaryIndex) {
+				let size = isFilling ? zero : targets[primaryIndex].positionableSize(fitting:limit)
+				let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
+				
+				for target in targets {
+					target.applyPositionableFrame(frame, context:context)
+				}
+			} else {
+				for target in targets {
+					let size = isFilling ? zero : target.positionableSize(fitting:limit)
+					let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
+					
+					target.applyPositionableFrame(frame, context:context)
+				}
+			}
+		}
+		
+		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
+			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
+		}
+	}
+	
 	/// Arrange a group of elements in a vertical stack.
 	struct Vertical: PositionableWithTargets {
 		/// The elements to arrange.
@@ -1494,113 +1646,6 @@ struct Layout {
 			let ordered = isPositive ? targets.reversed() : targets
 			
 			return ordered.flatMap { $0.orderablePositionables(environment:environment, order:order) }
-		}
-	}
-	
-	/// Arrange a group of elements into the same space with the same alignment.
-	///
-	/// Use an overlay to
-	/// - align a single element within available space
-	/// - put a background behind an element
-	/// - put an overlay above an element
-	/// - have independent layouts share the same space
-	struct Overlay: PositionableWithTargets {
-		/// The elements to arrange
-		var targets:[Positionable]
-		/// The vertical alignment.  Defaults to fill.
-		var vertical:Alignment
-		/// The horizontal alignment.  Defaults to fill.
-		var horizontal:Alignment
-		/// When specified, the primary element is measured and aligned then the same frame is applied to all elements.
-		var primaryIndex:Int
-		
-		var frame:CGRect {
-			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].frame }
-			
-			return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
-		}
-		
-		var compressionResistance:CGPoint {
-			return targets.indices.contains(primaryIndex) ? targets[primaryIndex].compressionResistance : .zero
-		}
-		
-		init(targets:[Positionable], horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1) {
-			self.targets = targets
-			self.vertical = vertical
-			self.horizontal = horizontal
-			self.primaryIndex = primary
-		}
-		
-		init(horizontal:Alignment = .fill, vertical:Alignment = .fill, primary:Int = -1, _ targets:Positionable...) {
-			self.targets = targets
-			self.vertical = vertical
-			self.horizontal = horizontal
-			self.primaryIndex = primary
-		}
-		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].positionableSize(fitting:limit) }
-			
-			var result:Layout.Size = .zero
-			
-			for target in targets {
-				let size = target.positionableSize(fitting:limit)
-				
-				result.width.increase(size.width)
-				result.height.increase(size.height)
-			}
-			
-			return result
-		}
-		
-		func positionableFrame(for size:Size, box:CGRect, context:Context) -> CGRect {
-			let x, y, width, height:CGFloat
-			
-			if let value = vertical.value(axis:.vertical, environment:context.environment) {
-				height = min(CGFloat(size.height.resolve(box.size.height.native, maximize:true)), box.size.height)
-				y = (box.size.height - height) * CGFloat(value)
-			} else {
-				height = box.size.height
-				y = 0
-			}
-			
-			if let value = horizontal.value(axis:.horizontal, environment:context.environment) {
-				width = min(CGFloat(size.width.resolve(box.size.width.native, maximize:true)), box.size.width)
-				x = (box.size.width - width) * CGFloat(value)
-			} else {
-				width = box.size.width
-				x = 0
-			}
-			
-			let frame = CGRect(x:box.origin.x + x, y:box.origin.y + y, width:width, height:height)
-			
-			return frame
-		}
-		
-		func applyPositionableFrame(_ box:CGRect, context:Context) {
-			let isFilling = vertical.isFill && horizontal.isFill
-			let limit = Layout.Limit(width:box.size.width.native, height:box.size.height.native)
-			let zero = Layout.Size.zero
-			
-			if targets.indices.contains(primaryIndex) {
-				let size = isFilling ? zero : targets[primaryIndex].positionableSize(fitting:limit)
-				let frame = positionableFrame(for:size, box:box, context:context)
-				
-				for target in targets {
-					target.applyPositionableFrame(frame, context:context)
-				}
-			} else {
-				for target in targets {
-					let size = isFilling ? zero : target.positionableSize(fitting:limit)
-					let frame = positionableFrame(for:size, box:box, context:context)
-					
-					target.applyPositionableFrame(frame, context:context)
-				}
-			}
-		}
-		
-		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
-			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
 		}
 	}
 	
@@ -2551,11 +2596,11 @@ extension Positionable {
 		return Layout.Sizing(self, width:width, height:height)
 	}
 	
-	func fraction(width:Layout.Native, minimumWidth:Layout.Native = 0, maximumWidth:Layout.Native = Layout.Dimension.unbound, height:Layout.Native, minimumHeight:Layout.Native = 0, maximumHeight:Layout.Native = Layout.Dimension.unbound) -> Positionable {
+	func fraction(width:Layout.Native?, minimumWidth:Layout.Native = 0, maximumWidth:Layout.Native = Layout.Dimension.unbound, height:Layout.Native?, minimumHeight:Layout.Native = 0, maximumHeight:Layout.Native = Layout.Dimension.unbound) -> Positionable {
 		return Layout.Sizing(
 			self,
-			width:Layout.Dimension(constant:0, range:minimumWidth ... maximumWidth, fraction:width),
-			height:Layout.Dimension(constant:0, range:minimumHeight ... maximumHeight, fraction:height)
+			width:width != nil ? Layout.Dimension(constant:0, range:minimumWidth ... maximumWidth, fraction:width ?? 0) : nil,
+			height:height != nil ? Layout.Dimension(constant:0, range:minimumHeight ... maximumHeight, fraction:height ?? 0) : nil
 		)
 	}
 	
@@ -2572,7 +2617,7 @@ extension Positionable {
 	}
 	
 	func align(horizontal:Layout.Alignment = .center, vertical:Layout.Alignment = .center) -> Positionable {
-		return Layout.Overlay(targets:[self], horizontal:horizontal, vertical:vertical)
+		return Layout.Align(self, horizontal:horizontal, vertical:vertical)
 	}
 	
 	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {
