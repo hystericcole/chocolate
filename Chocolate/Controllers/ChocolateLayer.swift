@@ -358,6 +358,9 @@ class ChocolateLayerViewController: BaseViewController {
 
 extension CGContext {
 	func drawPlaneFromCubeHSB(box:CGRect, axis:Int, scalar:CGFloat, colorSpace:CGColorSpace, drawSpace:CGColorSpace) {
+		let colorSpace = self.colorSpace ?? colorSpace
+		let drawSpace = self.colorSpace ?? drawSpace
+		
 		let overColors:[CGColor]
 		let downColors:[CGColor]
 		let mode:CGBlendMode
@@ -402,6 +405,9 @@ extension CGContext {
 	}
 	
 	func drawPlaneFromCubeRGB(box:CGRect, axis:Int, scalar:CGFloat, colorSpace:CGColorSpace, drawSpace:CGColorSpace) {
+		let colorSpace = self.colorSpace ?? colorSpace
+		let drawSpace = self.colorSpace ?? drawSpace
+		
 		let s = CGFloat(scalar)
 		var c0:[CGFloat] = [0, 0, 0, 1]
 		var c1:[CGFloat] = [0, 0, 0, 1]
