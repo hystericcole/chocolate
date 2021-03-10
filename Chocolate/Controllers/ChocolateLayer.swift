@@ -19,12 +19,30 @@ class ChocolateLayer: CALayer {
 		
 		var model:ColorModel
 		var axis:Int
+		
+		func colors(chocolate:CHCLT, color:CHCLT.LinearRGB, count:Int) -> [CHCLT.LinearRGB] {
+			switch (model, axis % 3) {
+			case (.rgb, 0): return [.black, .red]
+			case (.rgb, 1): return [.black, .green]
+			case (.rgb, _): return [.black, .blue]
+			case (.hsb, 0): return (0 ..< count).map { CHCLT.LinearRGB(chocolate.linear(DisplayRGB.hexagonal(hue:Double($0) / Double(count - 1), saturation:1, brightness:1))) }
+			case (.hsb, 1): return [.white, CHCLT.LinearRGB(chocolate.linear(DisplayRGB.hexagonal(hue:color.display(chocolate).hsb().hue, saturation:1, brightness:1)))]
+			case (.hsb, _): return [.black, CHCLT.LinearRGB(chocolate.linear(DisplayRGB.hexagonal(hue:color.display(chocolate).hsb().hue, saturation:1, brightness:1)))]
+			case (.chclt, 0): return chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count).map { CHCLT.LinearRGB($0).applyLuminance(chocolate, value:0.5) }
+			case (.chclt, 1): return [color.saturated().applyChroma(chocolate, value:0), color.saturated().applyChroma(chocolate, value:1)]
+			case (.chclt, _): return [.black, .white]
+			}
+		}
 	}
 	
 	var chocolate:CHCLT = CHCLT.default
 	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
 	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
 	var mode = Mode.standard { didSet { setNeedsDisplay() } }
+	
+	func colorsForMode(mode:Mode, color:CHCLT.LinearRGB, count:Int = 360) -> [CHCLT.LinearRGB] {
+		return mode.colors(chocolate:chocolate, color:color, count:count)
+	}
 	
 	func colorsForChroma(primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, drawSpace:CGColorSpace) -> CGGradient? {
 		let color = primary.applyChroma(chocolate, value:chroma)
@@ -245,9 +263,9 @@ class ChocolateLayerViewController: BaseViewController {
 	}
 	
 	let chocolate = ChocolateLayerView()
-	let slider = Viewable.Slider(value:0.5, action:#selector(sliderChanged))
-	let toggle = Viewable.Switch(action:#selector(switchFlipped))
+	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged))
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
+	let indicator = Viewable.Shape(style:Viewable.Shape.Style(fill:nil))
 	let group = Viewable.Group(content:Layout.EmptySpace())
 	let axis:Axis = .chclt_l
 	
@@ -255,6 +273,8 @@ class ChocolateLayerViewController: BaseViewController {
 		super.prepare()
 		
 		title = DisplayStrings.Picker.title
+		
+		Common.Recognizer(.pan(false), target:self, action:#selector(indicatorPanned)).attachToView(chocolate)
 	}
 	
 	override func loadView() {
@@ -270,19 +290,29 @@ class ChocolateLayerViewController: BaseViewController {
 		axisChanged()
 	}
 	
-	@objc
-	func sliderChanged() {
-		chocolate.scalar = slider.value
+	func refreshGradient() {
+		let chclt = chocolate.chocolateLayer?.chocolate ?? .default
+		let linear = chocolate.mode.colors(chocolate:chclt, color:.green, count:360)
+		let colors = linear.compactMap { $0.color() }
+		
+		slider.track.colors = colors
 	}
 	
 	@objc
-	func switchFlipped() {
-		chocolate.mode.axis = toggle.isOn ? 1 : 2
+	func indicatorPanned(_ recognizer:PlatformPanGestureRecognizer) {
+		
+	}
+	
+	@objc
+	func sliderChanged() {
+		chocolate.scalar = slider.value
+		refreshGradient()
 	}
 	
 	@objc
 	func axisChanged() {
 		chocolate.mode = Axis(rawValue:picker.select)?.mode ?? .standard
+		refreshGradient()
 	}
 	
 	func layout() -> Positionable {
@@ -290,11 +320,16 @@ class ChocolateLayerViewController: BaseViewController {
 			Layout.Horizontal(
 				spacing:20,
 				position:.stretch,
-				slider.minimum(width:60),
+				slider.fraction(width:0.75, minimumWidth:66, height:nil),
 				picker.fixed(width:160).limiting(height:30 ... 80)
 			).padding(horizontal:20, vertical:10),
-			//Viewable.Color(color:.black).fixed(height:3),
-			chocolate.ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
+			Layout.Overlay(
+				horizontal:.fill,
+				vertical:.fill,
+				primary:1,
+				indicator,
+				chocolate.ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
+			)
 		)
 	}
 	
@@ -413,5 +448,93 @@ extension CGContext {
 			setBlendMode(.lighten)
 			drawLinearGradient(gradient, start:start, end:downEnd, options:options)
 		}
+	}
+}
+
+//	MARK: -
+
+class ChocolateGradientSlider: Viewable.Group {
+	var layout:Layout.ThumbTrackHorizontal
+	var thumb = Viewable.Color(color:PlatformColor(white:1, alpha:0.0))
+	var track = Viewable.Gradient(colors:[], direction:.right)
+	var action:Selector
+	var radius:CGFloat
+	weak var target:AnyObject?
+	
+	enum Constant {
+		static let trackBorderWidth:CGFloat = 1.0
+		static let thumbBorderWidth:CGFloat = 3.0
+		static let trackInset = thumbBorderWidth - trackBorderWidth
+	}
+	
+	struct InsetGradient: PositionableWithTarget {
+		let target:Positionable
+		let inset:CGFloat
+		
+		func applyPositionableFrame(_ frame: CGRect, context: Layout.Context) {
+			target.applyPositionableFrame(frame, context:context)
+			
+			let gradients = target.orderablePositionables(environment:context.environment, order:.existing)
+				.compactMap { $0 as? PlatformView }
+				.compactMap { $0.layer as? CAGradientLayer }
+			
+			for layer in gradients {
+				layer.applyDirection(.right, inset:inset / layer.bounds.size.width)
+			}
+		}
+	}
+	
+	var value:Double {
+		get { return layout.thumbPosition }
+		set { layout.thumbPosition = newValue; view?.ordered = layout }
+	}
+	
+	init(value:Double = 0.0, target:AnyObject? = nil, action:Selector, radius:CGFloat = 22) {
+		let diameter = radius.native * 2
+		let gradient = InsetGradient(target:track, inset:radius - Constant.trackInset)
+		
+		self.radius = radius
+		self.action = action
+		self.target = target
+		
+		self.layout = Layout.ThumbTrackHorizontal(
+			thumb:thumb.fixed(width:diameter, height:diameter),
+			trackBelow:Layout.EmptySpace(),
+			trackAbove:Layout.EmptySpace(),
+			trackWhole:gradient.rounded(),
+			thumbPosition:value,
+			trackInset:Layout.EdgeInsets(uniform:Constant.trackInset.native)
+		)
+		
+		super.init(content:layout)
+	}
+	
+	override func attachToView(_ view: ViewableGroupView) {
+		super.attachToView(view)
+		
+		let thumbBorderColor = PlatformColor.black
+		let trackBorderColor = PlatformColor.lightGray
+		
+		track.border(CALayer.Border(width:Constant.trackBorderWidth, radius:radius, color:trackBorderColor.cgColor))
+		thumb.border(CALayer.Border(width:Constant.thumbBorderWidth, radius:radius, color:thumbBorderColor.cgColor))
+		
+		Common.Recognizer(.pan(false), target:self, action:#selector(recognizerPanned)).attachToView(view)
+	}
+	
+	@objc
+	func recognizerPanned(_ recognizer:PlatformPanGestureRecognizer) {
+		guard recognizer.state == .changed, let view = view else { return }
+		
+		let box = CGRect(origin:.zero, size:view.bounds.size)
+		let groove = box.insetBy(dx:radius, dy:0)
+		let location = recognizer.location(in:view)
+		let offset = location.x.native - groove.origin.x.native
+		let fraction = min(max(0, offset / groove.width.native), 1)
+		
+		guard value != fraction else { return }
+		
+		value = fraction
+		
+		PlatformApplication.shared.sendAction(action, to:target, from:view)
 	}
 }
