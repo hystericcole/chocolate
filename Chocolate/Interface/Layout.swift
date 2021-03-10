@@ -2571,6 +2571,8 @@ struct Layout {
 			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
 		}
 	}
+	
+	static let empty = EmptySpace()
 }
 
 //	MARK: -

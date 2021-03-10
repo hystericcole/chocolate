@@ -158,7 +158,7 @@ enum Viewable {
 			set { model.content = newValue; view?.content = newValue }
 		}
 		
-		init(tag:Int = 0, content:Positionable) {
+		init(tag:Int = 0, content:Positionable = Layout.empty) {
 			self.model = Model(tag:tag, content:content)
 		}
 		
@@ -232,7 +232,7 @@ enum Viewable {
 		
 		struct Model {
 			let tag:Int
-			let content:Positionable
+			var content:Positionable
 			weak var target:AnyObject?
 			var action:Selector?
 		}
@@ -241,7 +241,12 @@ enum Viewable {
 		var model:Model
 		var tag:Int { get { return view?.tag ?? model.tag } }
 		
-		init(tag:Int = 0, content:Positionable, target:AnyObject? = nil, action:Selector?) {
+		var content:Positionable {
+			get { return view?.content ?? model.content }
+			set { model.content = newValue; view?.content = newValue }
+		}
+		
+		init(tag:Int = 0, content:Positionable = Layout.empty, target:AnyObject? = nil, action:Selector?) {
 			self.model = Model(tag:tag, content:content, target:target, action:action)
 		}
 		
@@ -534,7 +539,7 @@ enum Viewable {
 			set { model.zoomRange = newValue; view?.zoomRange = newValue }
 		}
 		
-		init(tag:Int = 0, content:Positionable, minimum:CGSize? = nil, maximum:CGSize? = nil, zoomRange:ZoomRange = 1 ... 1) {
+		init(tag:Int = 0, content:Positionable = Layout.empty, minimum:CGSize? = nil, maximum:CGSize? = nil, zoomRange:ZoomRange = 1 ... 1) {
 			self.model = Model(tag:tag, content:content, minimum:minimum ?? .zero, maximum:maximum ?? Layout.Size.unbound, zoomRange:zoomRange)
 		}
 		
@@ -1207,7 +1212,7 @@ class ViewableGradientView: PlatformTaggableView {
 
 class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewControllerAttachable {
 	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 #if os(macOS)
@@ -1256,7 +1261,7 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 
 class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
 	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	override var intrinsicContentSize:CGSize {
@@ -1366,7 +1371,7 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 #endif
 	
 	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	func attachViewController(_ controller:PlatformViewController) {
@@ -1612,7 +1617,7 @@ class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
 	class var reuseIdentifier:String { return String(describing:self) }
 	
 	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 #if os(macOS)

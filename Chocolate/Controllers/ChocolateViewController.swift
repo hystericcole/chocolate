@@ -55,9 +55,9 @@ class ChocolateViewController: BaseViewController {
 	var previousInput:Input = .luma
 	var stableChroma:Bool = true
 	
-	let group = Viewable.Group(content:Layout.EmptySpace())
-	let sampleScroll = Viewable.Scroll(content:Layout.EmptySpace())
-	let foregrounds = Viewable.Group(content:Layout.EmptySpace())
+	let group = Viewable.Group()
+	let sampleScroll = Viewable.Scroll()
+	let foregrounds = Viewable.Group()
 	let spacePicker = Viewable.Picker(titles:ColorSpace.titles, attributes:Style.medium.attributes, select:0, action:#selector(colorSpaceChanged))
 	let sliderRed = Viewable.Slider(tag:Input.red.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.red)
 	let sliderGreen = Viewable.Slider(tag:Input.green.rawValue, action:#selector(colorSliderChanged), minimumTrackColor:.green)

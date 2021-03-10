@@ -12,7 +12,7 @@ import QuartzCore
 class ChocolateLumaRampViewController: BaseViewController {
 	enum Input: Int { case unknown, hueStart, hueShift, chroma, lumaLower, lumaUpper }
 	
-	let group = Viewable.Group(content:Layout.EmptySpace())
+	let group = Viewable.Group()
 	let sliderHueStart = Viewable.Slider(tag:Input.hueStart.rawValue, value:0.5, action:#selector(colorSliderChanged))
 	let sliderHueRotations = Viewable.Slider(tag:Input.hueShift.rawValue, value:1, range:-4 ... 4, action:#selector(colorSliderChanged))
 	let sliderLumaLower = Viewable.Slider(tag:Input.lumaLower.rawValue, value:1/16, action:#selector(colorSliderChanged))
