@@ -16,6 +16,7 @@ typealias PlatformFontDescriptor = NSFontDescriptor
 typealias PlatformColor = NSColor
 typealias PlatformImage = NSImage
 typealias PlatformPasteboard = NSPasteboard
+typealias PlatformApplication = NSApplication
 typealias PlatformWindow = NSWindow
 typealias PlatformResponder = NSResponder
 typealias PlatformViewController = NSViewController
@@ -62,6 +63,7 @@ typealias PlatformFontDescriptor = UIFontDescriptor
 typealias PlatformColor = UIColor
 typealias PlatformImage = UIImage
 typealias PlatformPasteboard = UIPasteboard
+typealias PlatformApplication = UIApplication
 typealias PlatformWindow = UIWindow
 typealias PlatformResponder = UIResponder
 typealias PlatformViewController = UIViewController
@@ -185,6 +187,10 @@ extension PlatformView {
 	var backgroundColor:PlatformColor? {
 		get { return layer?.backgroundColor?.platformColor }
 		set { layer?.backgroundColor = newValue?.cgColor }
+	}
+	
+	func scheduleLayout() {
+		needsLayout = true
 	}
 }
 
@@ -451,6 +457,14 @@ extension CGImage {
 
 //	MARK: -
 
+extension PlatformApplication {
+	func sendAction(_ action:Selector, to target:AnyObject?, from sender:AnyObject?) {
+		self.sendAction(action, to:target, from:sender, for:nil)
+	}
+}
+
+//	MARK: -
+
 extension PlatformPasteboard {
 	func setImage(_ image:PlatformImage) {
 		self.image = image
@@ -471,6 +485,10 @@ extension PlatformView {
 	func prepareViewableColor(isOpaque:Bool) {
 		self.isUserInteractionEnabled = false
 		self.isOpaque = isOpaque
+	}
+	
+	func scheduleLayout() {
+		setNeedsLayout()
 	}
 }
 
