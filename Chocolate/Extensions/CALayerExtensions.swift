@@ -312,7 +312,13 @@ extension CAGradientLayer {
 			}
 		}
 		
-		var points:(start:CGPoint, end:CGPoint) {
+		init(start:CGPoint, end:CGPoint) {
+			let angle = atan2(end.y - start.y, end.x - start.x)
+			
+			self = .angle(angle)
+		}
+		
+		func points(inset:CGFloat = 0) -> (start:CGPoint, end:CGPoint) {
 			let sc:__double2
 			
 			switch self {
@@ -323,16 +329,13 @@ extension CAGradientLayer {
 			let (s, c) = (sc.__sinval, sc.__cosval)
 			let (x, y) = s.magnitude < c.magnitude ? (copysign(1, c), s / c.magnitude) : (c / s.magnitude, copysign(1, s))
 			
-			let from = CGPoint(x:0.5 - x / 2, y:0.5 - y / 2)
-			let to = CGPoint(x:0.5 + x / 2, y:0.5 + y / 2)
+			let r = 1.0 - 2.0 * inset.native
+			let (rx, ry) = (r * x, r * y)
+			
+			let from = CGPoint(x:0.5 - rx / 2, y:0.5 - ry / 2)
+			let to = CGPoint(x:0.5 + rx / 2, y:0.5 + ry / 2)
 			
 			return (start:from, end:to)
-		}
-		
-		init(start:CGPoint, end:CGPoint) {
-			let angle = atan2(end.y - start.y, end.x - start.x)
-			
-			self = .angle(angle)
 		}
 	}
 	
@@ -348,7 +351,7 @@ extension CAGradientLayer {
 		
 		var direction:Direction {
 			get { return Direction(start:start, end:end) }
-			set { (start, end) = newValue.points }
+			set { (start, end) = newValue.points() }
 		}
 		
 		init(colors:[CGColor], locations:[NSNumber]? = nil, start:CGPoint = CGPoint(x:0.5, y:0), startRadius:CGFloat = 0, end:CGPoint = CGPoint(x:0.5, y:1), endRadius:CGFloat = 0, type:CAGradientLayerType = .axial) {
@@ -362,7 +365,7 @@ extension CAGradientLayer {
 		}
 		
 		init(colors:[CGColor], locations:[NSNumber]? = nil, direction:Direction, startRadius:CGFloat = 0, endRadius:CGFloat = 0, type:CAGradientLayerType = .axial) {
-			let (start, end) = direction.points
+			let (start, end) = direction.points()
 			
 			self.init(colors:colors, locations:locations, start:start, startRadius:startRadius, end:end, endRadius:endRadius, type:type)
 		}
@@ -410,7 +413,11 @@ extension CAGradientLayer {
 	
 	var direction:Direction {
 		get { return Direction(start:startPoint, end:endPoint) }
-		set { (startPoint, endPoint) = newValue.points }
+		set { (startPoint, endPoint) = newValue.points() }
+	}
+	
+	func applyDirection(_ direction:Direction, inset:CGFloat) {
+		(startPoint, endPoint) = direction.points(inset:inset)
 	}
 }
 
