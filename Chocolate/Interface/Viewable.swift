@@ -168,6 +168,8 @@ enum Viewable {
 			view.content = model.content
 		}
 		
+		func attachToView(_ view:ViewType) { self.view = view }
+		
 		func attachToExistingView(_ view: PlatformView?) {
 			guard let view = view as? ViewType else { return }
 			
@@ -1205,7 +1207,8 @@ class ViewableGradientView: PlatformTaggableView {
 
 class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewControllerAttachable {
 	var priorSize:CGSize = .zero
-	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
+	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 #if os(macOS)
 	override var acceptsFirstResponder: Bool { return true }
@@ -1215,17 +1218,9 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 		translatesAutoresizingMaskIntoConstraints = false
 	}
 	
-	func applyContent() {
+	func orderContent(_ content:Positionable) {
 		orderPositionables([content], environment:positionableEnvironment, options:.set)
-		
-#if os(macOS)
-		if priorSize.minimum > 0 {
-			sizeChanged()
-		}
-#else
-		invalidateLayout()
-		setNeedsLayout()
-#endif
+		ordered = content
 	}
 	
 	func attachViewController(_ controller:PlatformViewController) {
@@ -1261,23 +1256,16 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 
 class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
 	var priorSize:CGSize = .zero
-	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
+	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	override var intrinsicContentSize:CGSize {
 		return content.positionableSize(fitting:Layout.Limit()).resolve(.zero)
 	}
 	
-	func applyContent() {
+	func orderContent(_ content:Positionable) {
 		orderPositionables([content], environment:positionableEnvironment, options:.set)
-		
-#if os(macOS)
-		if priorSize.minimum > 0 {
-			sizeChanged()
-		}
-#else
-		invalidateLayout()
-		setNeedsLayout()
-#endif
+		ordered = content
 	}
 	
 #if os(macOS)
@@ -1378,7 +1366,8 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 #endif
 	
 	var priorSize:CGSize = .zero
-	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
+	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	func attachViewController(_ controller:PlatformViewController) {
 		autoresizingMask = .flexibleSize
@@ -1406,23 +1395,17 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 #endif
 	}
 	
-	func applyContent() {
+	func orderContent(_ content:Positionable) {
+		ordered = content
+		
 #if os(macOS)
-		containerView.orderPositionables([content], environment:positionableEnvironment, options:.set)
-		
-		if priorSize.minimum > 0 {
-			sizeChanged()
-		}
 #else
-		invalidateLayout()
-		setNeedsLayout()
-		
 		if containerView.superview !== self {
 			insertSubview(containerView, at:0)
 		}
+#endif
 		
 		containerView.orderPositionables([content], environment:positionableEnvironment, options:.set)
-#endif
 	}
 	
 	func invalidateLayout() { priorSize = .zero }
@@ -1629,7 +1612,8 @@ class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
 	class var reuseIdentifier:String { return String(describing:self) }
 	
 	var priorSize:CGSize = .zero
-	var content:Positionable = Layout.EmptySpace() { didSet { applyContent() } }
+	var ordered:Positionable = Layout.EmptySpace() { didSet { invalidateLayout(); scheduleLayout() } }
+	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 #if os(macOS)
 	override var isFlipped:Bool { return true }
@@ -1655,19 +1639,14 @@ class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
 		translatesAutoresizingMaskIntoConstraints = false
 	}
 	
-	func applyContent() {
+	func orderContent(_ content:Positionable) {
 #if os(macOS)
 		attachPositionables(content, environment:positionableEnvironment)
-		
-		if priorSize.minimum > 0 {
-			sizeChanged()
-		}
 #else
 		contentView.attachPositionables(content, environment:positionableEnvironment)
-		
-		invalidateLayout()
-		setNeedsLayout()
 #endif
+		
+		ordered = content
 	}
 	
 	override func prepareForReuse() {
