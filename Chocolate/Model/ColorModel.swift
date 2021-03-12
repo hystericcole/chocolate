@@ -126,11 +126,13 @@ enum ColorModel: Int {
 		return r ? result.reversed() : result
 	}
 	
-	static func chromaGradient(chclt:CHCLT, primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, colorSpace:CGColorSpace?) -> CGGradient? {
+	static func chromaGradient(chclt:CHCLT, primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, colorSpace:CGColorSpace?, darkToLight:Bool = false) -> CGGradient? {
 		let color = primary.applyChroma(chclt, value:chroma)
 		let value = color.luminance(chclt)
-		let locations:[CGFloat] = [0, CGFloat(1 - value), 1]
-		let colors:[CGColor] = [.white, color, .black].map { $0.color() }
+		let locations:[CGFloat] = [0, CGFloat(darkToLight ? value : 1 - value), 1]
+		var colors:[CGColor] = [.white, color, .black].map { $0.color() }
+		
+		if darkToLight { colors.reverse() }
 		
 		return CGGradient(colorsSpace:colorSpace, colors:colors as CFArray, locations:locations)
 	}
@@ -144,14 +146,16 @@ extension CGContext {
 		let overColors:[CGColor]
 		let downColors:[CGColor]
 		let mode:CGBlendMode
+		let overAxis = (axis / 6 & 1) * 6 + axis % 6
+		let downAxis = (axis / 6 & 2) * 6 + axis % 6
 		
 		overColors = [
-			ColorModel.platformRGB(axis:axis, x:0, y:0, z:scalar).cgColor,
-			ColorModel.platformRGB(axis:axis, x:1, y:0, z:scalar).cgColor
+			ColorModel.platformRGB(axis:overAxis, x:0, y:0, z:scalar).cgColor,
+			ColorModel.platformRGB(axis:overAxis, x:1, y:0, z:scalar).cgColor
 		]
 		downColors = [
-			ColorModel.platformRGB(axis:axis, x:0, y:1, z:scalar).cgColor,
-			ColorModel.platformRGB(axis:axis, x:0, y:0, z:scalar).cgColor
+			ColorModel.platformRGB(axis:downAxis, x:0, y:1, z:scalar).cgColor,
+			ColorModel.platformRGB(axis:downAxis, x:0, y:0, z:scalar).cgColor
 		]
 		mode = .lighten
 		
@@ -180,6 +184,8 @@ extension CGContext {
 		let mode:CGBlendMode
 		let a = axis / 6
 		let isFlipped = (axis / 3) & 1 != 0
+		let flipOver = isFlipped ? ~a & 2 : a & 1
+		let flipDown = isFlipped ? ~a & 1 : a & 2
 		let count = Int(isFlipped ? box.size.height : box.size.width)
 		
 		switch axis % 3 {
@@ -203,8 +209,8 @@ extension CGContext {
 			mode = .normal
 		}
 		
-		if a & (isFlipped ? 2 : 1) != 0 { copyColors.reverse() }
-		if a & (isFlipped ? 1 : 2) != 0 { modeColors.reverse() }
+		if flipOver != 0 { copyColors.reverse() }
+		if flipDown != 0 { modeColors.reverse() }
 		
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
@@ -225,27 +231,33 @@ extension CGContext {
 	}
 	
 	func drawPlaneFromCubeCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chocolate:CHCLT) {
-		let drawSpace = CHCLT.LinearRGB.colorSpace // colorSpace
+		let drawSpace = CHCLT.LinearRGB.colorSpace
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
 		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let a = axis / 6
 		let isFlipped = (axis / 3) & 1 != 0
+		let flipOver = isFlipped ? ~a & 2 : a & 1
+		let flipDown = isFlipped ? ~a & 1 : a & 2
 		let count = Int(isFlipped ? box.size.height : box.size.width)
 		let size = isFlipped ? CGSize(width:box.size.width, height:1) : CGSize(width:1, height:box.size.height)
+		let step = isFlipped ? CGPoint(x:0, y:1) : CGPoint(x:1, y:0)
 		
 		setRenderingIntent(CGColorRenderingIntent.absoluteColorimetric)
 		
 		switch axis % 3 {
 		case 0:	//	scalar is hue
 			let primary = CHCLT.LinearRGB(chocolate, hue:scalar)
+			let flipChroma = flipOver != 0
+			let flipLuma = flipDown != 0
 			
 			for index in 0 ..< count {
-				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
+				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
 				let chroma = CHCLT.Scalar(index) / CHCLT.Scalar(count - 1)
 				
-				guard let gradient = ColorModel.chromaGradient(chclt:chocolate, primary:primary, chroma:chroma, colorSpace:drawSpace) else { continue }
+				guard let gradient = ColorModel.chromaGradient(chclt:chocolate, primary:primary, chroma:flipChroma ? 1 - chroma : chroma, colorSpace:drawSpace, darkToLight:flipLuma) else { continue }
 				
 				clip(to:stripe)
 				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
@@ -253,26 +265,33 @@ extension CGContext {
 			}
 		case 1:	//	scalar is chroma
 			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let flipHue = flipOver != 0
+			let flipLuma = flipDown != 0
 			
 			for index in 0 ..< count {
-				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
+				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
+				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index])
 				
-				guard let gradient = ColorModel.chromaGradient(chclt:chocolate, primary:CHCLT.LinearRGB(hues[index]), chroma:scalar, colorSpace:drawSpace) else { continue }
+				guard let gradient = ColorModel.chromaGradient(chclt:chocolate, primary:primary, chroma:scalar, colorSpace:drawSpace, darkToLight:flipLuma) else { continue }
 				
 				clip(to:stripe)
 				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
 				resetClip()
 			}
-		default:	//	scalar is luminance
+		case _:	//	scalar is luminance
 			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let flipHue = flipOver != 0
+			let flipChroma = flipDown != 0
 			
 			for index in 0 ..< count {
-				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
+				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
+				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index]).applyLuminance(chocolate, value:scalar)
+				var colors = [primary, primary.applyChroma(chocolate, value:0.5), primary.applyChroma(chocolate, value:0)].map { $0.color() }
 				
-				let primary = CHCLT.LinearRGB(hues[index]).applyLuminance(chocolate, value:scalar)
-				let colors = [primary, primary.applyChroma(chocolate, value:0.5), primary.applyChroma(chocolate, value:0)].map { $0.color() }
+				if flipChroma { colors.reverse() }
+				
 				guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
 				
 				clip(to:stripe)

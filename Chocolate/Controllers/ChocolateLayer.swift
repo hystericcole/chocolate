@@ -126,7 +126,8 @@ class ChocolateLayerViewController: BaseViewController {
 	
 	func refreshGradient() {
 		let chclt = chocolate.chocolateLayer?.chocolate ?? .default
-		let linear = chocolate.mode.linearColors(chclt:chclt, hue:indicatorPosition.point().x.native, count:360)
+		let point = indicatorPosition.point()
+		let linear = chocolate.mode.linearColors(chclt:chclt, hue:point.x.native, count:360)
 		let colors = linear.compactMap { $0.color() }
 		
 		slider.track.colors = colors
