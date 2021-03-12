@@ -106,12 +106,6 @@ typealias PlatformColorWell = UIColorWell
 
 //	MARK: -
 
-extension CGColor {
-	var platformColor:PlatformColor? { return PlatformColor(cgColor:self) }
-}
-
-//	MARK: -
-
 extension CTFont {
 	var platformFont:PlatformFont { return self as PlatformFont }
 }
@@ -127,15 +121,28 @@ extension CGRect {
 //	MARK: -
 
 #if os(macOS)
+
+extension CGColor {
+	var platformColor:PlatformColor { return PlatformColor(cgColor:self) ?? .clear }
+}
+
+//	MARK: -
+
 class PlatformTaggableView: PlatformView {
 	var _tag = 0
+	var isUserInteractionEnabled:Bool = true
 	override var isFlipped:Bool { return true }
 	override var tag:Int { get { return _tag } set { _tag = newValue } }
 	
 	func prepareViewableColor(isOpaque:Bool) {
+		isUserInteractionEnabled = false
 		wantsLayer = true
 		layer?.isOpaque = isOpaque
 		compressionResistance = .zero
+	}
+	
+	override func hitTest(_ point: NSPoint) -> NSView? {
+		return isUserInteractionEnabled ? super.hitTest(point) : nil
 	}
 }
 
@@ -442,6 +449,12 @@ extension PlatformTabController {
 #else
 
 typealias PlatformTaggableView = PlatformView
+
+extension CGColor {
+	var platformColor:PlatformColor { return PlatformColor(cgColor:self) }
+}
+
+//	MARK: -
 
 extension PlatformAutoresizing {
 	static let flexibleSize:PlatformAutoresizing = [.flexibleWidth, .flexibleHeight]

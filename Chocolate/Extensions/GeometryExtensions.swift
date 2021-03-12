@@ -158,3 +158,14 @@ extension CGRect {
 	public static func - (lhs:CGRect, rhs:CGSize) -> CGRect { return CGRect(origin:lhs.origin, size:lhs.size - rhs) }
 	public static func * (lhs:CGRect, rhs:CGFloat) -> CGRect { return CGRect(origin:lhs.origin * rhs, size:lhs.size * rhs) }
 }
+
+extension CGContext {
+	func unflip() {
+		let t = userSpaceToDeviceSpaceTransform
+		
+		guard t.d < 0 else { return }
+		
+		translateBy(x:0, y:t.ty / -t.d)
+		scaleBy(x:1, y:-1)
+	}
+}

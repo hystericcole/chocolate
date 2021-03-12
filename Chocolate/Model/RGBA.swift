@@ -292,10 +292,10 @@ extension DisplayRGB {
 		self.init(components[0].native, components[1].native, components[2].native, components[3].native)
 	}
 	
-	public func color(colorSpace:CGColorSpace? = nil) -> CGColor? {
+	public func color(colorSpace:CGColorSpace? = nil) -> CGColor! {
 		let space:CGColorSpace
 		
-		if let colorSpace = colorSpace, colorSpace.model == .rgb {
+		if let colorSpace = colorSpace, colorSpace.model == .rgb, colorSpace.numberOfComponents == 3 {
 			space = colorSpace
 		} else {
 			space = DisplayRGB.colorSpace
@@ -310,20 +310,20 @@ extension DisplayRGB {
 //	MARK: -
 
 extension CHCLT.LinearRGB {
-	public static var colorSpace = linearColorSpace()
+	public static var colorSpace:CGColorSpace = linearColorSpace()
 	
-	public static func linearColorSpace() -> CGColorSpace? {
-		if #available(macOS 10.14.3, iOS 12.3, *), let linear = CGColorSpace(name:CGColorSpace.extendedLinearDisplayP3) { return linear }
+	public static func linearColorSpace() -> CGColorSpace! {
+		// extendedLinearDisplayP3 incorrect on iOS
+		//if #available(macOS 10.14.3, iOS 12.3, *), let linear = CGColorSpace(name:CGColorSpace.extendedLinearDisplayP3) { return linear }
 		if #available(macOS 10.12, iOS 10.0, *), let linear = CGColorSpace(name:CGColorSpace.linearSRGB) { return linear }
 		
-		return CGColorSpace(name:CGColorSpace.genericRGBLinear)
+		return CGColorSpace(name:CGColorSpace.genericRGBLinear)!
 	}
 	
 	public init?(_ color:CGColor?) {
 		if
 			#available(macOS 10.11, iOS 9.0, *),
-			let space = CHCLT.LinearRGB.colorSpace,
-			let color = color?.converted(to:space, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
+			let color = color?.converted(to:CHCLT.LinearRGB.colorSpace, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
 			let components = color.components
 		{
 			self.init(components[0].native, components[1].native, components[2].native)
@@ -338,23 +338,21 @@ extension CHCLT.LinearRGB {
 		}
 	}
 	
-	public func color(colorSpace:CGColorSpace? = nil, alpha:CGFloat = 1) -> CGColor? {
+	public func color(colorSpace:CGColorSpace? = nil, alpha:CGFloat = 1) -> CGColor! {
 		let space:CGColorSpace
 		let rgb:CHCLT.Vector3
 		
-		if let colorSpace = colorSpace, colorSpace.model == .rgb {
+		if let colorSpace = colorSpace, colorSpace.model == .rgb, colorSpace.numberOfComponents == 3 {
 			rgb = colorSpace.chclt?.display(vector) ?? vector
 			space = colorSpace
-		} else if let linear = CHCLT.LinearRGB.colorSpace {
-			rgb = vector
-			space = linear
 		} else {
-			return nil
+			rgb = vector
+			space = CHCLT.LinearRGB.colorSpace
 		}
 		
 		var components:[CGFloat] = [CGFloat(rgb.x), CGFloat(rgb.y), CGFloat(rgb.z), alpha]
 		
-		return CGColor(colorSpace:space, components:&components)
+		return CGColor(colorSpace:space, components:&components)!
 	}
 	
 	static func drawPlaneFromPolarCubeHCL(_ chclt:CHCLT, axis:Int, value:CHCLT.Scalar, pixels:UnsafeMutablePointer<UInt32>, width:Int, height:Int, rowLength:Int) {

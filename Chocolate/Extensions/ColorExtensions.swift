@@ -12,8 +12,6 @@ import Foundation
 #if os(macOS)
 import Cocoa
 
-typealias SystemColor = NSColor
-
 extension NSColor {
 	var rgba:DisplayRGB? {
 		return DisplayRGB(cgColor)
@@ -21,8 +19,6 @@ extension NSColor {
 }
 #else
 import UIKit
-
-typealias SystemColor = UIColor
 
 extension UIColor {
 	var rgba:DisplayRGB? {
@@ -66,7 +62,7 @@ extension CGColor {
 	func chocolateTransform(_ transform:CHCLT.Transform, chclt:CHCLT? = nil) -> CGColor? { return linearRGB?.transform(chclt ?? chocolate, transform:transform).color(colorSpace:colorSpace, alpha:alpha) }
 }
 
-extension SystemColor {
+extension PlatformColor {
 	convenience init?(chocolateHue hue:Double, chroma:Double, luma:Double, alpha:Double) {
 		let color = DisplayRGB(CGColor.chocolate, hue:hue, chroma:chroma, luma:luma, alpha:alpha)
 		let vector = color.vector

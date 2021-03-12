@@ -116,6 +116,13 @@ struct Layout {
 			}
 		}
 		
+		static func point(horizontal:Alignment, vertical:Alignment, environment:Environment) -> CGPoint {
+			return CGPoint(
+				x:horizontal.value(axis:.horizontal, environment:environment) ?? 0.5,
+				y:vertical.value(axis:.vertical, environment:environment) ?? 0.5
+			)
+		}
+		
 		static func frame(for size:Size, box:CGRect, horizontal:Alignment, vertical:Alignment, environment:Environment) -> CGRect {
 			let x, y, width, height:CGFloat
 			
@@ -916,6 +923,10 @@ struct Layout {
 			let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
 			
 			target.applyPositionableFrame(frame, context:context)
+		}
+		
+		func point(environment:Layout.Environment = .current) -> CGPoint {
+			return Alignment.point(horizontal:horizontal, vertical:vertical, environment:environment)
 		}
 	}
 	
