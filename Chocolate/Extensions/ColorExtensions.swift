@@ -6,36 +6,8 @@
 //	Copyright © 2021 Eric Cole. All rights reserved.
 //
 
+import CoreGraphics
 import Foundation
-
-
-#if os(macOS)
-import Cocoa
-
-extension NSColor {
-	var rgba:DisplayRGB? {
-		return DisplayRGB(cgColor)
-	}
-}
-#else
-import UIKit
-
-extension UIColor {
-	var rgba:DisplayRGB? {
-		return DisplayRGB(cgColor)
-	}
-}
-#endif
-
-extension CGColor {
-	var rgba:DisplayRGB? {
-		return DisplayRGB(self)
-	}
-	
-	static func from(rgba:DisplayRGB?, colorSpace:CGColorSpace?) -> CGColor? {
-		return rgba?.color(colorSpace:colorSpace)
-	}
-}
 
 extension CGColor {
 	static var chocolate = CHCLT_sRGB.standard
@@ -63,6 +35,9 @@ extension CGColor {
 }
 
 extension PlatformColor {
+	var displayRGB:DisplayRGB? { return cgColor.displayRGB }
+	var linearRGB:CHCLT.LinearRGB? { return cgColor.linearRGB }
+	
 	convenience init?(chocolateHue hue:Double, chroma:Double, luma:Double, alpha:Double) {
 		let color = DisplayRGB(CGColor.chocolate, hue:hue, chroma:chroma, luma:luma, alpha:alpha)
 		let vector = color.vector
