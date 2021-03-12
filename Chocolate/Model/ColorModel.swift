@@ -136,6 +136,25 @@ enum ColorModel: Int {
 		
 		return CGGradient(colorsSpace:colorSpace, colors:colors as CFArray, locations:locations)
 	}
+	
+	static func hsb_from_hsl(h:CHCLT.Scalar, s:CHCLT.Scalar, l:CHCLT.Scalar) -> (hue:CHCLT.Scalar, saturation:CHCLT.Scalar, brightness:CHCLT.Scalar) {
+		guard l > 0 else { return (h, 0, 0) }
+		
+		let d = l > 0.5 ? 1.0 - l : l
+		let m = s * d
+		let b = l + m
+		
+		return (h, m * 2.0 / b, b)
+	}
+	
+	static func hsl_from_hsb(h:CHCLT.Scalar, s:CHCLT.Scalar, b:CHCLT.Scalar) -> (hue:CHCLT.Scalar, saturation:CHCLT.Scalar, lightness:CHCLT.Scalar) {
+		guard b > 0 else { return (h, 0, 0) }
+		
+		let l = b - b * s * 0.5
+		let d = l > 0.5 ? 1.0 - l : l
+		
+		return (h, s * b * 0.5 / d, l)
+	}
 }
 
 //	MARK: -

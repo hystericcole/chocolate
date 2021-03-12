@@ -9,90 +9,19 @@
 import QuartzCore
 import Foundation
 
-class ChocolateLayer: CALayer {
-	struct Mode {
-		static let standard = Mode(model:.chclt, axis:0)
-		
-		var model:ColorModel
-		var axis:Int
-		
-		func linearColor(chclt:CHCLT, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> CHCLT.LinearRGB {
-			return model.linearColor(axis:axis, x:x, y:y, z:z, chclt:chclt)
-		}
-		
-		func displayColor(chclt:CHCLT, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> DisplayRGB {
-			return model.displayColor(axis:axis, x:x, y:y, z:z, chclt:chclt)
-		}
-		
-		func platformColor(chclt:CHCLT, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> PlatformColor {
-			return model.platformColor(axis:axis, x:x, y:y, z:z, chclt:chclt)
-		}
-		
-		func linearColors(chclt:CHCLT, hue:CHCLT.Scalar, count:Int = 360) -> [CHCLT.LinearRGB] {
-			return model.linearColors(axis:axis, chclt:chclt, hue:hue, count:count)
-		}
-	}
-	
-	var chocolate:CHCLT = CHCLT.default
-	var colorSpace = CGColorSpace(name:CGColorSpace.genericRGBLinear) ?? CGColorSpaceCreateDeviceRGB()
-	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
-	var mode = Mode.standard { didSet { setNeedsDisplay() } }
-	
-	override func draw(in ctx: CGContext) {
-		let box = CGRect(origin:.zero, size:bounds.size)
-		
-		ctx.clip(to:box)
-		
-		switch mode.model {
-		case .chclt: ctx.drawPlaneFromCubeCHCLT(axis:mode.axis, scalar:scalar, box:box, chocolate:chocolate)
-		case .rgb: ctx.drawPlaneFromCubeRGB(axis:mode.axis, scalar:scalar, box:box)
-		case .hsb: ctx.drawPlaneFromCubeHSB(axis:mode.axis, scalar:scalar, box:box)
-		}
-	}
-	
-	override func render(in ctx: CGContext) {
-		draw(in:ctx)
-	}
-}
-
-//	MARK: -
-
-class ChocolateLayerView: BaseView {
-#if os(macOS)
-	override class var layerClass:CALayer.Type { return ChocolateLayer.self }
-	override func viewDidEndLiveResize() { super.viewDidEndLiveResize(); refresh() }
-	override var wantsUpdateLayer:Bool { return true }
-	
-	func refresh() { needsDisplay = true }
-#else
-	override class var layerClass:AnyClass { return ChocolateLayer.self }
-	
-	func refresh() { setNeedsDisplay() }
-#endif
-	
-	var chocolateLayer:ChocolateLayer? { return layer as? ChocolateLayer }
-	
-	var mode:ChocolateLayer.Mode { get { return chocolateLayer?.mode ?? .standard } set { chocolateLayer?.mode = newValue; refresh() } }
-	var scalar:CHCLT.Scalar { get { return chocolateLayer?.scalar ?? 0 } set { chocolateLayer?.scalar = newValue } }
-	
-	override func prepare() { super.prepare(); refresh() }
-}
-
-//	MARK: -
-
 class ChocolateLayerViewController: BaseViewController {
 	enum Axis: Int {
 		case chclt_h, chclt_c, chclt_l, rgb_r, rgb_g, rgb_b, hsb_h, hsb_s, hsb_b
 		
-		var mode:ChocolateLayer.Mode {
-			return ChocolateLayer.Mode(model:ColorModel(rawValue:rawValue / 3) ?? .chclt, axis:rawValue % 3)
+		var mode:ChocolatePlaneLayer.Mode {
+			return ChocolatePlaneLayer.Mode(model:ColorModel(rawValue:rawValue / 3) ?? .chclt, axis:rawValue % 3)
 		}
 		
 		static var titles:[String] = ["CHCLT Hue", "CHCLT Chroma", "CHCLT Luma", "RGB Red", "RGB Green", "RGB Blue", "HSB Hue", "HSB Saturation", "HSB Brightness"]
 	}
 	
 	let indicatorRadius:CGFloat = 33.5
-	let chocolate = ChocolateLayerView()
+	let chocolate = ChocolatePlaneView()
 	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged))
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
 	let indicator = Viewable.Color(color:.black)
@@ -125,7 +54,7 @@ class ChocolateLayerViewController: BaseViewController {
 	}
 	
 	func refreshGradient() {
-		let chclt = chocolate.chocolateLayer?.chocolate ?? .default
+		let chclt = chocolate.planeLayer?.chclt ?? .default
 		let point = indicatorPosition.point()
 		let linear = chocolate.mode.linearColors(chclt:chclt, hue:point.x.native, count:360)
 		let colors = linear.compactMap { $0.color() }
@@ -134,7 +63,7 @@ class ChocolateLayerViewController: BaseViewController {
 	}
 	
 	func refreshIndicator(_ unit:CGPoint) {
-		let chclt = chocolate.chocolateLayer?.chocolate ?? .default
+		let chclt = chocolate.planeLayer?.chclt ?? .default
 		let mode = chocolate.mode
 		let borderContrasting = 0.0
 		let indicatorColor:PlatformColor
@@ -209,7 +138,7 @@ class ChocolateLayerViewController: BaseViewController {
 	}
 	
 	func copyToPasteboard() {
-		guard let layer = chocolate.chocolateLayer else { return }
+		guard let layer = chocolate.planeLayer else { return }
 		
 		let size = layer.bounds.size
 		

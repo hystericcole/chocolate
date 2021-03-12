@@ -144,30 +144,7 @@ public struct DisplayRGB {
 	}
 	
 	public func applyLuma(_ chclt:CHCLT, value u:Scalar) -> DisplayRGB {
-		//return linear(chclt).applyLuminance(chclt, value:u).display(chclt, alpha:vector.w)
-		
-		guard u > 0 else { return DisplayRGB(Scalar.vector4(.zero, vector.w)) }
-		guard u < 1 else { return DisplayRGB(Scalar.vector4(.one, vector.w)) }
-		
-		let l = chclt.linear(vector.xyz)
-		let v = chclt.luminance(l)
-		
-		guard v > 0 else { return DisplayRGB(gray:chclt.transfer(u), vector.w) }
-		
-		let n = CHCLT.normalize(l, luminance:v, leavePositive:true)
-		let rgb = chclt.display(n)
-		let s = chclt.transfer(u / v)
-		let d = rgb.max()
-		
-		guard s * d > 1 else { return DisplayRGB(Scalar.vector4(rgb * s, vector.w)) }
-		
-		let maximumPreservingHue = rgb / d
-		let m = chclt.linear(maximumPreservingHue)
-		let w = chclt.luminance(m)
-		let distanceFromWhite = (1 - u) / (1 - w)
-		let interpolated = 1 - distanceFromWhite + distanceFromWhite * m
-		
-		return DisplayRGB(Scalar.vector4(chclt.display(interpolated), vector.w))
+		return linear(chclt).applyLuminance(chclt, value:u).display(chclt, alpha:vector.w)
 	}
 	
 	public func contrast(_ chclt:CHCLT) -> Scalar {
@@ -256,7 +233,7 @@ public struct DisplayRGB {
 		let hue6 = domain + mid_minus_min / max_minus_min
 		let hue = hue6 / 6
 		
-		return (hue < 0 ? 1 + hue : hue, max_minus_min, maximum)
+		return (hue < 0 ? 1 + hue : hue, max_minus_min / maximum, maximum)
 	}
 	
 	public func hcl(_ chclt:CHCLT) -> (hue:Scalar, chroma:Scalar, luma:Scalar) {
@@ -426,7 +403,7 @@ extension CHCLT.LinearRGB {
 	}
 	
 	static func drawHueGraphs(_ chclt:CHCLT, count:Int, context:CGContext, box:CGRect, polar:Bool) {
-		let hues = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
+		let hues = chclt.hueRange(start:0.0, shift:1.0 / CHCLT.Scalar(count), count:count)
 		let domain = (0 ..< count).map { Double($0) / Double(count - 1) }
 		let mode:CGPathDrawingMode = polar ? .fillStroke : .stroke
 		let opacity:CGFloat = 0.25
@@ -434,24 +411,24 @@ extension CHCLT.LinearRGB {
 		let red:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:hues[$0].x) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(hues[$0].x)) }
-		context.setStrokeColor(red:1, green:0, blue:0, alpha:1)
-		context.setFillColor(red:1, green:0, blue:0, alpha:opacity)
+		context.setStrokeColor(red:1.0, green:0.0, blue:0.0, alpha:1.0)
+		context.setFillColor(red:1.0, green:0.0, blue:0.0, alpha:opacity)
 		context.addLines(between:red)
 		context.drawPath(using:mode)
 		
 		let green:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:hues[$0].y) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(hues[$0].y)) }
-		context.setStrokeColor(red:0, green:1, blue:0, alpha:1)
-		context.setFillColor(red:0, green:1, blue:0, alpha:opacity)
+		context.setStrokeColor(red:0.0, green:1.0, blue:0.0, alpha:1.0)
+		context.setFillColor(red:0.0, green:1.0, blue:0.0, alpha:opacity)
 		context.addLines(between:green)
 		context.drawPath(using:mode)
 		
 		let blue:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:hues[$0].z) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(hues[$0].z)) }
-		context.setStrokeColor(red:0, green:0, blue:1, alpha:1)
-		context.setFillColor(red:0, green:0, blue:1, alpha:opacity)
+		context.setStrokeColor(red:0.0, green:0.0, blue:1.0, alpha:1.0)
+		context.setFillColor(red:0.0, green:0.0, blue:1.0, alpha:opacity)
 		context.addLines(between:blue)
 		context.drawPath(using:mode)
 		
@@ -459,8 +436,8 @@ extension CHCLT.LinearRGB {
 		let luminance:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:luminances[$0]) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(luminances[$0])) }
-		context.setStrokeColor(red:0, green:0, blue:0, alpha:1)
-		context.setFillColor(red:0, green:0, blue:0, alpha:opacity)
+		context.setStrokeColor(red:0.0, green:0.0, blue:0.0, alpha:1.0)
+		context.setFillColor(red:0.0, green:0.0, blue:0.0, alpha:opacity)
 		context.addLines(between:luminance)
 		context.drawPath(using:mode)
 		

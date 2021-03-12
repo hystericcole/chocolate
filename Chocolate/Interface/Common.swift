@@ -199,6 +199,10 @@ extension PlatformView {
 	func scheduleLayout() {
 		needsLayout = true
 	}
+	
+	func scheduleDisplay() {
+		needsDisplay = true
+	}
 }
 
 //	MARK: -
@@ -498,6 +502,10 @@ extension PlatformView {
 	func prepareViewableColor(isOpaque:Bool) {
 		self.isUserInteractionEnabled = false
 		self.isOpaque = isOpaque
+	}
+	
+	func scheduleDisplay() {
+		setNeedsDisplay()
 	}
 	
 	func scheduleLayout() {
