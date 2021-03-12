@@ -266,24 +266,19 @@ extension CGContext {
 			}
 		default:	//	scalar is luminance
 			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
-			let gray = CHCLT.LinearRGB(gray:scalar)
-			let huesWithLuminance = hues.map { CHCLT.LinearRGB($0).applyLuminance(chocolate, value:scalar).color(alpha:1) }
-			let desaturate = [gray.color(alpha:0), gray.color(alpha:0.5), gray.color(alpha:1)]
 			
-			clip(to:box)
-			
-			if let gradient = CGGradient(colorsSpace:drawSpace, colors:huesWithLuminance as CFArray, locations:nil) {
-				setBlendMode(.copy)
-				drawLinearGradient(gradient, start:start, end:isFlipped ? downEnd : overEnd, options:options)
-			}
-			
-			//	Luminance is not preserved by color space when desaturating by blending with gray
-			if let gradient = CGGradient(colorsSpace:drawSpace, colors:desaturate as CFArray, locations:nil) {
-				setBlendMode(.normal)
+			for index in 0 ..< count {
+				let origin = isFlipped ? CGPoint(x:box.origin.x, y:box.origin.y + CGFloat(index)) : CGPoint(x:box.origin.x + CGFloat(index), y:box.origin.y)
+				let stripe = CGRect(origin:origin, size:size)
+				
+				let primary = CHCLT.LinearRGB(hues[index]).applyLuminance(chocolate, value:scalar)
+				let colors = [primary, primary.applyChroma(chocolate, value:0.5), primary.applyChroma(chocolate, value:0)].map { $0.color() }
+				guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
+				
+				clip(to:stripe)
 				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+				resetClip()
 			}
-			
-			resetClip()
 		}
 	}
 }
