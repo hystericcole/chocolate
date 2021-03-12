@@ -938,6 +938,37 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
+	public enum YUV {
+		public static let rgb_to_yuv_bt601 = YUV.rgb_to_yuv(coefficients:CHCLT.Linear.vector3(0.299, 0.587, 0.114), maximum:CHCLT.Linear.vector2(0.436, 0.615))
+		public static let rgb_to_ycc_bt601 = YUV.rgb_to_yuv(coefficients:CHCLT.Linear.vector3(0.299, 0.587, 0.114), maximum:CHCLT.Linear.vector2(0.5, 0.5))
+		public static let rgb_to_ydd_bt601 = YUV.rgb_to_yuv(coefficients:CHCLT.Linear.vector3(0.299, 0.587, 0.114), maximum:CHCLT.Linear.vector2(1.333, -1.333))
+		public static let rgb_to_yuv_bt709 = YUV.rgb_to_yuv(coefficients:CHCLT.Linear.vector3(0.2126, 0.7152, 0.0722), maximum:CHCLT.Linear.vector2(0.436, 0.615))
+		public static let rgb_to_ycc_bt709 = YUV.rgb_to_yuv(coefficients:CHCLT.Linear.vector3(0.2126, 0.7152, 0.0722), maximum:CHCLT.Linear.vector2(0.5, 0.5))
+		
+		public static func rgb_to_yuv(coefficients:CHCLT.Linear.Vector3, maximum:CHCLT.Linear.Vector2) -> CHCLT.Linear.Matrix3x3 {
+			let um = maximum.x / (1.0 - coefficients.z)
+			let vm = maximum.y / (1.0 - coefficients.x)
+			
+			let c0 = CHCLT.Linear.vector3(coefficients.x, -coefficients.x * um, maximum.y)
+			let c1 = CHCLT.Linear.vector3(coefficients.y, -coefficients.y * um, -coefficients.y * vm)
+			let c2 = CHCLT.Linear.vector3(coefficients.z, maximum.x, -coefficients.z * vm)
+			
+			return CHCLT.Linear.Matrix3x3(c0, c1, c2)
+		}
+		
+		public static func fromLinearRGB(rgb:CHCLT.Linear.Vector3, rgb_to_yuv:CHCLT.Linear.Matrix3x3) -> CHCLT.Linear.Vector3 {
+			return rgb_to_yuv * rgb
+		}
+		
+		public static func toLinearRGB(yuv:CHCLT.Linear.Vector3, rgb_to_yuv:CHCLT.Linear.Matrix3x3) -> CHCLT.Linear.Vector3 {
+			return rgb_to_yuv.inverse * yuv
+		}
+	}
+}
+
+//	MARK: -
+
+extension CHCLT {
 	public enum Lab {
 		public static func toXYZ(_ t:CHCLT.Linear) -> CHCLT.Linear {
 			let o = 6.0 / 29.0
