@@ -924,6 +924,14 @@ extension CHCLT {
 		public static func luminanceCoefficients(_ rgb_to_xyz:CHCLT.Linear.Matrix3x3) -> CHCLT.Linear.Vector3 {
 			return CHCLT.Linear.vector3(rgb_to_xyz.columns.0.y, rgb_to_xyz.columns.1.y, rgb_to_xyz.columns.2.y)
 		}
+		
+		public static func fromLinearRGB(rgb:CHCLT.Linear.Vector3, rgb_to_xyz:CHCLT.Linear.Matrix3x3) -> CHCLT.Linear.Vector3 {
+			return rgb_to_xyz * rgb
+		}
+		
+		public static func toLinearRGB(xyz:CHCLT.Linear.Vector3, rgb_to_xyz:CHCLT.Linear.Matrix3x3) -> CHCLT.Linear.Vector3 {
+			return rgb_to_xyz.inverse * xyz
+		}
 	}
 }
 
@@ -946,8 +954,8 @@ extension CHCLT {
 		
 		public static func toXYZ(lab:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = XYZ.d65) -> CHCLT.Linear.Vector3 {
 			let l = (lab.x + 16.0) / 116.0
-			let x = l + lab.y / 500
-			let z = l - lab.z / 200
+			let x = l + lab.y / 500.0
+			let z = l - lab.z / 200.0
 			
 			return white * CHCLT.Linear.vector3(toXYZ(x), toXYZ(l), toXYZ(z))
 		}
@@ -973,7 +981,7 @@ extension CHCLT {
 			let y = fromXYZ(xyz.y)
 			let z = fromXYZ(xyz.z)
 			
-			return CHCLT.Linear.vector3(116 * y - 16, 500 * (x - y), 200 * (y - z))
+			return CHCLT.Linear.vector3(116.0 * y - 16.0, 500.0 * (x - y), 200.0 * (y - z))
 		}
 		
 		public static func toLCH(lab:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
