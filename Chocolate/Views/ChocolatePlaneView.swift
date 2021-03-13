@@ -52,11 +52,13 @@ class ChocolatePlaneLayer: CALayer {
 
 //	MARK: -
 
-class ChocolatePlaneView: BaseView {
+class ChocolatePlaneView: CommonView {
 #if os(macOS)
-	override class var layerClass:CALayer.Type { return ChocolatePlaneLayer.self }
-	override func viewDidEndLiveResize() { super.viewDidEndLiveResize(); scheduleDisplay() }
+	override var isFlipped:Bool { return true }
 	override var wantsUpdateLayer:Bool { return true }
+	override func prepare() { super.prepare(); wantsLayer = true }
+	override func makeBackingLayer() -> CALayer { return ChocolatePlaneLayer() }
+	override func viewDidEndLiveResize() { super.viewDidEndLiveResize(); scheduleDisplay() }
 #else
 	override class var layerClass:AnyClass { return ChocolatePlaneLayer.self }
 #endif
@@ -72,6 +74,4 @@ class ChocolatePlaneView: BaseView {
 		get { return planeLayer?.scalar ?? 0 }
 		set { planeLayer?.scalar = newValue }
 	}
-	
-	override func prepare() { super.prepare(); scheduleDisplay() }
 }

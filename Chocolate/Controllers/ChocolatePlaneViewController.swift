@@ -32,6 +32,7 @@ class ChocolatePlaneViewController: BaseViewController {
 	override func prepare() {
 		super.prepare()
 		
+		slider.value = chocolate.scalar
 		title = DisplayStrings.Picker.title
 		indicatorPosition.target = indicator.padding(0.5 - indicatorRadius.native).fixed(width:1, height:1)
 		
@@ -41,7 +42,6 @@ class ChocolatePlaneViewController: BaseViewController {
 	}
 	
 	override func loadView() {
-		slider.value = chocolate.scalar
 		group.content = layout()
 		view = group.lazyView
 		group.view?.attachViewController(self)

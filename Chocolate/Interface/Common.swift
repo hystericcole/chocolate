@@ -128,7 +128,7 @@ extension CGColor {
 
 //	MARK: -
 
-class PlatformTaggableView: PlatformView {
+class PlatformTaggableView: CommonView {
 	var _tag = 0
 	var isUserInteractionEnabled:Bool = true
 	override var isFlipped:Bool { return true }
@@ -452,7 +452,7 @@ extension PlatformTabController {
 
 #else
 
-typealias PlatformTaggableView = PlatformView
+typealias PlatformTaggableView = CommonView
 
 extension CGColor {
 	var platformColor:PlatformColor { return PlatformColor(cgColor:self) }
@@ -716,6 +716,109 @@ extension PlatformViewController {
 }
 
 #endif
+
+//	MARK: -
+
+extension PlatformView {
+	var stableBounds:CGRect {
+		return CGRect(origin:.zero, size:bounds.size)
+	}
+	
+	var safeBounds:CGRect {
+#if os(macOS)
+		if #available(macOS 11.0, *) {
+			let insets = safeAreaInsets
+			let size = bounds.size
+			
+			return CGRect(x:insets.left, y:insets.top, width:size.width - insets.left - insets.right, height:size.height - insets.top - insets.bottom)
+		}
+		
+		return stableBounds
+#else
+		return stableBounds.inset(by:safeAreaInsets)
+#endif
+	}
+}
+
+//	MARK: -
+
+class CommonViewController: PlatformViewController {
+	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
+		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
+		
+		prepare()
+	}
+	
+	required init?(coder:NSCoder) {
+		super.init(coder:coder)
+		
+		prepare()
+	}
+	
+	func prepare() {}
+}
+
+//	MARK: -
+
+class CommonTabController: PlatformTabController {
+	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
+		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
+		
+		prepare()
+	}
+	
+	required init?(coder:NSCoder) {
+		super.init(coder:coder)
+		
+		prepare()
+	}
+	
+	func prepare() {}
+}
+
+//	MARK: -
+
+class CommonView: PlatformView {
+#if os(macOS)
+	override var isFlipped:Bool { return true }
+#endif
+	
+	override init(frame:CGRect) {
+		super.init(frame:frame)
+		
+		prepare()
+	}
+	
+	required init?(coder:NSCoder) {
+		super.init(coder:coder)
+		
+		prepare()
+	}
+	
+	func prepare() {}
+}
+
+//	MARK: -
+
+class CommonControl: PlatformControl {
+#if os(macOS)
+	override var isFlipped:Bool { return true }
+#endif
+	
+	override init(frame:CGRect) {
+		super.init(frame:frame)
+		
+		prepare()
+	}
+	
+	required init?(coder:NSCoder) {
+		super.init(coder:coder)
+		
+		prepare()
+	}
+	
+	func prepare() {}
+}
 
 //	MARK: -
 

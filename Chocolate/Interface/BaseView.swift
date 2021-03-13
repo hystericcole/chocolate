@@ -20,28 +20,7 @@ protocol ViewControllerAttachable: AnyObject {
 
 //	MARK: -
 
-extension PlatformView {
-	var stableBounds:CGRect { return CGRect(origin:.zero, size:bounds.size) }
-	
-	var safeBounds:CGRect {
-#if os(macOS)
-		if #available(macOS 11.0, *) {
-			let insets = safeAreaInsets
-			let size = bounds.size
-			
-			return CGRect(x:insets.left, y:insets.top, width:size.width - insets.left - insets.right, height:size.height - insets.top - insets.bottom)
-		}
-		
-		return stableBounds
-#else
-		return stableBounds.inset(by:safeAreaInsets)
-#endif
-	}
-}
-
-//	MARK: -
-
-class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
+class BaseView: CommonView, PlatformSizeChangeView, ViewControllerAttachable {
 #if os(macOS)
 	class var layerClass:CALayer.Type { return CALayer.self }
 	
@@ -59,19 +38,7 @@ class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 #endif
 	}
 	
-	override init(frame:CGRect) {
-		super.init(frame:frame)
-		
-		prepare()
-	}
-	
-	required init?(coder:NSCoder) {
-		super.init(coder:coder)
-		
-		prepare()
-	}
-	
-	func prepare() {
+	override func prepare() {
 		translatesAutoresizingMaskIntoConstraints = false
 		
 #if os(macOS)
@@ -105,19 +72,7 @@ class BaseView: PlatformView, PlatformSizeChangeView, ViewControllerAttachable {
 
 //	MARK: -
 
-class BaseViewController: PlatformViewController {
-	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
-		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
-		
-		prepare()
-	}
-	
-	required init?(coder:NSCoder) {
-		super.init(coder:coder)
-		
-		prepare()
-	}
-	
+class BaseViewController: CommonViewController {
 	deinit {
 		NotificationCenter.default.removeObserver(self)
 	}
@@ -127,35 +82,6 @@ class BaseViewController: PlatformViewController {
 		
 		(view as? ViewControllerAttachable)?.attachViewController(self)
 	}
-	
-	func prepare() {}
-	
-#if os(iOS)
-	override func viewWillAppear(_ animated: Bool) {
-		super.viewWillAppear(animated)
-		self.viewWillAppear()
-	}
-	
-	override func viewDidAppear(_ animated: Bool) {
-		super.viewDidAppear(animated)
-		self.viewDidAppear()
-	}
-	
-	override func viewWillDisappear(_ animated: Bool) {
-		super.viewWillDisappear(animated)
-		self.viewWillDisappear()
-	}
-	
-	override func viewDidDisappear(_ animated: Bool) {
-		super.viewDidDisappear(animated)
-		self.viewDidDisappear()
-	}
-	
-	func viewWillAppear() {}
-	func viewDidAppear() {}
-	func viewWillDisappear() {}
-	func viewDidDisappear() {}
-#endif
 	
 #if os(macOS)
 	func replaceChild(with child:PlatformViewController, duration:TimeInterval = 0.5, options:NSViewController.TransitionOptions = .crossfade) {
@@ -199,24 +125,37 @@ class BaseViewController: PlatformViewController {
 			child.didMove(toParent:self)
 		}
 	}
+	
+	override func viewWillAppear(_ animated: Bool) {
+		super.viewWillAppear(animated)
+		self.viewWillAppear()
+	}
+	
+	override func viewDidAppear(_ animated: Bool) {
+		super.viewDidAppear(animated)
+		self.viewDidAppear()
+	}
+	
+	override func viewWillDisappear(_ animated: Bool) {
+		super.viewWillDisappear(animated)
+		self.viewWillDisappear()
+	}
+	
+	override func viewDidDisappear(_ animated: Bool) {
+		super.viewDidDisappear(animated)
+		self.viewDidDisappear()
+	}
+	
+	func viewWillAppear() {}
+	func viewDidAppear() {}
+	func viewWillDisappear() {}
+	func viewDidDisappear() {}
 #endif
 }
 
 //	MARK: -
 
-class BaseTabController: PlatformTabController {
-	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
-		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
-		
-		prepare()
-	}
-	
-	required init?(coder:NSCoder) {
-		super.init(coder:coder)
-		
-		prepare()
-	}
-	
+class BaseTabController: CommonTabController {
 	deinit {
 		NotificationCenter.default.removeObserver(self)
 	}
@@ -228,8 +167,6 @@ class BaseTabController: PlatformTabController {
 		view.backgroundColor = .white
 	}
 	
-	func prepare() {}
-	
 #if os(macOS)
 	override func tabView(_ tabView:NSTabView, didSelect tabViewItem:NSTabViewItem?) {
 		super.tabView(tabView, didSelect:tabViewItem)
@@ -239,22 +176,4 @@ class BaseTabController: PlatformTabController {
 		tabView.window?.makeFirstResponder(controller.view)
 	}
 #endif
-}
-
-//	MARK: -
-
-class BaseControl: PlatformControl {
-	override init(frame:CGRect) {
-		super.init(frame:frame)
-		
-		prepare()
-	}
-	
-	required init?(coder:NSCoder) {
-		super.init(coder:coder)
-		
-		prepare()
-	}
-	
-	func prepare() {}
 }
