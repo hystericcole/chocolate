@@ -198,48 +198,16 @@ public struct DisplayRGB {
 		return hue4 * c + m
 	}
 	
-	public func hsb() -> (hue:Scalar, saturation:Scalar, brightness:Scalar) {
-		let domain, maximum, mid_minus_min, max_minus_min:Scalar
-		let r = vector.x, g = vector.y, b = vector.z
+	public func hsb() -> Scalar.Vector4 {
+		let (h, s, b) = ColorModel.hsb_from_rgb(r:vector.x, g:vector.y, b:vector.z)
 		
-		if r < g {
-			if g < b {
-				maximum = b
-				mid_minus_min = r - g
-				max_minus_min = b - r
-				domain = 4
-			} else {
-				maximum = g
-				mid_minus_min = b - r
-				max_minus_min = g - min(r, b)
-				domain = 2
-			}
-		} else {
-			if r < b {
-				maximum = b
-				mid_minus_min = r - g
-				max_minus_min = b - g
-				domain = 4
-			} else {
-				maximum = r
-				mid_minus_min = g - b
-				max_minus_min = r - min(g, b)
-				domain = 0
-			}
-		}
-		
-		guard max_minus_min > 0 else { return (1, 0, 0) }
-		
-		let hue6 = domain + mid_minus_min / max_minus_min
-		let hue = hue6 / 6
-		
-		return (hue < 0 ? 1 + hue : hue, max_minus_min / maximum, maximum)
+		return Scalar.vector4(h, s, b, vector.w)
 	}
 	
-	public func hcl(_ chclt:CHCLT) -> (hue:Scalar, chroma:Scalar, luma:Scalar) {
-		let l = linear(chclt)
+	public func hcl(_ chclt:CHCLT) -> Scalar.Vector4 {
+		let hcl = chclt.hcl(linear(chclt).vector)
 		
-		return (l.hue(chclt), l.chroma(chclt), l.luminance(chclt))
+		return Scalar.vector4(hcl, vector.w)
 	}
 }
 

@@ -12,78 +12,123 @@ import Foundation
 enum ColorModel: Int {
 	case chclt, rgb, hsb
 	
-	static func transform(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> CHCLT.Scalar.Vector3 {
+	static func components(coordinates:CHCLT.Scalar.Vector3, axis:Int) -> CHCLT.Scalar.Vector3 {
+		var v = coordinates
 		let a = axis / 6
-		let x = a & 1 != 0 ? 1 - x : x
-		let y = a & 2 != 0 ? 1 - y : y
-		let z = a & 4 != 0 ? 1 - z : z
+		
+		if a & 1 != 0 { v.x = 1 - v.x }
+		if a & 2 != 0 { v.y = 1 - v.y }
+		if a & 4 != 0 { v.z = 1 - v.z }
 		
 		switch axis % 6 {
-		case 0: return CHCLT.Scalar.vector3(z, x, y)
-		case 1: return CHCLT.Scalar.vector3(x, z, y)
-		case 2: return CHCLT.Scalar.vector3(x, y, z)
-		case 3: return CHCLT.Scalar.vector3(z, y, x)
-		case 4: return CHCLT.Scalar.vector3(y, z, x)
-		case _: return CHCLT.Scalar.vector3(y, x, z)
+		case 0: return CHCLT.Scalar.vector3(v.z, v.x, v.y)
+		case 1: return CHCLT.Scalar.vector3(v.x, v.z, v.y)
+		case 2: return CHCLT.Scalar.vector3(v.x, v.y, v.z)
+		case 3: return CHCLT.Scalar.vector3(v.z, v.y, v.x)
+		case 4: return CHCLT.Scalar.vector3(v.y, v.z, v.x)
+		case _: return CHCLT.Scalar.vector3(v.y, v.x, v.z)
 		}
 	}
 	
-	static func linearRGB(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> CHCLT.LinearRGB {
-		return CHCLT.LinearRGB(transform(axis:axis, x:x, y:y, z:z))
+	static func coordinates(components:CHCLT.Scalar.Vector3, axis:Int) -> CHCLT.Scalar.Vector3 {
+		var v:CHCLT.Scalar.Vector3
+		let c = components
+		let a = axis / 6
+		
+		switch axis % 6 {
+		case 0: v = CHCLT.Scalar.vector3(c.y, c.z, c.x)
+		case 1: v = CHCLT.Scalar.vector3(c.x, c.z, c.y)
+		case 2: v = CHCLT.Scalar.vector3(c.x, c.y, c.z)
+		case 3: v = CHCLT.Scalar.vector3(c.z, c.y, c.x)
+		case 4: v = CHCLT.Scalar.vector3(c.z, c.x, c.y)
+		case _: v = CHCLT.Scalar.vector3(c.y, c.x, c.z)
+		}
+		
+		if a & 1 != 0 { v.x = 1 - v.x }
+		if a & 2 != 0 { v.y = 1 - v.y }
+		if a & 4 != 0 { v.z = 1 - v.z }
+		
+		return v
 	}
 	
-	static func platformRGB(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, alpha:CGFloat = 1.0) -> PlatformColor {
-		let rgb = transform(axis:axis, x:x, y:y, z:z)
+	static func linearRGB(axis:Int, coordinates:CHCLT.Scalar.Vector3) -> CHCLT.LinearRGB {
+		return CHCLT.LinearRGB(components(coordinates:coordinates, axis:axis))
+	}
+	
+	static func platformRGB(axis:Int, coordinates:CHCLT.Scalar.Vector3, alpha:CGFloat = 1.0) -> PlatformColor {
+		let rgb = components(coordinates:coordinates, axis:axis)
 		
 		return PlatformColor(red:CGFloat(rgb.x), green:CGFloat(rgb.y), blue:CGFloat(rgb.z), alpha:alpha)
 	}
 	
-	static func linearHSB(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> CHCLT.LinearRGB {
-		let hsb = transform(axis:axis, x:x, y:y, z:z)
+	static func linearHSB(axis:Int, coordinates:CHCLT.Scalar.Vector3) -> CHCLT.LinearRGB {
+		let hsb = components(coordinates:coordinates, axis:axis)
 		
 		return CHCLT.LinearRGB(DisplayRGB.hexagonal(hue:hsb.x, saturation:hsb.y, brightness:hsb.z))
 	}
 	
-	static func platformHSB(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, alpha:CGFloat = 1.0) -> PlatformColor {
-		let hsb = transform(axis:axis, x:x, y:y, z:z)
+	static func platformHSB(axis:Int, coordinates:CHCLT.Scalar.Vector3, alpha:CGFloat = 1.0) -> PlatformColor {
+		let hsb = components(coordinates:coordinates, axis:axis)
 		
 		return PlatformColor(hue:CGFloat(hsb.x), saturation:CGFloat(hsb.y), brightness:CGFloat(hsb.z), alpha:alpha)
 	}
 	
-	static func linearCHCLT(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, chclt:CHCLT) -> CHCLT.LinearRGB {
-		let hcl = transform(axis:axis, x:x, y:y, z:z)
+	static func linearCHCLT(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
+		let hcl = components(coordinates:coordinates, axis:axis)
 		
 		return CHCLT.LinearRGB(chclt, hue:hcl.x, chroma:hcl.y, luminance:hcl.z)
 	}
 	
-	static func platformCHCLT(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
-		let hcl = transform(axis:axis, x:x, y:y, z:z)
+	static func platformCHCLT(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
+		let hcl = components(coordinates:coordinates, axis:axis)
 		
 		return CHCLT.LinearRGB(chclt, hue:hcl.x, chroma:hcl.y, luminance:hcl.z).display(chclt, alpha:alpha.native).color().platformColor
 	}
 	
-	func linearColor(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, chclt:CHCLT) -> CHCLT.LinearRGB {
+	func linearColor(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
 		switch self {
-		case .rgb: return ColorModel.linearRGB(axis:axis, x:x, y:y, z:z)
-		case .hsb: return ColorModel.linearHSB(axis:axis, x:x, y:y, z:z)
-		case .chclt: return ColorModel.linearCHCLT(axis:axis, x:x, y:y, z:z, chclt:chclt)
+		case .rgb: return ColorModel.linearRGB(axis:axis, coordinates:coordinates)
+		case .hsb: return ColorModel.linearHSB(axis:axis, coordinates:coordinates)
+		case .chclt: return ColorModel.linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
 	}
 	
-	func displayColor(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, chclt:CHCLT, alpha:CHCLT.Scalar = 1) -> DisplayRGB {
+	func displayColor(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CHCLT.Scalar = 1) -> DisplayRGB {
 		switch self {
-		case .rgb: return DisplayRGB(CHCLT.Scalar.vector4(ColorModel.linearRGB(axis:axis, x:x, y:y, z:z).vector, alpha))
-		case .hsb: return DisplayRGB(CHCLT.Scalar.vector4(ColorModel.linearHSB(axis:axis, x:x, y:y, z:z).vector, alpha))
-		case .chclt: return ColorModel.linearCHCLT(axis:axis, x:x, y:y, z:z, chclt:chclt).display(chclt, alpha:alpha)
+		case .rgb: return DisplayRGB(CHCLT.Scalar.vector4(ColorModel.linearRGB(axis:axis, coordinates:coordinates).vector, alpha))
+		case .hsb: return DisplayRGB(CHCLT.Scalar.vector4(ColorModel.linearHSB(axis:axis, coordinates:coordinates).vector, alpha))
+		case .chclt: return ColorModel.linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt).display(chclt, alpha:alpha)
 		}
 	}
 	
-	func platformColor(axis:Int, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
+	func platformColor(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
 		switch self {
-		case .rgb: return ColorModel.platformRGB(axis:axis, x:x, y:y, z:z, alpha:alpha)
-		case .hsb: return ColorModel.platformHSB(axis:axis, x:x, y:y, z:z, alpha:alpha)
-		case .chclt: return ColorModel.platformCHCLT(axis:axis, x:x, y:y, z:z, chclt:chclt, alpha:alpha)
+		case .rgb: return ColorModel.platformRGB(axis:axis, coordinates:coordinates, alpha:alpha)
+		case .hsb: return ColorModel.platformHSB(axis:axis, coordinates:coordinates, alpha:alpha)
+		case .chclt: return ColorModel.platformCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
+	}
+	
+	func coordinates(axis:Int, color:CHCLT.LinearRGB, chclt:CHCLT) -> CHCLT.Scalar.Vector3 {
+		switch self {
+		case .rgb: return ColorModel.coordinates(components:color.display(chclt).vector.xyz, axis:axis)
+		case .hsb: return ColorModel.coordinates(components:color.display(chclt).hsb().xyz, axis:axis)
+		case .chclt: return ColorModel.coordinates(components:chclt.hcl(color.vector), axis:axis)
+		}
+	}
+	
+	func coordinates(axis:Int, color:DisplayRGB, chclt:CHCLT) -> CHCLT.Scalar.Vector3 {
+		switch self {
+		case .rgb: return ColorModel.coordinates(components:color.vector.xyz, axis:axis)
+		case .hsb: return ColorModel.coordinates(components:color.hsb().xyz, axis:axis)
+		case .chclt: return ColorModel.coordinates(components:chclt.hcl(color.linear(chclt).vector), axis:axis)
+		}
+	}
+	
+	func coordinates(axis:Int, color:PlatformColor, chclt:CHCLT) -> CHCLT.Scalar.Vector3? {
+		guard let display = color.displayRGB else { return nil }
+		
+		return coordinates(axis:axis, color:display, chclt:chclt)
 	}
 	
 	func linearColors(axis:Int, chclt:CHCLT, hue:CHCLT.Scalar, count:Int) -> [CHCLT.LinearRGB] {
@@ -115,9 +160,9 @@ enum ColorModel: Int {
 		case (.rgb, 0):   result = [.black, .red]
 		case (.rgb, 1):   result = [.black, .green]
 		case (.rgb, _):   result = [.black, .blue]
-		case (.hsb, 0):   result = (0 ..< count).map { ColorModel.platformHSB(axis:1, x:0, y:1, z:Double($0) / Double(count - 1)) }
-		case (.hsb, 1):   result = [.white, ColorModel.platformHSB(axis:1, x:hue, y:1, z:1)]
-		case (.hsb, _):   result = [.black, ColorModel.platformHSB(axis:2, x:hue, y:1, z:1)]
+		case (.hsb, 0):   result = (0 ..< count).map { ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, Double($0) / Double(count - 1))) }
+		case (.hsb, 1):   result = [.white, ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(hue, 1, 1))]
+		case (.hsb, _):   result = [.black, ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(hue, 1, 1))]
 		case (.chclt, 0): result = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count).map { CHCLT.LinearRGB($0).applyLuminance(chclt, value:0.5).color().platformColor }
 		case (.chclt, 1): result = [CHCLT.LinearRGB(chclt, hue:hue).applyChroma(chclt, value:0), CHCLT.LinearRGB(chclt, hue:hue).applyChroma(chclt, value:1)].map { $0.color().platformColor }
 		case (.chclt, _): result = [.black, .white]
@@ -135,6 +180,43 @@ enum ColorModel: Int {
 		if darkToLight { colors.reverse() }
 		
 		return CGGradient(colorsSpace:colorSpace, colors:colors as CFArray, locations:locations)
+	}
+	
+	static func hsb_from_rgb(r:CHCLT.Scalar, g:CHCLT.Scalar, b:CHCLT.Scalar) -> (hue:CHCLT.Scalar, saturation:CHCLT.Scalar, brightness:CHCLT.Scalar) {
+		let domain, maximum, mid_minus_min, max_minus_min:CHCLT.Scalar
+		
+		if r < g {
+			if g < b {
+				maximum = b
+				mid_minus_min = r - g
+				max_minus_min = b - r
+				domain = 4
+			} else {
+				maximum = g
+				mid_minus_min = b - r
+				max_minus_min = g - min(r, b)
+				domain = 2
+			}
+		} else {
+			if r < b {
+				maximum = b
+				mid_minus_min = r - g
+				max_minus_min = b - g
+				domain = 4
+			} else {
+				maximum = r
+				mid_minus_min = g - b
+				max_minus_min = r - min(g, b)
+				domain = 0
+			}
+		}
+		
+		guard max_minus_min > 0 else { return (1, 0, 0) }
+		
+		let hue6 = domain + mid_minus_min / max_minus_min
+		let hue = hue6 / 6
+		
+		return (hue < 0 ? 1 + hue : hue, max_minus_min / maximum, maximum)
 	}
 	
 	static func hsb_from_hsl(h:CHCLT.Scalar, s:CHCLT.Scalar, l:CHCLT.Scalar) -> (hue:CHCLT.Scalar, saturation:CHCLT.Scalar, brightness:CHCLT.Scalar) {
@@ -169,12 +251,12 @@ extension CGContext {
 		let downAxis = (axis / 6 & 2) * 6 + axis % 6
 		
 		overColors = [
-			ColorModel.platformRGB(axis:overAxis, x:0, y:0, z:scalar).cgColor,
-			ColorModel.platformRGB(axis:overAxis, x:1, y:0, z:scalar).cgColor
+			ColorModel.platformRGB(axis:overAxis, coordinates:CHCLT.Scalar.vector3(0, 0, scalar)).cgColor,
+			ColorModel.platformRGB(axis:overAxis, coordinates:CHCLT.Scalar.vector3(1, 0, scalar)).cgColor
 		]
 		downColors = [
-			ColorModel.platformRGB(axis:downAxis, x:0, y:1, z:scalar).cgColor,
-			ColorModel.platformRGB(axis:downAxis, x:0, y:0, z:scalar).cgColor
+			ColorModel.platformRGB(axis:downAxis, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor,
+			ColorModel.platformRGB(axis:downAxis, coordinates:CHCLT.Scalar.vector3(0, 0, scalar)).cgColor
 		]
 		mode = .lighten
 		
@@ -210,20 +292,20 @@ extension CGContext {
 		switch axis % 3 {
 		case 0:
 			copyColors = [
-				ColorModel.platformHSB(axis:0, x:0, y:1, z:scalar).cgColor,
-				ColorModel.platformHSB(axis:0, x:1, y:1, z:scalar).cgColor
+				ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor,
+				ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar)).cgColor
 			]
 			modeColors = [PlatformColor.white.cgColor, PlatformColor.black.cgColor]
 			mode = .multiply
 		case 1:
-			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:1, x:Double($0) / Double(count - 1), y:1, z:scalar).cgColor }
+			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
 			modeColors = [PlatformColor.white.cgColor, PlatformColor.black.cgColor]
 			mode = .multiply
 		case _:
-			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:2, x:Double($0) / Double(count - 1), y:1, z:scalar).cgColor }
+			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
 			modeColors = [
-				ColorModel.platformHSB(axis:2, x:0, y:0, z:scalar, alpha:0).cgColor,
-				ColorModel.platformHSB(axis:2, x:0, y:0, z:scalar, alpha:1).cgColor
+				ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), alpha:0).cgColor,
+				ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), alpha:1).cgColor
 			]
 			mode = .normal
 		}

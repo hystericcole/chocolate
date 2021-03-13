@@ -607,6 +607,14 @@ extension CHCLT {
 	
 	// MARK: Transform
 	
+	public func hcl(_ vector:Linear.Vector3) -> Linear.Vector3 {
+		let l = luminance(vector)
+		let h = hue(vector, luminance:l)
+		let c = chroma(vector, luminance:l)
+		
+		return Linear.vector3(h, c, l)
+	}
+	
 	public func transformContrast(_ vector:Linear.Vector3, luminance v:Linear, transform:Transform.Effect) -> Linear.Vector3 {
 		switch transform.mode {
 		case .relative: return scaleContrast(vector, luminance:v, by:transform.scalar)

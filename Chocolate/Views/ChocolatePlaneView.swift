@@ -16,12 +16,12 @@ class ChocolatePlaneLayer: CALayer {
 		var model:ColorModel
 		var axis:Int
 		
-		func linearColor(chclt:CHCLT, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> CHCLT.LinearRGB {
-			return model.linearColor(axis:axis, x:x, y:y, z:z, chclt:chclt)
+		func linearColor(chclt:CHCLT, coordinates:CHCLT.Scalar.Vector3) -> CHCLT.LinearRGB {
+			return model.linearColor(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
 		
-		func platformColor(chclt:CHCLT, x:CHCLT.Scalar, y:CHCLT.Scalar, z:CHCLT.Scalar) -> PlatformColor {
-			return model.platformColor(axis:axis, x:x, y:y, z:z, chclt:chclt)
+		func platformColor(chclt:CHCLT, coordinates:CHCLT.Scalar.Vector3) -> PlatformColor {
+			return model.platformColor(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
 		
 		func linearColors(chclt:CHCLT, hue:CHCLT.Scalar, count:Int = 360) -> [CHCLT.LinearRGB] {
@@ -63,7 +63,7 @@ class ChocolatePlaneView: CommonView {
 	override class var layerClass:AnyClass { return ChocolatePlaneLayer.self }
 #endif
 	
-	var planeLayer:ChocolatePlaneLayer? { return layer as? ChocolatePlaneLayer }
+	var planeLayer:ChocolatePlaneLayer! { return layer as? ChocolatePlaneLayer }
 	
 	var mode:ChocolatePlaneLayer.Mode {
 		get { return planeLayer?.mode ?? .standard }

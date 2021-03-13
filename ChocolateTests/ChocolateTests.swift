@@ -37,12 +37,30 @@ class ChocolateTests: XCTestCase {
 		
 		for index in 0 ..< 8 {
 			let direction = directions[index]
-			let (start, end) = direction.points
+			let (start, end) = direction.points()
 			let e = points[index]
 			let s = points[(index + 4) % 8]
 			
 			XCTAssertEqual(start, s, "start direction \(index)/8")
 			XCTAssertEqual(end, e, "end direction \(index)/8")
+		}
+	}
+	
+	func testColorModelTransforms() {
+		let v = CHCLT.Scalar.vector3(0.3125, 0.6, 0.9)
+		
+		for axis in 0 ..< 48 {
+			let c = ColorModel.components(coordinates:v, axis:axis)
+			let d = ColorModel.coordinates(components:c, axis:axis)
+			
+			XCTAssertEqual(v, d, "axis \(axis)")
+		}
+		
+		for axis in 0 ..< 48 {
+			let c = ColorModel.coordinates(components:v, axis:axis)
+			let d = ColorModel.components(coordinates:c, axis:axis)
+			
+			XCTAssertEqual(v, d, "axis \(axis)")
 		}
 	}
 }
