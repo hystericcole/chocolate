@@ -123,7 +123,7 @@ extension NSMutableParagraphStyle {
 extension NSShadow {
 	convenience init?(offset:CGSize = .zero, radius:CGFloat = 0, color:PlatformColor? = nil) {
 		guard radius != 0 || offset.width != 0 || offset.height != 0 else { return nil }
-		guard color == nil || color?.cgColor.alpha ?? 0 > 0 else { return nil }
+		guard color?.cgColor.alpha ?? 1 > 0 else { return nil }
 		
 		self.init()
 		

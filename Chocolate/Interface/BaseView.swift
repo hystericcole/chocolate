@@ -14,12 +14,6 @@ import Cocoa
 import UIKit
 #endif
 
-protocol ViewControllerAttachable: AnyObject {
-	func attachViewController(_ viewController:PlatformViewController)
-}
-
-//	MARK: -
-
 class BaseView: CommonView, PlatformSizeChangeView, ViewControllerAttachable {
 #if os(macOS)
 	class var layerClass:CALayer.Type { return CALayer.self }

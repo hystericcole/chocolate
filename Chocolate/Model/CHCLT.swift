@@ -443,7 +443,7 @@ extension CHCLT {
 		let g = hue(color, luminance:w)
 		let d = h - g
 		let e = d.magnitude > 0.5 ? d < 0 ? d + 1 : d - 1 : d
-		let s = shift.magnitude.integerFraction.1
+		let s = modf(shift.magnitude).1
 		let t = s > 0.5 ? 1 - s : s
 		
 		guard e.magnitude < t else { return vector }

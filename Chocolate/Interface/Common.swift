@@ -719,6 +719,12 @@ extension PlatformViewController {
 
 //	MARK: -
 
+protocol ViewControllerAttachable: AnyObject {
+	func attachViewController(_ viewController:PlatformViewController)
+}
+
+//	MARK: -
+
 extension PlatformView {
 	var stableBounds:CGRect {
 		return CGRect(origin:.zero, size:bounds.size)

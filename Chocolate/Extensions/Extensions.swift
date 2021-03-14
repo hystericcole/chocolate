@@ -14,9 +14,13 @@ extension BinaryFloatingPoint {
 	func interpolate(towards:Self, by:Self) -> Self { let n = 1.0 - by; return self * n + towards * by }
 }
 
+//	MARK: -
+
 extension ClosedRange where Bound: AdditiveArithmetic {
 	var length:Bound { return upperBound - lowerBound }
 }
+
+//	MARK: -
 
 extension DispatchQueue {
 	static var background:DispatchQueue { return global(qos:.background) }
@@ -25,6 +29,8 @@ extension DispatchQueue {
 	static var userInitiated:DispatchQueue { return global(qos:.userInitiated) }
 	static var userInteractive:DispatchQueue { return global(qos:.userInteractive) }
 }
+
+//	MARK: -
 
 extension RandomAccessCollection where Index == Int {
 	/// return index (0 ... count) such that array[index - 1] < value <= array[index]
@@ -43,6 +49,8 @@ extension RandomAccessCollection where Index == Int {
 		return m
 	}
 }
+
+//	MARK: -
 
 extension NumberFormatter {
 	var fractionDigits:ClosedRange<Int> {
