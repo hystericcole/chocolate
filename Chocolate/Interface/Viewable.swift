@@ -1205,7 +1205,7 @@ class ViewableGradientView: PlatformTaggableView {
 	override class var layerClass: AnyClass { return CAGradientLayer.self }
 #endif
 	
-	var gradientLayer:CAGradientLayer? { return layer as? CAGradientLayer }
+	var gradientLayer:CAGradientLayer! { return layer as? CAGradientLayer }
 }
 
 //	MARK: -

@@ -48,7 +48,7 @@ struct Style {
 		}
 		
 		case system, bold
-		case title, body
+		case title, body, monospaceDigits
 		case name(String)
 		case descriptor(PlatformFontDescriptor)
 		case attributes([PlatformFontDescriptor.AttributeName:Any])
@@ -88,7 +88,13 @@ struct Style {
 			case .attributes(let attributes):
 				return displayFont(descriptor:PlatformFontDescriptor(fontAttributes:attributes), size:size)
 			case .family(let family, let traits):
-				return displayFont(descriptor:PlatformFontDescriptor(fontAttributes:[.family: family.rawValue]), traits:traits, size:size)
+				return displayFont(descriptor:PlatformFontDescriptor(fontAttributes:[.family:family.rawValue]), traits:traits, size:size)
+			case .monospaceDigits:
+				if #available(macOS 10.11, iOS 9.0, *) {
+					return PlatformFont.monospacedDigitSystemFont(ofSize:size ?? 0, weight:.regular)
+				} else {
+					return displayFont(descriptor:PlatformFontDescriptor(fontAttributes:[.family:FamilyName.courierNew.rawValue]), traits:nil, size:size)
+				}
 			case .title:
 #if os(macOS)
 				return PlatformFont.menuFont(ofSize:size ?? 0)
