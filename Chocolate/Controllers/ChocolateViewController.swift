@@ -320,7 +320,8 @@ class ChocolateViewController: BaseViewController {
 					Style.small.label("B"),
 					Style.small.label("H"),
 					Style.small.label("C"),
-					Style.small.label("L")
+					Style.small.label("L"),
+					Layout.empty
 				),
 				Layout.Vertical(
 					alignment:.fill,
@@ -330,7 +331,8 @@ class ChocolateViewController: BaseViewController {
 					sliderBlue,
 					sliderHue,
 					sliderChroma,
-					sliderLuma
+					sliderLuma,
+					stringWeb
 				).minimum(width:minimumSliderWidth),
 				Layout.Vertical(
 					alignment:.fill,
@@ -340,7 +342,8 @@ class ChocolateViewController: BaseViewController {
 					stringBlue,
 					stringHue,
 					stringChroma,
-					stringLuma
+					stringLuma,
+					Layout.empty
 				).minimum(width:minimumStringWidth)
 			)
 		], spacing:8, alignment:.center, position:.stretch)

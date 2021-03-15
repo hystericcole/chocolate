@@ -20,23 +20,28 @@ class ChocolatePlaneViewController: BaseViewController {
 		static var titles:[String] = ["CHCLT Hue", "CHCLT Chroma", "CHCLT Luma", "RGB Red", "RGB Green", "RGB Blue", "HSB Hue", "HSB Saturation", "HSB Brightness"]
 	}
 	
+	enum Constant {
+		static let colorStyle = Style(font:.monospaceDigits, size:14, color:nil, alignment:.center)
+	}
+	
 	let indicatorRadius:CGFloat = 33.5
-	let chocolate = ChocolatePlaneView()
+	let planeView = ChocolatePlaneView()
 	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged))
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
 	let indicator = Viewable.Color(color:.black)
 	var indicatorPosition = Layout.Align(Layout.empty)
+	let colorLabel = Constant.colorStyle.label("")
 	let group = Viewable.Group()
 	let axis:Axis = .chclt_l
 	
 	override func prepare() {
 		super.prepare()
 		
-		slider.value = chocolate.scalar
+		slider.value = planeView.scalar
 		title = DisplayStrings.Picker.title
 		indicatorPosition.target = indicator.padding(0.5 - indicatorRadius.native).fixed(width:1, height:1)
 		
-		Common.Recognizer(.pan(false), target:self, action:#selector(indicatorPanned)).attachToView(chocolate)
+		Common.Recognizer(.pan(false), target:self, action:#selector(indicatorPanned)).attachToView(planeView)
 		
 		refreshIndicator(CGPoint(x:0.5, y:0.5))
 	}
@@ -53,35 +58,49 @@ class ChocolatePlaneViewController: BaseViewController {
 		axisChanged()
 	}
 	
+	func applyColorDescription(chclt:CHCLT, linearColor:CHCLT.LinearRGB) {
+		let formatter = NumberFormatter(fractionDigits:1 ... 1)
+		let hcl = chclt.hcl(linearColor.vector)
+		let contrast = linearColor.contrast(chclt)
+		let symbol = hcl.z < chclt.contrast.mediumLuminance ? "◐" : "◑"
+		
+		colorLabel.text = [
+			formatter.string(from:hcl.x * 360.0 as NSNumber)! + "°",
+			formatter.string(from:hcl.y * 100 as NSNumber)! + "%",
+			formatter.string(from:hcl.z * 100 as NSNumber)! + "☼",
+			formatter.string(from:contrast * 100 as NSNumber)! + symbol
+		].joined(separator:" • ")
+	}
+	
 	func refreshGradient() {
-		let chclt = chocolate.planeLayer?.chclt ?? .default
+		let chclt = planeView.planeLayer?.chclt ?? .default
 		let point = indicatorPosition.point()
 		
-		slider.applyModel(model:chocolate.mode.model, axis:chocolate.mode.axis, chclt:chclt, hue:point.x.native)
+		slider.applyModel(model:planeView.mode.model, axis:planeView.mode.axis, chclt:chclt, hue:point.x.native)
 	}
 	
 	func refreshIndicator(_ unit:CGPoint) {
-		let chclt = chocolate.planeLayer?.chclt ?? .default
-		let mode = chocolate.mode
+		let chclt = planeView.planeLayer?.chclt ?? .default
+		let mode = planeView.mode
 		let borderContrasting = 0.0
-		let indicatorColor:PlatformColor
-		let borderColor:CGColor
 		let coordinates = CHCLT.Scalar.vector3(unit.x.native, 1 - unit.y.native, slider.value)
 		
+		let linearColor:CHCLT.LinearRGB
+		let platformColor:PlatformColor
+		let borderColor:CGColor
+		
 		if mode.model == .chclt {
-			let color = mode.linearColor(chclt:chclt, coordinates:coordinates)
-			
-			indicatorColor = color.color().platformColor
-			borderColor = color.contrasting(chclt, value:borderContrasting).color()
+			linearColor = mode.linearColor(chclt:chclt, coordinates:coordinates)
+			platformColor = linearColor.color().platformColor
+			borderColor = linearColor.contrasting(chclt, value:borderContrasting).color()
 		} else {
-			let color = mode.platformColor(chclt:chclt, coordinates:coordinates)
-			let border = color.cgColor.linearRGB?.contrasting(chclt, value:borderContrasting).color(colorSpace:color.cgColor.colorSpace)
-			
-			indicatorColor = color
-			borderColor = border ?? PlatformColor.white.cgColor
+			platformColor = mode.platformColor(chclt:chclt, coordinates:coordinates)
+			linearColor = platformColor.cgColor.linearRGB ?? .white
+			borderColor = linearColor.contrasting(chclt, value:borderContrasting).color(colorSpace:platformColor.cgColor.colorSpace)
 		}
 		
-		indicator.color = indicatorColor
+		indicator.color = platformColor
+		applyColorDescription(chclt:chclt, linearColor:linearColor)
 		
 		if let layer = indicator.view?.layer {
 			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:borderColor, clips:true)
@@ -92,9 +111,10 @@ class ChocolatePlaneViewController: BaseViewController {
 	func indicatorPanned(_ recognizer:PlatformPanGestureRecognizer) {
 		guard recognizer.state == .changed else { return }
 		
-		let box = CGRect(origin:.zero, size:chocolate.bounds.size)
-		let location = recognizer.location(in:chocolate)
-		let unit = location / box.size
+		let box = CGRect(origin:.zero, size:planeView.bounds.size)
+		let location = recognizer.location(in:planeView)
+		let unbound = location / box.size
+		let unit = CGPoint(x:min(max(0, unbound.x), 1), y:min(max(0, unbound.y), 1))
 		
 		indicatorPosition.horizontal = .fraction(unit.x.native)
 		indicatorPosition.vertical = .fraction(unit.y.native)
@@ -106,14 +126,14 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	@objc
 	func sliderChanged() {
-		chocolate.scalar = slider.value
+		planeView.scalar = slider.value
 		refreshIndicator(indicatorPosition.point())
 		refreshGradient()
 	}
 	
 	@objc
 	func axisChanged() {
-		chocolate.mode = Axis(rawValue:picker.select)?.mode ?? .standard
+		planeView.mode = Axis(rawValue:picker.select)?.mode ?? .standard
 		refreshIndicator(indicatorPosition.point())
 		refreshGradient()
 	}
@@ -126,18 +146,19 @@ class ChocolatePlaneViewController: BaseViewController {
 				slider.fraction(width:0.75, minimumWidth:66, height:nil),
 				picker.fixed(width:160).limiting(height:30 ... 80)
 			).padding(horizontal:20, vertical:10),
+			colorLabel.padding(horizontal:20, vertical:0),
 			Layout.Overlay(
 				horizontal:.fill,
 				vertical:.fill,
 				primary:0,
-				chocolate,
+				planeView,
 				indicatorPosition
 			).padding(0).ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
 		)
 	}
 	
 	func copyToPasteboard() {
-		guard let layer = chocolate.planeLayer else { return }
+		guard let layer = planeView.planeLayer else { return }
 		
 		let size = layer.bounds.size
 		
