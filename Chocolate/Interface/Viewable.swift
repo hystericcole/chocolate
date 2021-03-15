@@ -1217,6 +1217,7 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 	
 #if os(macOS)
 	override var acceptsFirstResponder: Bool { return true }
+	override func acceptsFirstMouse(for event:PlatformEvent?) -> Bool { return true }
 #endif
 	
 	func prepareViewableGroup() {

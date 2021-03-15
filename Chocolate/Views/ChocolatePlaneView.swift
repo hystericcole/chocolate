@@ -59,6 +59,7 @@ class ChocolatePlaneView: CommonView {
 	override func prepare() { super.prepare(); wantsLayer = true }
 	override func makeBackingLayer() -> CALayer { return ChocolatePlaneLayer() }
 	override func viewDidEndLiveResize() { super.viewDidEndLiveResize(); scheduleDisplay() }
+	override func acceptsFirstMouse(for event:PlatformEvent?) -> Bool { return true }
 #else
 	override class var layerClass:AnyClass { return ChocolatePlaneLayer.self }
 #endif
