@@ -399,6 +399,7 @@ extension CHCLT {
 	///   - v: The luminance of color.
 	/// - Returns: The hue
 	public func hue(_ vector:Linear.Vector3, luminance v:Linear) -> Linear {
+		let v = max(v, vector.min())
 		let hueSaturation = vector - v
 		let hueSaturationLengthSquared = simd_length_squared(hueSaturation)
 		

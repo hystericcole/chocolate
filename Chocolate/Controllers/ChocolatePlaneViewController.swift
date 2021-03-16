@@ -29,17 +29,24 @@ class ChocolatePlaneViewController: BaseViewController {
 	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged))
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
 	let indicator = Viewable.Color(color:.black)
-	var indicatorPosition = Layout.Align(Layout.empty)
+	var positionIndicator = Layout.Align(Layout.empty)
 	let colorLabel = Constant.colorStyle.label("")
 	let group = Viewable.Group()
 	let axis:Axis = .chclt_l
+	
+	let lineContrast = Viewable.Color(color:.black, intrinsicSize:CGSize(width:1, height:1))
+	let complement = Viewable.Color(color:.black)
+	var positionLineContrast = Layout.Align(Layout.empty, horizontal:.fill)
+	var positionComplement = Layout.Align(Layout.empty)
 	
 	override func prepare() {
 		super.prepare()
 		
 		slider.value = planeView.scalar
 		title = DisplayStrings.Picker.title
-		indicatorPosition.target = indicator.padding(0.5 - indicatorRadius.native).fixed(width:1, height:1)
+		positionIndicator.target = indicator.padding(0.5 - indicatorRadius.native).fixed(width:1, height:1)
+		positionLineContrast.target = lineContrast
+		positionComplement.target = complement.padding(0.5 - indicatorRadius.native * 0.5).fixed(width:1, height:1)
 		
 		Common.Recognizer(.pan(false), target:self, action:#selector(indicatorPanned)).attachToView(planeView)
 		
@@ -74,7 +81,7 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	func refreshGradient() {
 		let chclt = planeView.planeLayer?.chclt ?? .default
-		let point = indicatorPosition.point()
+		let point = positionIndicator.point()
 		
 		slider.applyModel(model:planeView.mode.model, axis:planeView.mode.axis, chclt:chclt, hue:point.x.native)
 	}
@@ -99,12 +106,33 @@ class ChocolatePlaneViewController: BaseViewController {
 			borderColor = linearColor.contrasting(chclt, value:borderContrasting).color(colorSpace:platformColor.cgColor.colorSpace)
 		}
 		
+		let linearComplement = linearColor.applyChroma(chclt, value:-linearColor.chroma(chclt))
+		let coordinatesComplement = mode.model.coordinates(axis:mode.axis, color:linearComplement, chclt:chclt)
+		
 		indicator.color = platformColor
+		lineContrast.color = platformColor
+		positionLineContrast.vertical = .fraction(1 - linearColor.contrasting(chclt, value:0).luminance(chclt))
+		
+		complement.color = linearComplement.color()?.platformColor
+		positionComplement.horizontal = .fraction(coordinatesComplement.x)
+		positionComplement.vertical = .fraction(1 - coordinatesComplement.y)
+		
 		applyColorDescription(chclt:chclt, linearColor:linearColor)
 		
 		if let layer = indicator.view?.layer {
 			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:borderColor, clips:true)
 		}
+		
+		if let layer = complement.view?.layer {
+			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:borderColor, clips:true)
+		}
+	}
+	
+	func indicatorMoved(_ unit:CGPoint) {
+		refreshIndicator(unit)
+		refreshGradient()
+		
+		group.view?.ordered = layout()
 	}
 	
 	@objc
@@ -116,26 +144,25 @@ class ChocolatePlaneViewController: BaseViewController {
 		let unbound = location / box.size
 		let unit = CGPoint(x:min(max(0, unbound.x), 1), y:min(max(0, unbound.y), 1))
 		
-		indicatorPosition.horizontal = .fraction(unit.x.native)
-		indicatorPosition.vertical = .fraction(unit.y.native)
-		refreshIndicator(unit)
-		refreshGradient()
-		
-		group.view?.ordered = layout()
+		positionIndicator.horizontal = .fraction(unit.x.native)
+		positionIndicator.vertical = .fraction(unit.y.native)
+		indicatorMoved(unit)
 	}
 	
 	@objc
 	func sliderChanged() {
 		planeView.scalar = slider.value
-		refreshIndicator(indicatorPosition.point())
-		refreshGradient()
+		indicatorMoved(positionIndicator.point())
 	}
 	
 	@objc
 	func axisChanged() {
-		planeView.mode = Axis(rawValue:picker.select)?.mode ?? .standard
-		refreshIndicator(indicatorPosition.point())
-		refreshGradient()
+		let axis = Axis(rawValue:picker.select)
+		
+		planeView.mode = axis?.mode ?? .standard
+		indicatorMoved(positionIndicator.point())
+		
+		lineContrast.view?.isHidden = axis != .chclt_c && axis != .chclt_h
 	}
 	
 	func layout() -> Positionable {
@@ -152,7 +179,9 @@ class ChocolatePlaneViewController: BaseViewController {
 				vertical:.fill,
 				primary:0,
 				planeView,
-				indicatorPosition
+				positionLineContrast,
+				positionComplement,
+				positionIndicator
 			).padding(0).ignoringSafeBounds(isUnderTabBar ? .horizontal : nil)
 		)
 	}
