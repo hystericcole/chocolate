@@ -74,7 +74,10 @@ class ChocolateGradientSlider: Viewable.Group {
 		track.border(CALayer.Border(width:Constant.trackBorderWidth, radius:radius, color:trackBorderColor.cgColor))
 		thumb.border(CALayer.Border(width:Constant.thumbBorderWidth, radius:radius, color:thumbBorderColor.cgColor))
 		
-		Common.Recognizer(.pan(false), target:self, action:#selector(recognizerPanned)).attachToView(view)
+		Common.Recognizer.attachRecognizers([
+			Common.Recognizer(.pan(false), target:self, action:#selector(recognizerPanned)),
+			Common.Recognizer(.tap(false, 1), target:self, action:#selector(recognizerPanned))
+		], to:view)
 	}
 	
 	func applyModel(model:ColorModel, axis:Int, chclt:CHCLT, hue:CHCLT.Scalar, count:Int = 360) {
@@ -86,7 +89,12 @@ class ChocolateGradientSlider: Viewable.Group {
 	
 	@objc
 	func recognizerPanned(_ recognizer:PlatformPanGestureRecognizer) {
-		guard recognizer.state == .changed, let view = view else { return }
+		guard let view = view else { return }
+		
+		switch recognizer.state {
+		case .recognized, .began, .changed: break
+		default: return
+		}
 		
 		let box = CGRect(origin:.zero, size:view.bounds.size)
 		let groove = box.insetBy(dx:radius, dy:0)

@@ -48,7 +48,10 @@ class ChocolatePlaneViewController: BaseViewController {
 		positionLineContrast.target = lineContrast
 		positionComplement.target = complement.padding(0.5 - indicatorRadius.native * 0.5).fixed(width:1, height:1)
 		
-		Common.Recognizer(.pan(false), target:self, action:#selector(indicatorPanned)).attachToView(planeView)
+		Common.Recognizer.attachRecognizers([
+			Common.Recognizer(.pan(false), target:self, action:#selector(indicatorPanned)),
+			Common.Recognizer(.tap(false, 1), target:self, action:#selector(indicatorPanned))
+		], to:planeView)
 		
 		refreshIndicator(CGPoint(x:0.5, y:0.5))
 	}
@@ -75,7 +78,8 @@ class ChocolatePlaneViewController: BaseViewController {
 			formatter.string(from:hcl.x * 360.0 as NSNumber)! + "°",
 			formatter.string(from:hcl.y * 100 as NSNumber)! + "%",
 			formatter.string(from:hcl.z * 100 as NSNumber)! + "☼",
-			formatter.string(from:contrast * 100 as NSNumber)! + symbol
+			formatter.string(from:contrast * 100 as NSNumber)! + symbol,
+			linearColor.display(chclt).web()
 		].joined(separator:" • ")
 	}
 	
@@ -137,7 +141,10 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	@objc
 	func indicatorPanned(_ recognizer:PlatformPanGestureRecognizer) {
-		guard recognizer.state == .changed else { return }
+		switch recognizer.state {
+		case .recognized, .began, .changed: break
+		default: return
+		}
 		
 		let box = CGRect(origin:.zero, size:planeView.bounds.size)
 		let location = recognizer.location(in:planeView)
