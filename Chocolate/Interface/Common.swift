@@ -769,6 +769,18 @@ class CommonViewController: PlatformViewController {
 //	MARK: -
 
 class CommonTabController: PlatformTabController {
+#if os(macOS)
+#else
+	override var viewControllers:[UIViewController]? {
+		didSet {
+			let index = selectedIndex
+			
+			selectedIndex = index ^ 1
+			selectedIndex = index
+		}
+	}
+#endif
+	
 	override init(nibName nibNameOrNil:String?, bundle nibBundleOrNil:Bundle?) {
 		super.init(nibName:nibNameOrNil, bundle:nibBundleOrNil)
 		
@@ -847,6 +859,50 @@ extension PlatformSizeChangeView {
 //	MARK: -
 
 enum Common {
+	struct AnimationTiming {
+		let c1, c2:CGPoint
+		
+		var function:CAMediaTimingFunction {
+			return CAMediaTimingFunction(controlPoints:Float(c1.x), Float(c1.y), Float(c2.x), Float(c2.y))
+		}
+		
+#if os(macOS)
+#else
+		var parameters:UICubicTimingParameters {
+			return UICubicTimingParameters(controlPoint1:c1, controlPoint2:c2)
+		}
+#endif
+		
+		static let linear = AnimationTiming(c1:.zero, c2:CGPoint(x:1.0, y:1.0))
+		static let easeIn = AnimationTiming(c1:CGPoint(x:0.42, y:0.0), c2:CGPoint(x:1.0, y:1.0))
+		static let easeOut = AnimationTiming(c1:.zero, c2:CGPoint(x:0.58, y:1.0))
+		static let easeInOut = AnimationTiming(c1:CGPoint(x:0.42, y:0.0), c2:CGPoint(x:0.58, y:1.0))
+		static let systemDefault = AnimationTiming(c1:CGPoint(x:0.25, y:0.1), c2:CGPoint(x:0.25, y:1.0))
+	}
+	
+	static func animate(duration:TimeInterval = 0.25, timing:AnimationTiming = .systemDefault, animations:@escaping () -> Void, completion:((Bool) -> Void)? = nil) {
+#if os(macOS)
+		NSAnimationContext.runAnimationGroup({ context in
+			context.allowsImplicitAnimation = true
+			context.duration = duration
+			context.timingFunction = timing.function
+			
+			animations()
+		}, completionHandler:completion != nil ? {
+			completion!(true)
+		} : nil)
+#else
+		let animator = UIViewPropertyAnimator(duration:duration, timingParameters:timing.parameters)
+		
+		if let completion = completion {
+			animator.addCompletion { completion($0 == UIViewAnimatingPosition.end) }
+		}
+		
+		animator.addAnimations(animations)
+		animator.startAnimation()
+#endif
+	}
+	
 	struct Interface {
 		static var scale:CGFloat {
 #if os(macOS)

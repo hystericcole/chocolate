@@ -39,6 +39,12 @@ class ChocolatePlaneViewController: BaseViewController {
 	var positionLineContrast = Layout.Align(Layout.empty, horizontal:.fill)
 	var positionComplement = Layout.Align(Layout.empty)
 	
+	var isDisplayed:Bool {
+		guard let layer = indicator.view?.layer else { return false }
+		
+		return layer.cornerRadius > 0
+	}
+	
 	override func prepare() {
 		super.prepare()
 		
@@ -132,15 +138,25 @@ class ChocolatePlaneViewController: BaseViewController {
 		}
 	}
 	
-	func indicatorMoved(_ unit:CGPoint) {
-		refreshIndicator(unit)
-		refreshGradient()
-		
-		group.view?.ordered = layout()
+	func refreshContent(_ unit:CGPoint, animate:Bool) {
+		if animate, let view = group.view {
+			Common.animate(duration:0.25, animations:{
+				self.refreshIndicator(unit)
+				self.refreshGradient()
+				
+				view.ordered = self.layout()
+				view.sizeChanged()
+			})
+		} else {
+			refreshIndicator(unit)
+			refreshGradient()
+			
+			group.view?.ordered = layout()
+		}
 	}
 	
 	@objc
-	func indicatorPanned(_ recognizer:PlatformPanGestureRecognizer) {
+	func indicatorPanned(_ recognizer:PlatformGestureRecognizer) {
 		switch recognizer.state {
 		case .recognized, .began, .changed: break
 		default: return
@@ -153,13 +169,13 @@ class ChocolatePlaneViewController: BaseViewController {
 		
 		positionIndicator.horizontal = .fraction(unit.x.native)
 		positionIndicator.vertical = .fraction(unit.y.native)
-		indicatorMoved(unit)
+		refreshContent(unit, animate:recognizer is PlatformTapGestureRecognizer)
 	}
 	
 	@objc
 	func sliderChanged() {
 		planeView.scalar = slider.value
-		indicatorMoved(positionIndicator.point())
+		refreshContent(positionIndicator.point(), animate:!slider.isTracking)
 	}
 	
 	@objc
@@ -167,7 +183,7 @@ class ChocolatePlaneViewController: BaseViewController {
 		let axis = Axis(rawValue:picker.select)
 		
 		planeView.mode = axis?.mode ?? .standard
-		indicatorMoved(positionIndicator.point())
+		refreshContent(positionIndicator.point(), animate:isDisplayed)
 		
 		lineContrast.view?.isHidden = axis != .chclt_c && axis != .chclt_h
 	}

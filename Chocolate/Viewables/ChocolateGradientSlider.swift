@@ -10,13 +10,6 @@ import Foundation
 import QuartzCore
 
 class ChocolateGradientSlider: Viewable.Group {
-	var layout:Layout.ThumbTrackHorizontal
-	var thumb = Viewable.Color(color:PlatformColor(white:1, alpha:0.0))
-	var track = Viewable.Gradient(colors:[], direction:.right)
-	var action:Selector
-	var radius:CGFloat
-	weak var target:AnyObject?
-	
 	enum Constant {
 		static let trackBorderWidth:CGFloat = 1.0
 		static let thumbBorderWidth:CGFloat = 3.0
@@ -40,6 +33,14 @@ class ChocolateGradientSlider: Viewable.Group {
 		}
 	}
 	
+	var layout:Layout.ThumbTrackHorizontal
+	var thumb = Viewable.Color(color:PlatformColor(white:1, alpha:0.0))
+	var track = Viewable.Gradient(colors:[], direction:.right)
+	var action:Selector
+	var radius:CGFloat
+	var isTracking:Bool
+	weak var target:AnyObject?
+	
 	var value:Double {
 		get { return layout.thumbPosition }
 		set { layout.thumbPosition = newValue; view?.ordered = layout }
@@ -52,6 +53,7 @@ class ChocolateGradientSlider: Viewable.Group {
 		self.radius = radius
 		self.action = action
 		self.target = target
+		self.isTracking = false
 		
 		self.layout = Layout.ThumbTrackHorizontal(
 			thumb:thumb.fixed(width:diameter, height:diameter),
@@ -88,12 +90,12 @@ class ChocolateGradientSlider: Viewable.Group {
 	}
 	
 	@objc
-	func recognizerPanned(_ recognizer:PlatformPanGestureRecognizer) {
+	func recognizerPanned(_ recognizer:PlatformGestureRecognizer) {
 		guard let view = view else { return }
 		
 		switch recognizer.state {
 		case .recognized, .began, .changed: break
-		default: return
+		default: isTracking = false; return
 		}
 		
 		let box = CGRect(origin:.zero, size:view.bounds.size)
@@ -104,7 +106,12 @@ class ChocolateGradientSlider: Viewable.Group {
 		
 		guard value != fraction else { return }
 		
+		isTracking = recognizer is PlatformPanGestureRecognizer
 		value = fraction
+		
+		if !isTracking {
+			Common.animate(duration:0.25, animations:{ view.sizeChanged() }, completion:nil)
+		}
 		
 		PlatformApplication.shared.sendAction(action, to:target, from:view)
 	}
