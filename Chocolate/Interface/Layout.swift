@@ -1030,10 +1030,6 @@ struct Layout {
 				}
 			}
 		}
-		
-		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
-			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
-		}
 	}
 	
 	/// Arrange a group of elements in a vertical stack.
@@ -2500,10 +2496,6 @@ struct Layout {
 				preferTemplate.applyPositionableFrame(box, context:context, axial:&preferMeasured.axial, sizes:preferMeasured.sizes, available:preferMeasured.available, isFloating:preferTemplate.isFloating)
 			}
 		}
-		
-		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
-			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
-		}
 	}
 	
 	struct Circle: PositionableWithTargets {
@@ -2576,10 +2568,6 @@ struct Layout {
 				
 				targets[index].applyPositionableFrame(frame, context:context)
 			}
-		}
-		
-		func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
-			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
 		}
 	}
 	
@@ -2664,6 +2652,10 @@ extension PositionableWithTargets {
 	var positionables:[Positionable] { return targets }
 	var frame:CGRect { return targets.reduce(.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) } }
 	var compressionResistance:CGPoint { return .zero }
+	
+	func orderablePositionables(environment:Layout.Environment, order:Layout.Order) -> [Positionable] {
+		return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
+	}
 }
 
 //	MARK: -
