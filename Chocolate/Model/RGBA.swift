@@ -186,6 +186,9 @@ public struct DisplayRGB {
 	//	MARK: Hexagonal
 	
 	public static func hexagonal(hue:Scalar, saturation:Scalar, brightness:Scalar) -> Scalar.Vector3 {
+		let hue = saturation < 0 ? hue + 0.5 : hue
+		let saturation = saturation.magnitude
+		
 		guard brightness > 0 && saturation > 0 else { return Scalar.vector3(brightness, brightness, brightness) }
 		
 		let hue1 = Scalar.vector3(hue, hue - 1.0/3.0, hue - 2.0/3.0)

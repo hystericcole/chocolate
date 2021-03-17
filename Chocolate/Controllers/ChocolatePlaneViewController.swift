@@ -14,7 +14,10 @@ class ChocolatePlaneViewController: BaseViewController {
 		case chclt_h, chclt_c, chclt_l, rgb_r, rgb_g, rgb_b, hsb_h, hsb_s, hsb_b
 		
 		var mode:ChocolatePlaneLayer.Mode {
-			return ChocolatePlaneLayer.Mode(model:ColorModel(rawValue:rawValue / 3) ?? .chclt, axis:rawValue % 3)
+			return ChocolatePlaneLayer.Mode(
+				model:ColorModel(rawValue:rawValue / 3) ?? .chclt,
+				axis:rawValue % 3
+			)
 		}
 		
 		static var titles:[String] = ["CHCLT Hue", "CHCLT Chroma", "CHCLT Luma", "RGB Red", "RGB Green", "RGB Blue", "HSB Hue", "HSB Saturation", "HSB Brightness"]

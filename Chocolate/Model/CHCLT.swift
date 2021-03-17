@@ -606,6 +606,40 @@ extension CHCLT {
 		return applyChroma(vector, luminance:v, apply:c * n + d * value)
 	}
 	
+	public func chromaRamp(_ vector:Linear.Vector3, luminance v:Linear, intermediaries:Int = 1, withNegative:Bool = false) -> [Linear.Vector3] {
+		let maximum = CHCLT.maximumChroma(vector, luminance:v)
+		
+		guard maximum.isFinite else { return [vector, vector] }
+		
+		var result = [scaleChroma(vector, luminance:v, by:maximum)]
+		
+		if intermediaries > 0 {
+			for index in 0 ..< intermediaries {
+				let value = Linear(intermediaries - index) / Linear(intermediaries + 1)
+				
+				result.append(scaleChroma(vector, luminance:v, by:maximum * value))
+			}
+		}
+		
+		result.append(scaleChroma(vector, luminance:v, by:0))
+		
+		if withNegative {
+			let minimum = CHCLT.minimumChroma(vector, luminance:v)
+			
+			if intermediaries > 0 {
+				for index in 0 ..< intermediaries {
+					let value = Linear(index + 1) / Linear(intermediaries + 1)
+					
+					result.append(scaleChroma(vector, luminance:v, by:minimum * value))
+				}
+			}
+			
+			result.append(scaleChroma(vector, luminance:v, by:minimum))
+		}
+		
+		return result
+	}
+	
 	// MARK: Transform
 	
 	public func hcl(_ vector:Linear.Vector3) -> Linear.Vector3 {

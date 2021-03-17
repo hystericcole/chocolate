@@ -12,28 +12,57 @@ import Foundation
 enum ColorModel: Int {
 	case chclt, rgb, hsb
 	
-	static func components(coordinates:CHCLT.Scalar.Vector3, axis:Int) -> CHCLT.Scalar.Vector3 {
-		var v = coordinates
-		let a = axis / 6
+	static let count = 3
+	
+	struct AxisOptions: OptionSet {
+		let rawValue:Int
 		
-		if a & 1 != 0 { v.x = 1 - v.x }
-		if a & 2 != 0 { v.y = 1 - v.y }
-		if a & 4 != 0 { v.z = 1 - v.z }
+		var flipOver:Bool { return rawValue & 1 != 0 ? ~rawValue & 4 != 0 : rawValue & 2 != 0 }
+		var flipDown:Bool { return rawValue & 1 != 0 ? ~rawValue & 2 != 0 : rawValue & 4 != 0 }
+		
+		static let models = 3
+		static let swapXY = AxisOptions(rawValue:1 << 0)
+		static let flipX = AxisOptions(rawValue:1 << 1)
+		static let flipY = AxisOptions(rawValue:1 << 2)
+		static let flipZ = AxisOptions(rawValue:1 << 3)
+		static let negativeY = AxisOptions(rawValue:1 << 4)
+		
+		init(rawValue:Int) { self.rawValue = rawValue }
+		init(axis:Int) { self.rawValue = axis / ColorModel.count }
+		
+		static func overAxis(_ axis:Int) -> Int { return (axis / ColorModel.count & 3) * ColorModel.count + axis % ColorModel.count }
+		static func downAxis(_ axis:Int) -> Int { return (axis / ColorModel.count & 5) * ColorModel.count + axis % ColorModel.count }
+	}
+	
+	static func components(coordinates:CHCLT.Scalar.Vector3, axis:Int) -> CHCLT.Scalar.Vector3 {
+		var c:CHCLT.Scalar.Vector3
+		var v = coordinates
+		let options = AxisOptions(axis:axis)
+		
+		if options.contains(.flipX) { v.x = 1 - v.x }
+		if options.contains(.flipY) { v.y = 1 - v.y }
+		if options.contains(.flipZ) { v.z = 1 - v.z }
 		
 		switch axis % 6 {
-		case 0: return CHCLT.Scalar.vector3(v.z, v.x, v.y)
-		case 1: return CHCLT.Scalar.vector3(v.x, v.z, v.y)
-		case 2: return CHCLT.Scalar.vector3(v.x, v.y, v.z)
-		case 3: return CHCLT.Scalar.vector3(v.z, v.y, v.x)
-		case 4: return CHCLT.Scalar.vector3(v.y, v.z, v.x)
-		case _: return CHCLT.Scalar.vector3(v.y, v.x, v.z)
+		case 0: c = CHCLT.Scalar.vector3(v.z, v.x, v.y)
+		case 1: c = CHCLT.Scalar.vector3(v.x, v.z, v.y)
+		case 2: c = CHCLT.Scalar.vector3(v.x, v.y, v.z)
+		case 3: c = CHCLT.Scalar.vector3(v.z, v.y, v.x)
+		case 4: c = CHCLT.Scalar.vector3(v.y, v.z, v.x)
+		case _: c = CHCLT.Scalar.vector3(v.y, v.x, v.z)
 		}
+		
+		if options.contains(.negativeY) { c.y = c.y * 2 - 1 }
+		
+		return c
 	}
 	
 	static func coordinates(components:CHCLT.Scalar.Vector3, axis:Int) -> CHCLT.Scalar.Vector3 {
 		var v:CHCLT.Scalar.Vector3
-		let c = components
-		let a = axis / 6
+		var c = components
+		let options = AxisOptions(axis:axis)
+		
+		if options.contains(.negativeY) { c.y = c.y * 0.5 + 0.5 }
 		
 		switch axis % 6 {
 		case 0: v = CHCLT.Scalar.vector3(c.y, c.z, c.x)
@@ -44,9 +73,9 @@ enum ColorModel: Int {
 		case _: v = CHCLT.Scalar.vector3(c.y, c.x, c.z)
 		}
 		
-		if a & 1 != 0 { v.x = 1 - v.x }
-		if a & 2 != 0 { v.y = 1 - v.y }
-		if a & 4 != 0 { v.z = 1 - v.z }
+		if options.contains(.flipX) { v.x = 1 - v.x }
+		if options.contains(.flipY) { v.y = 1 - v.y }
+		if options.contains(.flipZ) { v.z = 1 - v.z }
 		
 		return v
 	}
@@ -70,7 +99,7 @@ enum ColorModel: Int {
 	static func platformHSB(axis:Int, coordinates:CHCLT.Scalar.Vector3, alpha:CGFloat = 1.0) -> PlatformColor {
 		let hsb = components(coordinates:coordinates, axis:axis)
 		
-		return PlatformColor(hue:CGFloat(hsb.x), saturation:CGFloat(hsb.y), brightness:CGFloat(hsb.z), alpha:alpha)
+		return PlatformColor(hue:CGFloat(modf(hsb.y < 0 ? hsb.x + 0.5 : hsb.x).1), saturation:CGFloat(hsb.y.magnitude), brightness:CGFloat(hsb.z), alpha:alpha)
 	}
 	
 	static func linearCHCLT(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
@@ -132,46 +161,73 @@ enum ColorModel: Int {
 	}
 	
 	func linearColors(axis:Int, chclt:CHCLT, hue:CHCLT.Scalar, count:Int) -> [CHCLT.LinearRGB] {
-		let result:[CHCLT.LinearRGB]
-		let a = axis / 6
-		let r = a & 4 != 0
+		let count = count > 1 ? count : 12
+		var result:[CHCLT.LinearRGB]
+		let options = AxisOptions(axis:axis)
 		
 		switch (self, axis % 3) {
-		case (.rgb, 0):   result = [.black, .red]
-		case (.rgb, 1):   result = [.black, .green]
-		case (.rgb, _):   result = [.black, .blue]
-		case (.hsb, 0):   result = (0 ..< count).map { CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:Double($0) / Double(count - 1), saturation:1, brightness:1))) }
-		case (.hsb, 1):   result = [.white, CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:hue, saturation:1, brightness:1)))]
-		case (.hsb, _):   result = [.black, CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:hue, saturation:1, brightness:1)))]
-		case (.chclt, 0): result = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count).map { CHCLT.LinearRGB($0).applyLuminance(chclt, value:0.5) }
-		case (.chclt, 1): result = [CHCLT.LinearRGB(chclt, hue:hue).applyChroma(chclt, value:0), CHCLT.LinearRGB(chclt, hue:hue).applyChroma(chclt, value:1)]
-		case (.chclt, _): result = [.black, .white]
+		case (.rgb, 0):
+			result = [.black, .red]
+		case (.rgb, 1):
+			result = [.black, .green]
+		case (.rgb, _):
+			result = [.black, .blue]
+		case (.hsb, 0):
+			result = (0 ..< count).map { CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:Double($0) / Double(count - 1), saturation:1, brightness:1))) }
+		case (.hsb, 1):
+			result = [.white, CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:hue, saturation:1, brightness:1)))]
+			if options.contains(.negativeY) { result.insert(CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:hue + 0.5, saturation:1, brightness:1))), at:0) }
+		case (.hsb, _):
+			result = [.black, CHCLT.LinearRGB(chclt.linear(DisplayRGB.hexagonal(hue:hue, saturation:1, brightness:1)))]
+		case (.chclt, 0):
+			result = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count - 1), count:count).map { CHCLT.LinearRGB($0) }
+		case (.chclt, 1):
+			let color = CHCLT.LinearRGB(chclt, hue:hue)
+			result = chclt.chromaRamp(color.vector, luminance:color.luminance(chclt), intermediaries:0, withNegative:options.contains(.negativeY)).reversed().map { CHCLT.LinearRGB($0) }
+		case (.chclt, _):
+			result = [.black, .white]
 		}
 		
-		return r ? result.reversed() : result
+		if options.contains(.flipZ) { result.reverse() }
+		
+		return result
 	}
 	
 	func platformColors(axis:Int, chclt:CHCLT, hue:CHCLT.Scalar, count:Int) -> [PlatformColor] {
-		let result:[PlatformColor]
-		let a = axis / 6
-		let r = a & 4 != 0
+		let count = count > 1 ? count : 12
+		var result:[PlatformColor]
+		let options = AxisOptions(axis:axis)
 		
 		switch (self, axis % 3) {
-		case (.rgb, 0):   result = [.black, .red]
-		case (.rgb, 1):   result = [.black, .green]
-		case (.rgb, _):   result = [.black, .blue]
-		case (.hsb, 0):   result = (0 ..< count).map { ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, Double($0) / Double(count - 1))) }
-		case (.hsb, 1):   result = [.white, ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(hue, 1, 1))]
-		case (.hsb, _):   result = [.black, ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(hue, 1, 1))]
-		case (.chclt, 0): result = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count).map { CHCLT.LinearRGB($0).applyLuminance(chclt, value:0.5).color().platformColor }
-		case (.chclt, 1): result = [CHCLT.LinearRGB(chclt, hue:hue).applyChroma(chclt, value:0), CHCLT.LinearRGB(chclt, hue:hue).applyChroma(chclt, value:1)].map { $0.color().platformColor }
-		case (.chclt, _): result = [.black, .white]
+		case (.rgb, 0):
+			result = [.black, .red]
+		case (.rgb, 1):
+			result = [.black, .green]
+		case (.rgb, _):
+			result = [.black, .blue]
+		case (.hsb, 0):
+			result = (0 ..< count).map { ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, Double($0) / Double(count - 1))) }
+		case (.hsb, 1):
+			result = [.white, ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(hue, 1, 1))]
+			// TODO: remove 49
+			if options.contains(.negativeY) { result.insert(ColorModel.platformHSB(axis:49, coordinates:CHCLT.Scalar.vector3(hue, 1, 0)), at:0) }
+		case (.hsb, _):
+			result = [.black, ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(hue, 1, 1))]
+		case (.chclt, 0):
+			result = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count - 1), count:count).map { CHCLT.LinearRGB($0).color().platformColor }
+		case (.chclt, 1):
+			let color = CHCLT.LinearRGB(chclt, hue:hue)
+			result = chclt.chromaRamp(color.vector, luminance:color.luminance(chclt), intermediaries:0, withNegative:options.contains(.negativeY)).reversed().map { CHCLT.LinearRGB($0).color().platformColor }
+		case (.chclt, _):
+			result = [.black, .white]
 		}
-
-		return r ? result.reversed() : result
+		
+		if options.contains(.flipZ) { result.reverse() }
+		
+		return result
 	}
 	
-	static func chromaGradient(chclt:CHCLT, primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, colorSpace:CGColorSpace?, darkToLight:Bool = false) -> CGGradient? {
+	static func luminanceGradient(chclt:CHCLT, primary:CHCLT.LinearRGB, chroma:CHCLT.Scalar, colorSpace:CGColorSpace?, darkToLight:Bool = false) -> CGGradient? {
 		let color = primary.applyChroma(chclt, value:chroma)
 		let value = color.luminance(chclt)
 		let locations:[CGFloat] = [0, CGFloat(darkToLight ? value : 1 - value), 1]
@@ -180,6 +236,14 @@ enum ColorModel: Int {
 		if darkToLight { colors.reverse() }
 		
 		return CGGradient(colorsSpace:colorSpace, colors:colors as CFArray, locations:locations)
+	}
+	
+	static func chromaGradient(chclt:CHCLT, primary:CHCLT.LinearRGB, colorSpace:CGColorSpace?, intermediaries:Int = 1, reverse:Bool, withNegative:Bool) -> CGGradient? {
+		var colors = chclt.chromaRamp(primary.vector, luminance:chclt.luminance(primary.vector), intermediaries:intermediaries, withNegative:withNegative)
+		
+		if reverse { colors.reverse() }
+		
+		return CGGradient(colorsSpace:colorSpace, colors:colors.map { CHCLT.LinearRGB($0).color() } as CFArray, locations:nil)
 	}
 	
 	static func hsb_from_rgb(r:CHCLT.Scalar, g:CHCLT.Scalar, b:CHCLT.Scalar) -> (hue:CHCLT.Scalar, saturation:CHCLT.Scalar, brightness:CHCLT.Scalar) {
@@ -247,8 +311,8 @@ extension CGContext {
 		let overColors:[CGColor]
 		let downColors:[CGColor]
 		let mode:CGBlendMode
-		let overAxis = (axis / 6 & 1) * 6 + axis % 6
-		let downAxis = (axis / 6 & 2) * 6 + axis % 6
+		let overAxis = ColorModel.AxisOptions.overAxis(axis)
+		let downAxis = ColorModel.AxisOptions.downAxis(axis)
 		
 		overColors = [
 			ColorModel.platformRGB(axis:overAxis, coordinates:CHCLT.Scalar.vector3(0, 0, scalar)).cgColor,
@@ -263,18 +327,18 @@ extension CGContext {
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
-		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
 		
 		setRenderingIntent(CGColorRenderingIntent.absoluteColorimetric)
 		
 		if let gradient = CGGradient(colorsSpace:drawSpace, colors:overColors as CFArray, locations:nil) {
 			setBlendMode(.copy)
-			drawLinearGradient(gradient, start:start, end:overEnd, options:options)
+			drawLinearGradient(gradient, start:start, end:overEnd, options:drawingOptions)
 		}
 		
 		if let gradient = CGGradient(colorsSpace:drawSpace, colors:downColors as CFArray, locations:nil) {
 			setBlendMode(mode)
-			drawLinearGradient(gradient, start:start, end:downEnd, options:options)
+			drawLinearGradient(gradient, start:start, end:downEnd, options:drawingOptions)
 		}
 	}
 	
@@ -283,10 +347,8 @@ extension CGContext {
 		var copyColors:[CGColor]
 		var modeColors:[CGColor]
 		let mode:CGBlendMode
-		let a = axis / 6
-		let isFlipped = (axis / 3) & 1 != 0
-		let flipOver = isFlipped ? ~a & 2 : a & 1
-		let flipDown = isFlipped ? ~a & 1 : a & 2
+		let options = ColorModel.AxisOptions(axis:axis)
+		let isFlipped = options.contains(.swapXY)
 		let count = Int(isFlipped ? box.size.height : box.size.width)
 		
 		switch axis % 3 {
@@ -295,9 +357,15 @@ extension CGContext {
 				ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor,
 				ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar)).cgColor
 			]
+			
+			if options.contains(.negativeY) {
+				copyColors.insert(ColorModel.platformHSB(axis:48, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor, at:0)
+			}
+			
 			modeColors = [PlatformColor.white.cgColor, PlatformColor.black.cgColor]
 			mode = .multiply
 		case 1:
+			let scalar = options.contains(.negativeY) ? scalar * 2 - 1 : scalar
 			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
 			modeColors = [PlatformColor.white.cgColor, PlatformColor.black.cgColor]
 			mode = .multiply
@@ -310,24 +378,24 @@ extension CGContext {
 			mode = .normal
 		}
 		
-		if flipOver != 0 { copyColors.reverse() }
-		if flipDown != 0 { modeColors.reverse() }
+		if options.flipOver { copyColors.reverse() }
+		if options.flipDown { modeColors.reverse() }
 		
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
-		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
 		
 		setRenderingIntent(CGColorRenderingIntent.absoluteColorimetric)
 		
 		if let gradient = CGGradient(colorsSpace:drawSpace, colors:copyColors as CFArray, locations:nil) {
 			setBlendMode(.copy)
-			drawLinearGradient(gradient, start:start, end:isFlipped ? downEnd : overEnd, options:options)
+			drawLinearGradient(gradient, start:start, end:isFlipped ? downEnd : overEnd, options:drawingOptions)
 		}
 		
 		if let gradient = CGGradient(colorsSpace:drawSpace, colors:modeColors as CFArray, locations:nil) {
 			setBlendMode(mode)
-			drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+			drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:drawingOptions)
 		}
 	}
 	
@@ -336,11 +404,10 @@ extension CGContext {
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
-		let options:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
-		let a = axis / 6
-		let isFlipped = (axis / 3) & 1 != 0
-		let flipOver = isFlipped ? ~a & 2 : a & 1
-		let flipDown = isFlipped ? ~a & 1 : a & 2
+		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let options = ColorModel.AxisOptions(axis:axis)
+		let isFlipped = options.contains(.swapXY)
+		let wideChroma = options.contains(.negativeY)
 		let count = Int(isFlipped ? box.size.height : box.size.width)
 		let size = isFlipped ? CGSize(width:box.size.width, height:1) : CGSize(width:1, height:box.size.height)
 		let step = isFlipped ? CGPoint(x:0, y:1) : CGPoint(x:1, y:0)
@@ -350,53 +417,74 @@ extension CGContext {
 		switch axis % 3 {
 		case 0:	//	scalar is hue
 			let primary = CHCLT.LinearRGB(chocolate, hue:scalar)
-			let flipChroma = flipOver != 0
-			let flipLuma = flipDown != 0
+			let inverse = primary.applyChroma(chocolate, value:-1).saturated()
+			let flipChroma = options.flipOver
+			let flipLuma = options.flipDown
 			
 			for index in 0 ..< count {
 				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
-				let chroma = CHCLT.Scalar(index) / CHCLT.Scalar(count - 1)
+				var chroma = CHCLT.Scalar(index) / CHCLT.Scalar(count - 1)
 				
-				guard let gradient = ColorModel.chromaGradient(chclt:chocolate, primary:primary, chroma:flipChroma ? 1 - chroma : chroma, colorSpace:drawSpace, darkToLight:flipLuma) else { continue }
+				if flipChroma { chroma = 1 - chroma }
+				if wideChroma { chroma = chroma * 2 - 1 }
+				
+				guard let gradient = ColorModel.luminanceGradient(
+					chclt:chocolate,
+					primary:chroma < 0 ? inverse : primary,
+					chroma:chroma.magnitude,
+					colorSpace:drawSpace,
+					darkToLight:flipLuma
+				) else { continue }
 				
 				clip(to:stripe)
-				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:drawingOptions)
 				resetClip()
 			}
 		case 1:	//	scalar is chroma
 			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
-			let flipHue = flipOver != 0
-			let flipLuma = flipDown != 0
+			let flipHue = options.flipOver
+			let flipLuma = options.flipDown
+			let scalar = wideChroma ? scalar * 2 - 1 : scalar
 			
 			for index in 0 ..< count {
 				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
 				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index])
 				
-				guard let gradient = ColorModel.chromaGradient(chclt:chocolate, primary:primary, chroma:scalar, colorSpace:drawSpace, darkToLight:flipLuma) else { continue }
+				guard let gradient = ColorModel.luminanceGradient(
+					chclt:chocolate,
+					primary:scalar < 0 ? primary.applyChroma(chocolate, value:-1).saturated() : primary,
+					chroma:scalar.magnitude,
+					colorSpace:drawSpace,
+					darkToLight:flipLuma
+				) else { continue }
 				
 				clip(to:stripe)
-				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:drawingOptions)
 				resetClip()
 			}
 		case _:	//	scalar is luminance
 			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
-			let flipHue = flipOver != 0
-			let flipChroma = flipDown != 0
+			let flipHue = options.flipOver
+			let flipChroma = options.flipDown
 			
 			for index in 0 ..< count {
 				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
 				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index]).applyLuminance(chocolate, value:scalar)
-				var colors = [primary, primary.applyChroma(chocolate, value:0.5), primary.applyChroma(chocolate, value:0)].map { $0.color() }
 				
-				if flipChroma { colors.reverse() }
-				
-				guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
+				guard let gradient = ColorModel.chromaGradient(
+					chclt:chocolate,
+					primary:primary,
+					colorSpace:drawSpace,
+					intermediaries:3,
+					reverse:flipChroma,
+					withNegative:wideChroma
+				) else { continue }
 				
 				clip(to:stripe)
-				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:options)
+				drawLinearGradient(gradient, start:start, end:isFlipped ? overEnd : downEnd, options:drawingOptions)
 				resetClip()
 			}
 		}

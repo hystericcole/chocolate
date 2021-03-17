@@ -47,16 +47,17 @@ class ChocolateTests: XCTestCase {
 	}
 	
 	func testColorModelTransforms() {
-		let v = CHCLT.Scalar.vector3(0.3125, 0.6, 0.9)
+		let v = CHCLT.Scalar.vector3(0.3125, 0.625, 0.9)
+		let n = 144
 		
-		for axis in 0 ..< 48 {
+		for axis in 0 ..< n {
 			let c = ColorModel.components(coordinates:v, axis:axis)
 			let d = ColorModel.coordinates(components:c, axis:axis)
 			
 			XCTAssertEqual(v, d, "axis \(axis)")
 		}
 		
-		for axis in 0 ..< 48 {
+		for axis in 0 ..< n {
 			let c = ColorModel.coordinates(components:v, axis:axis)
 			let d = ColorModel.components(coordinates:c, axis:axis)
 			
