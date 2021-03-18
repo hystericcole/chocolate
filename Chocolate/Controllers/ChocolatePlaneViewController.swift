@@ -121,10 +121,11 @@ class ChocolatePlaneViewController: BaseViewController {
 		
 		let linearComplement = linearColor.applyChroma(chclt, value:-linearColor.chroma(chclt))
 		let coordinatesComplement = mode.model.coordinates(axis:mode.axis, color:linearComplement, chclt:chclt)
+		let linearContrast = linearColor.contrasting(chclt, value:0)
 		
 		indicator.color = platformColor
 		lineContrast.color = platformColor
-		positionLineContrast.vertical = .fraction(1 - linearColor.contrasting(chclt, value:0).luminance(chclt))
+		positionLineContrast.vertical = .fraction(1 - linearContrast.luminance(chclt))
 		
 		complement.color = linearComplement.color()?.platformColor
 		positionComplement.horizontal = .fraction(coordinatesComplement.x)

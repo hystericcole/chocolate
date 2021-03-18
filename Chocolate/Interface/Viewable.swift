@@ -78,6 +78,7 @@ extension ViewablePositionable {
 	var viewType:PlatformView.Type { return ViewType.self }
 	var frame:CGRect { return view?.frame ?? .zero }
 	var compressionResistance:CGPoint { return view?.compressionResistance ?? .zero }
+	var layer:CALayer? { return view?.layer }
 	
 	func lazy() -> ViewType {
 		if let view = view { return view }

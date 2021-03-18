@@ -19,9 +19,14 @@ public class CHCLT {
 	public let coefficients:Vector3
 	public let contrast:CHCLT.Contrast
 	
-	public init(_ coefficients:Vector3, contrast:CHCLT.Contrast) {
-		self.coefficients = coefficients
+	public let toXYZ:Scalar.Matrix3x3
+	public let fromXYZ:Scalar.Matrix3x3
+	
+	public init(_ toXYZ:Scalar.Matrix3x3, contrast:CHCLT.Contrast, coefficients:Vector3? = nil) {
+		self.coefficients = coefficients ?? XYZ.luminanceCoefficients(toXYZ)
 		self.contrast = contrast
+		self.toXYZ = toXYZ
+		self.fromXYZ = toXYZ.inverse
 	}
 	
 	public func linear(_ value:Scalar) -> Linear {
@@ -70,6 +75,14 @@ public class CHCLT {
 	/// - Parameter vector: The linear results.
 	public func inverseLuminance(_ vector:Vector3) -> Vector3 {
 		return vector / coefficients
+	}
+	
+	public func xyz(rgb:Vector3) -> Vector3 {
+		return toXYZ * rgb
+	}
+	
+	public func rgb(xyz:Vector3) -> Vector3 {
+		return fromXYZ * xyz
 	}
 }
 
@@ -278,6 +291,33 @@ extension CHCLT {
 	
 	//	MARK: Contrast
 	
+	public func luminanceScaleContrast(_ luminance:Linear, by scalar:Scalar) -> Linear {
+		let m = contrast.mediumLuminance
+		let t = scalar < 0 ? luminance < m ? (1 - m) / m : m / (1 - m) : -1
+		let u = m + pow(scalar.magnitude, 1 / contrast.power) * (m - luminance) * t
+		
+		return u
+	}
+	
+	public func luminanceApplyContrast(_ luminance:Linear, value:Scalar) -> Linear {
+		let m = contrast.mediumLuminance
+		let t = pow(value.magnitude, 1 / contrast.power)
+		let u = (luminance < m) == (value < 0) ? (1 - m) * t + m : m * (1 - t)
+		
+		return u
+	}
+	
+	public func luminanceContrasting(_ luminance:Linear, value:Scalar) -> Linear {
+		let m = contrast.mediumLuminance
+		let cc = luminance > m ? (luminance - m) / (1 - m) : 1 - luminance / m
+		let c = pow(cc, contrast.power)
+		let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
+		let t = pow(tt, 1 / contrast.power)
+		let u = luminance > m ? m * (1 - t) : (1 - m) * t + m
+		
+		return u
+	}
+	
 	/// True if luminance is below the medium luminance.
 	public func isDark(_ vector:Linear.Vector3) -> Bool {
 		return luminance(vector) < contrast.mediumLuminance
@@ -307,11 +347,7 @@ extension CHCLT {
 	///   - scalar: The scaling factor.
 	/// - Returns: The adjusted color.
 	public func scaleContrast(_ vector:Linear.Vector3, luminance v:Linear, by scalar:Scalar) -> Linear.Vector3 {
-		let m = contrast.mediumLuminance
-		let t = scalar < 0 ? v < m ? (1 - m) / m : m / (1 - m) : -1
-		let u = m + pow(scalar.magnitude, 1 / contrast.power) * (m - v) * t
-		
-		return applyLuminance(vector, luminance:v, apply:u)
+		return applyLuminance(vector, luminance:v, apply:luminanceScaleContrast(v, by:scalar))
 	}
 	
 	/// Adjust the luminance to create a color that contrasts against the same colors as this color.  Negative values create contrasting colors.
@@ -323,11 +359,7 @@ extension CHCLT {
 	///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
 	/// - Returns: The adjusted color
 	public func applyContrast(_ vector:Linear.Vector3, luminance v:Linear, apply value:Linear) -> Linear.Vector3 {
-		let m = contrast.mediumLuminance
-		let t = pow(value.magnitude, 1 / contrast.power)
-		let u = (v < m) == (value < 0) ? (1 - m) * t + m : m * (1 - t)
-		
-		return applyLuminance(vector, luminance:v, apply:u)
+		return applyLuminance(vector, luminance:v, apply:luminanceApplyContrast(v, value:value))
 	}
 	
 	public func matchContrast(_ vector:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
@@ -358,14 +390,7 @@ extension CHCLT {
 	///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
 	/// - Returns: The adjusted color
 	public func contrasting(_ vector:Linear.Vector3, luminance v:Linear, value:Linear) -> Linear.Vector3 {
-		let m = contrast.mediumLuminance
-		let cc = v > m ? (v - m) / (1 - m) : 1 - v / m
-		let c = pow(cc, contrast.power)
-		let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
-		let t = pow(tt, 1 / contrast.power)
-		let u = v > m ? m * (1 - t) : (1 - m) * t + m
-		
-		return applyLuminance(vector, luminance:v, apply:u)
+		return applyLuminance(vector, luminance:v, apply:luminanceContrasting(v, value:value))
 	}
 	
 	//	MARK: Hue
@@ -1074,29 +1099,29 @@ extension CHCLT {
 
 extension CHCLT {
 	public static var `default` = CHCLT_sRGB.standard
-	public static let sRGB_linear = CHCLT(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_sRGB_d65), contrast:CHCLT_sRGB.contrast)
+	public static let sRGB_linear = CHCLT(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT_sRGB.contrast)
 }
 
 //	MARK: -
 
 public class CHCLT_Pure: CHCLT {
-	public static let y240 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_smpte240m_d65), exponent:2)
-	public static let y601 = CHCLT_Pure(CHCLT_BT.y601.coefficients, exponent:19 / 10)
-	public static let y709 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_bt709_d65), exponent:19 / 10)
-	public static let y2020 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_bt2020_d65), exponent:19 / 10)
-	public static let sRGB = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_sRGB_d65), exponent:11 / 5)
-	public static let dciP3 = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_theaterP3_dci), exponent:13 / 5)
-	public static let adobeRGB = CHCLT_Pure(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_adobeRGB_d65), exponent:563 / 256)
+	public static let y240 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_smpte240m_d65, exponent:2)
+	public static let y601 = CHCLT_Pure(CHCLT_BT.y601.toXYZ, exponent:19 / 10, coefficients:CHCLT_BT.y601.coefficients)
+	public static let y709 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_bt709_d65, exponent:19 / 10)
+	public static let y2020 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_bt2020_d65, exponent:19 / 10)
+	public static let sRGB = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, exponent:11 / 5)
+	public static let dciP3 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_theaterP3_dci, exponent:13 / 5)
+	public static let adobeRGB = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_adobeRGB_d65, exponent:563 / 256)
 	
 	public let exponent:Linear
 	
-	public init(_ coefficients:Vector3, exponent:Linear, contrast:CHCLT.Contrast) {
+	public init(_ toXYZ:Scalar.Matrix3x3, exponent:Linear, contrast:CHCLT.Contrast, coefficients:Vector3? = nil) {
 		self.exponent = exponent
-		super.init(coefficients, contrast:contrast)
+		super.init(toXYZ, contrast:contrast, coefficients:coefficients)
 	}
 	
-	public convenience init(_ coefficients:Vector3, exponent:Linear) {
-		self.init(coefficients, exponent:exponent, contrast:CHCLT.Contrast(pow(0.5, exponent)))
+	public convenience init(_ toXYZ:Scalar.Matrix3x3, exponent:Linear, coefficients:Vector3? = nil) {
+		self.init(toXYZ, exponent:exponent, contrast:CHCLT.Contrast(pow(0.5, exponent)), coefficients:coefficients)
 	}
 	
 	public override func linear(_ value:Scalar) -> Linear {
@@ -1111,14 +1136,14 @@ public class CHCLT_Pure: CHCLT {
 //	MARK: -
 
 public class CHCLT_sRGB: CHCLT {
-	public static let displayP3 = CHCLT_sRGB(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_displayP3_d65))
-	public static let standard = CHCLT_sRGB(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_sRGB_d65))
-	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_sRGB_d65), contrast:CHCLT.Contrast(2 / 11, power:1.0))
+	public static let displayP3 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_displayP3_d65)
+	public static let standard = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65)
+	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11, power:1.0))
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_sRGB.linear(0.5))
 	
-	public override init(_ coefficients:Vector3, contrast:CHCLT.Contrast = CHCLT_sRGB.contrast) {
-		super.init(coefficients, contrast:contrast)
+	public override init(_ toXYZ:Scalar.Matrix3x3, contrast:CHCLT.Contrast = CHCLT_sRGB.contrast, coefficients:Vector3? = nil) {
+		super.init(toXYZ, contrast:contrast, coefficients:coefficients)
 	}
 	
 	public static func linear(_ value:Scalar) -> Linear {
@@ -1136,20 +1161,33 @@ public class CHCLT_sRGB: CHCLT {
 	public override func transfer(_ value:Linear) -> Scalar {
 		return CHCLT_sRGB.transfer(value)
 	}
+	
+	public static func contrastingG18(_ vector:Linear.Vector3, luminance v:Linear, ratio:Linear = 4.5, offset:Linear = 0.05) -> Linear.Vector3 {
+		let m = 1 / (ratio + 1)
+		
+		guard v > 0 else { return Linear.vector3(m, m, m) }
+		
+		let vo = v + offset
+		let uo = v > m ? vo / ratio : vo * ratio
+		let u = uo - offset
+		let s = u / v
+		
+		return vector * s
+	}
 }
 
 //	MARK: -
 
 public class CHCLT_BT: CHCLT {
-	public static let y601 = CHCLT_BT(CHCLT.Linear.vector3(0.299, 0.587, 0.114))
-	public static let y709 = CHCLT_BT(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_bt709_d65))
-	public static let y2020 = CHCLT_BT(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_bt2020_d65))
+	public static let y601 = CHCLT_BT(CHCLT.XYZ.rgb_to_xyz_bt601_525_d65, coefficients:CHCLT.Linear.vector3(0.299, 0.587, 0.114))
+	public static let y709 = CHCLT_BT(CHCLT.XYZ.rgb_to_xyz_bt709_d65)
+	public static let y2020 = CHCLT_BT(CHCLT.XYZ.rgb_to_xyz_bt2020_d65)
 	public static let y2100 = y2020
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_BT.linear(0.5))
 	
-	public override init(_ coefficients:Vector3, contrast:CHCLT.Contrast = CHCLT_BT.contrast) {
-		super.init(coefficients, contrast:contrast)
+	public override init(_ toXYZ:Scalar.Matrix3x3, contrast:CHCLT.Contrast = CHCLT_BT.contrast, coefficients:Vector3? = nil) {
+		super.init(toXYZ, contrast:contrast, coefficients:coefficients)
 	}
 	
 	public static func linear(_ value:Scalar) -> Linear {
@@ -1172,12 +1210,12 @@ public class CHCLT_BT: CHCLT {
 //	MARK: -
 
 public class CHCLT_ROMM: CHCLT {
-	public static let standard = CHCLT_ROMM(CHCLT.XYZ.luminanceCoefficients(CHCLT.XYZ.rgb_to_xyz_romm_d50))
+	public static let standard = CHCLT_ROMM(CHCLT.XYZ.rgb_to_xyz_romm_d50)
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_ROMM.linear(0.5))
 	
-	public override init(_ coefficients:Vector3, contrast:CHCLT.Contrast = CHCLT_ROMM.contrast) {
-		super.init(coefficients, contrast:contrast)
+	public override init(_ toXYZ:Scalar.Matrix3x3, contrast:CHCLT.Contrast = CHCLT_ROMM.contrast, coefficients:Vector3? = nil) {
+		super.init(toXYZ, contrast:contrast, coefficients:coefficients)
 	}
 	
 	public static func linear(_ value:Scalar) -> Linear {
