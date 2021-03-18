@@ -14,9 +14,12 @@ class ChocolatePlaneViewController: BaseViewController {
 		case chclt_h, chclt_c, chclt_l, rgb_r, rgb_g, rgb_b, hsb_h, hsb_s, hsb_b
 		
 		var mode:ChocolatePlaneLayer.Mode {
+			let model = ColorModel(rawValue:rawValue / 3) ?? .chclt
+			let axis = rawValue % 3
+			
 			return ChocolatePlaneLayer.Mode(
-				model:ColorModel(rawValue:rawValue / 3) ?? .chclt,
-				axis:rawValue % 3
+				model:model,
+				axis:axis
 			)
 		}
 		
@@ -79,7 +82,7 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	func applyColorDescription(chclt:CHCLT, linearColor:CHCLT.LinearRGB) {
 		let formatter = NumberFormatter(fractionDigits:1 ... 1)
-		let hcl = chclt.hcl(linearColor.vector)
+		let hcl = chclt.hcl(rgb:linearColor.vector)
 		let contrast = linearColor.contrast(chclt)
 		let symbol = hcl.z < chclt.contrast.mediumLuminance ? "◐" : "◑"
 		

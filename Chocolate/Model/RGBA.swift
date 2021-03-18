@@ -208,7 +208,7 @@ public struct DisplayRGB {
 	}
 	
 	public func hcl(_ chclt:CHCLT) -> Scalar.Vector4 {
-		let hcl = chclt.hcl(linear(chclt).vector)
+		let hcl = chclt.hcl(rgb:linear(chclt).vector)
 		
 		return Scalar.vector4(hcl, vector.w)
 	}

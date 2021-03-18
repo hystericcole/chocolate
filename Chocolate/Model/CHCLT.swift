@@ -77,12 +77,40 @@ public class CHCLT {
 		return vector / coefficients
 	}
 	
+	public func whitepoint() -> Vector3 {
+		return toXYZ * Vector3.one
+	}
+	
 	public func xyz(rgb:Vector3) -> Vector3 {
 		return toXYZ * rgb
 	}
 	
 	public func rgb(xyz:Vector3) -> Vector3 {
 		return fromXYZ * xyz
+	}
+	
+	public func lab(rgb:Vector3) -> Vector3 {
+		return Lab.fromXYZ(xyz:xyz(rgb:rgb), white:whitepoint())
+	}
+	
+	public func rgb(lab:Vector3) -> Vector3 {
+		return rgb(xyz:Lab.toXYZ(lab:lab, white:whitepoint()))
+	}
+	
+	public func lch(rgb:Vector3) -> Vector3 {
+		var lch = Lab.toLCH(lab:lab(rgb:rgb) / 100.0)
+		
+		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
+		
+		return lch
+	}
+	
+	public func rgb(lch:Vector3) -> Vector3 {
+		var lch = lch
+		
+		lch.z = lch.z * 2.0 * .pi
+		
+		return rgb(lab:Lab.fromLCH(lch:lch) * 100.0)
 	}
 }
 
@@ -212,6 +240,7 @@ extension CHCLT {
 extension CHCLT {
 	/// Bring each component of vector within the 0 ... 1 range by desaturating
 	public static func normalize(_ vector:Linear.Vector3, luminance v:Linear, leavePositive:Bool) -> Linear.Vector3 {
+		let v = max(v, 0)
 		var vector = vector
 		let negative = vector.min()
 		
@@ -259,19 +288,20 @@ extension CHCLT {
 		guard v > 0 else { return Linear.vector3(u, u, u) }
 		
 		let n = CHCLT.normalize(vector, luminance:v, leavePositive:true)
-		let rgb = display(n)
 		let s = u / v
-		let t = transfer(s)
+		let t = s * n.max()
+		
+		guard transfer(t) > 1 else { return n * s }
+		
+		let rgb = display(n)
 		let d = rgb.max()
-		
-		guard t * d > 1 else { return n * s }
-		
 		let maximumPreservingHue = rgb / d
 		let m = linear(maximumPreservingHue)
 		let w = luminance(m)
 		let distanceFromWhite = (1 - u) / (1 - w)
+		let whitened = 1 - distanceFromWhite + m * distanceFromWhite
 		
-		return 1 - distanceFromWhite + m * distanceFromWhite
+		return whitened
 	}
 	
 	public func matchLuminance(_ vector:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
@@ -309,6 +339,7 @@ extension CHCLT {
 	
 	public func luminanceContrasting(_ luminance:Linear, value:Scalar) -> Linear {
 		let m = contrast.mediumLuminance
+		guard value > -1 else { return m }
 		let cc = luminance > m ? (luminance - m) / (1 - m) : 1 - luminance / m
 		let c = pow(cc, contrast.power)
 		let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
@@ -330,7 +361,7 @@ extension CHCLT {
 	///   - vector: The color.
 	///   - v: The luminance of color.
 	/// - Returns: The contrast of color.
-	public func contrast(_ vector:Linear.Vector3, luminance v:Linear) -> Linear {
+	public func contrast(luminance v:Linear) -> Linear {
 		let m = contrast.mediumLuminance
 		let c = v > m ? (v - m) / (1 - m) : 1 - v / m
 		
@@ -367,7 +398,7 @@ extension CHCLT {
 		let v = luminance(vector)
 		let u = luminance(color)
 		let n = 1 - value
-		let c = contrast(vector, luminance:v) * n + contrast(color, luminance:u) * value
+		let c = contrast(luminance:v) * n + contrast(luminance:u) * value
 		let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
 		
 		return applyContrast(vector, luminance:v, apply:c * s)
@@ -667,10 +698,10 @@ extension CHCLT {
 	
 	// MARK: Transform
 	
-	public func hcl(_ vector:Linear.Vector3) -> Linear.Vector3 {
-		let l = luminance(vector)
-		let h = hue(vector, luminance:l)
-		let c = chroma(vector, luminance:l)
+	public func hcl(rgb:Linear.Vector3) -> Linear.Vector3 {
+		let l = luminance(rgb)
+		let h = hue(rgb, luminance:l)
+		let c = chroma(rgb, luminance:l)
 		
 		return Linear.vector3(h, c, l)
 	}
@@ -849,11 +880,11 @@ extension CHCLT {
 		//	MARK: Contrast
 		
 		public func isDark(_ chclt:CHCLT) -> Bool {
-			return luminance(chclt) < chclt.contrast.mediumLuminance
+			return chclt.isDark(vector)
 		}
 		
 		public func contrast(_ chclt:CHCLT) -> Linear {
-			return chclt.contrast(vector, luminance:luminance(chclt))
+			return chclt.contrast(luminance:luminance(chclt))
 		}
 		
 		public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {

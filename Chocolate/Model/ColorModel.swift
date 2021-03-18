@@ -120,6 +120,14 @@ enum ColorModel: Int {
 		return linearXYZ(axis:axis, coordinates:coordinates, chclt:chclt).color(alpha:alpha).platformColor
 	}
 	
+	static func linearLCH(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
+		return CHCLT.LinearRGB(chclt.rgb(lch:components(coordinates:coordinates, axis:axis)))
+	}
+	
+	static func platformLCH(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
+		return linearLCH(axis:axis, coordinates:coordinates, chclt:chclt).color(alpha:alpha).platformColor
+	}
+	
 	func linearColor(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
 		switch self {
 		case .rgb: return ColorModel.linearRGB(axis:axis, coordinates:coordinates)
@@ -148,7 +156,7 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display(chclt).vector.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.display(chclt).hsb().xyz, axis:axis)
-		case .chclt: return ColorModel.coordinates(components:chclt.hcl(color.vector), axis:axis)
+		case .chclt: return ColorModel.coordinates(components:chclt.hcl(rgb:color.vector), axis:axis)
 		}
 	}
 	
@@ -156,7 +164,7 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.vector.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.hsb().xyz, axis:axis)
-		case .chclt: return ColorModel.coordinates(components:chclt.hcl(color.linear(chclt).vector), axis:axis)
+		case .chclt: return ColorModel.coordinates(components:chclt.hcl(rgb:color.linear(chclt).vector), axis:axis)
 		}
 	}
 	
@@ -404,7 +412,7 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeXYZ(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chocolate:CHCLT) {
+	func drawPlaneFromCubeXYZ(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
 		let drawSpace = colorSpace
 		let columns = Int(box.size.width)
 		let rows = min(16, Int(box.size.height))
@@ -420,7 +428,7 @@ extension CGContext {
 			let colors:[CGColor] = (0 ..< rows).map { row in
 				let y = Double(row) / Double(rows - 1)
 				
-				return ColorModel.platformXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chocolate).cgColor
+				return ColorModel.platformXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chclt).cgColor
 			}
 			
 			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
@@ -434,7 +442,44 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chocolate:CHCLT) {
+	func drawPlaneFromCubeLCH(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
+		let drawSpace = colorSpace
+		let columns = Int(box.size.width)
+		let rows = min(32, Int(box.size.height))
+		let start = box.origin
+		let downEnd = CGPoint(x:box.minX, y:box.maxY)
+		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let size = CGSize(width:1, height:box.size.height)
+		let step = CGPoint(x:1, y:0)
+		
+		for column in 0 ..< columns {
+			let x = Double(column) / Double(columns - 1)
+			
+			let colors:[CGColor] = (0 ..< rows).map { row in
+				let y = Double(row) / Double(rows - 1)
+				let coordinates = CHCLT.Scalar.vector3(x, 1 - y, scalar)
+				let rgb = ColorModel.linearLCH(axis:axis, coordinates:coordinates, chclt:chclt)
+				
+				if rgb.isNormal() { return rgb.color() }
+				
+				//return (rgb.vector.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
+				return rgb.normalized(chclt).scaleContrast(chclt, by:0.75).color()
+				//return rgb.normalized(chclt).color()
+				//return rgb.color()
+			}
+			
+			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
+			
+			let origin = step * CGFloat(column) + box.origin
+			let stripe = CGRect(origin:origin, size:size)
+			
+			clip(to:stripe)
+			drawLinearGradient(gradient, start:start, end:downEnd, options:drawingOptions)
+			resetClip()
+		}
+	}
+	
+	func drawPlaneFromCubeCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
 		let drawSpace = CHCLT.LinearRGB.colorSpace
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
@@ -451,8 +496,8 @@ extension CGContext {
 		
 		switch axis % 3 {
 		case 0:	//	scalar is hue
-			let primary = CHCLT.LinearRGB(chocolate, hue:scalar)
-			let inverse = primary.applyChroma(chocolate, value:-1).saturated()
+			let primary = CHCLT.LinearRGB(chclt, hue:scalar)
+			let inverse = primary.applyChroma(chclt, value:-1).saturated()
 			let flipChroma = options.flipOver
 			let flipLuma = options.flipDown
 			
@@ -465,7 +510,7 @@ extension CGContext {
 				if wideChroma { chroma = chroma * 2 - 1 }
 				
 				guard let gradient = ColorModel.luminanceGradient(
-					chclt:chocolate,
+					chclt:chclt,
 					primary:chroma < 0 ? inverse : primary,
 					chroma:chroma.magnitude,
 					colorSpace:drawSpace,
@@ -477,7 +522,7 @@ extension CGContext {
 				resetClip()
 			}
 		case 1:	//	scalar is chroma
-			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let hues = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
 			let flipHue = options.flipOver
 			let flipLuma = options.flipDown
 			let scalar = wideChroma ? scalar * 2 - 1 : scalar
@@ -488,8 +533,8 @@ extension CGContext {
 				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index])
 				
 				guard let gradient = ColorModel.luminanceGradient(
-					chclt:chocolate,
-					primary:scalar < 0 ? primary.applyChroma(chocolate, value:-1).saturated() : primary,
+					chclt:chclt,
+					primary:scalar < 0 ? primary.applyChroma(chclt, value:-1).saturated() : primary,
 					chroma:scalar.magnitude,
 					colorSpace:drawSpace,
 					darkToLight:flipLuma
@@ -500,17 +545,17 @@ extension CGContext {
 				resetClip()
 			}
 		case _:	//	scalar is luminance
-			let hues = chocolate.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
+			let hues = chclt.hueRange(start:0, shift:1 / CHCLT.Scalar(count), count:count)
 			let flipHue = options.flipOver
 			let flipChroma = options.flipDown
 			
 			for index in 0 ..< count {
 				let origin = step * CGFloat(index) + box.origin
 				let stripe = CGRect(origin:origin, size:size)
-				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index]).applyLuminance(chocolate, value:scalar)
+				let primary = CHCLT.LinearRGB(hues[flipHue ? count - 1 - index : index]).applyLuminance(chclt, value:scalar)
 				
 				guard let gradient = ColorModel.chromaGradient(
-					chclt:chocolate,
+					chclt:chclt,
 					primary:primary,
 					colorSpace:drawSpace,
 					intermediaries:3,
