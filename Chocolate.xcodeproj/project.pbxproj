@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		071FD44525E85A31002A69DF /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FD44425E85A31002A69DF /* Palette.swift */; };
 		071FD44625E85A31002A69DF /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071FD44425E85A31002A69DF /* Palette.swift */; };
+		07307EA82601046D0001CE60 /* ChocolateThemeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07307EA72601046D0001CE60 /* ChocolateThemeViewController.swift */; };
+		07307EA92601046D0001CE60 /* ChocolateThemeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07307EA72601046D0001CE60 /* ChocolateThemeViewController.swift */; };
 		0737BC6125EE1F2600511B47 /* Destination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6025EE1F2600511B47 /* Destination.swift */; };
 		0737BC6225EE1F2600511B47 /* Destination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6025EE1F2600511B47 /* Destination.swift */; };
 		0737BC7025EE732E00511B47 /* ColorTransformable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0737BC6F25EE732E00511B47 /* ColorTransformable.swift */; };
@@ -111,6 +113,7 @@
 
 /* Begin PBXFileReference section */
 		071FD44425E85A31002A69DF /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
+		07307EA72601046D0001CE60 /* ChocolateThemeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChocolateThemeViewController.swift; sourceTree = "<group>"; };
 		0737BC6025EE1F2600511B47 /* Destination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Destination.swift; sourceTree = "<group>"; };
 		0737BC6F25EE732E00511B47 /* ColorTransformable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTransformable.swift; sourceTree = "<group>"; };
 		07589C3A25CE37D900465F9A /* StringExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringExtensions.swift; sourceTree = "<group>"; };
@@ -244,6 +247,7 @@
 				07FA9F8E25C2129C005C439B /* ChocolateViewController.swift */,
 				075DEB9025C3C57C002F9B6C /* ChocolatePlaneViewController.swift */,
 				07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */,
+				07307EA72601046D0001CE60 /* ChocolateThemeViewController.swift */,
 				07D28D4525C3BB1D008347A4 /* Styles.swift */,
 			);
 			path = Controllers;
@@ -633,6 +637,7 @@
 				07B1D23925FD8B4F00BB5954 /* ChocolateDrawing.swift in Sources */,
 				07FA9EE625C20785005C439B /* ViewController.swift in Sources */,
 				071FD44525E85A31002A69DF /* Palette.swift in Sources */,
+				07307EA82601046D0001CE60 /* ChocolateThemeViewController.swift in Sources */,
 				079FDCBC25C8CC11008A2DF1 /* CALayerExtensions.swift in Sources */,
 				07AFCAF125DED1E40004382B /* MutableImage.swift in Sources */,
 				07FA9F7825C20A90005C439B /* GeometryExtensions.swift in Sources */,
@@ -693,6 +698,7 @@
 				07D28D1025C2277A008347A4 /* Layout.swift in Sources */,
 				07B1D21825FC3B5E00BB5954 /* ChocolateGradientSlider.swift in Sources */,
 				075DEB9225C3C57C002F9B6C /* ChocolatePlaneViewController.swift in Sources */,
+				07307EA92601046D0001CE60 /* ChocolateThemeViewController.swift in Sources */,
 				0737BC7125EE732E00511B47 /* ColorTransformable.swift in Sources */,
 				07FA9F2625C208B0005C439B /* AppDelegate.swift in Sources */,
 				07D28D3125C3B928008347A4 /* Style.swift in Sources */,
