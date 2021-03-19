@@ -26,8 +26,8 @@ extension CGColor {
 	func chocolateHue(_ value:Double) -> CGColor { return chocolateTransform { $0?.hueShifted(chocolate, by:($0?.hue(chocolate) ?? 0) - value) } ?? self }
 	func chocolateScaleChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleChroma(chocolate, by:value) } ?? self }
 	func chocolateChroma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyChroma(chocolate, value:value) } ?? self }
-	func chocolateScaleLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleLuminance(by:value) } ?? self }
-	func chocolateLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyLuminance(chocolate, value:value) } ?? self }
+	func chocolateScaleLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleLuma(chocolate, by:value) } ?? self }
+	func chocolateLuma(_ value:Double) -> CGColor { return chocolateTransform { $0?.applyLuma(chocolate, value:value) } ?? self }
 	func chocolateScaleContrast(_ value:Double) -> CGColor { return chocolateTransform { $0?.scaleContrast(chocolate, by:value) } ?? self }
 	func chocolateContrasting(_ value:Double) -> CGColor { return chocolateTransform { $0?.contrasting(chocolate, value:value) } ?? self }
 	

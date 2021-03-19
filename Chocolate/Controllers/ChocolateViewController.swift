@@ -467,11 +467,11 @@ extension ChocolateViewController {
 			let chocolate = model.chocolate
 			let formatter = NumberFormatter(fractionDigits:2 ... 2)
 			let bc = formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "?"
-			let bl = color.luma(sRGB)
+			let bl = color.linear(chocolate).luminance(sRGB)
 			
 			applyForegrounds(model.foregrounds.enumerated().map { order, color in
 				let fc = formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "?"
-				let fl = color.luma(sRGB)
+				let fl = color.linear(chocolate).luminance(sRGB)
 				let g18n = max(fl, bl) + 0.05
 				let g18d = min(fl, bl) + 0.05
 				let g18 = g18n / g18d

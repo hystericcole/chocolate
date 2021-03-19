@@ -29,7 +29,7 @@ enum ChocolateDrawing {
 				default: h = r; c = 1 - t.magnitude * 2; l = value
 				}
 				
-				let color = CHCLT.LinearRGB(chclt, hue:h, chroma:c, luminance:l)
+				let color = CHCLT.LinearRGB(chclt, hue:h, chroma:c, luma:l)
 				
 				pixels[y * rowLength + x] = color.pixel()
 			}
@@ -57,7 +57,7 @@ enum ChocolateDrawing {
 				default: h = y; c = a; l = value
 				}
 				
-				let color = CHCLT.LinearRGB(hues[h]).applyLuminance(chclt, value:l).applyChroma(chclt, value:c)
+				let color = CHCLT.LinearRGB(hues[h]).applyLuma(chclt, value:l).applyChroma(chclt, value:c)
 				
 				pixels[y * rowLength + x] = color.pixel()
 			}

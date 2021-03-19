@@ -136,15 +136,15 @@ public struct DisplayRGB {
 	}
 	
 	public func luma(_ chclt:CHCLT) -> Scalar {
-		return linear(chclt).luminance(chclt)
+		return linear(chclt).luma(chclt)
 	}
 	
 	public func scaleLuma(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
-		return scaled(scalar > 0 ? chclt.transfer(scalar) : 0)
+		return linear(chclt).scaleLuma(chclt, by:scalar).display(chclt, alpha:vector.w)
 	}
 	
-	public func applyLuma(_ chclt:CHCLT, value u:Scalar) -> DisplayRGB {
-		return linear(chclt).applyLuminance(chclt, value:u).display(chclt, alpha:vector.w)
+	public func applyLuma(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
+		return linear(chclt).applyLuma(chclt, value:value).display(chclt, alpha:vector.w)
 	}
 	
 	public func contrast(_ chclt:CHCLT) -> Scalar {
@@ -290,9 +290,15 @@ extension CHCLT.LinearRGB {
 		let space:CGColorSpace
 		let rgb:CHCLT.Vector3
 		
-		if let colorSpace = colorSpace, colorSpace.model == .rgb, colorSpace.numberOfComponents == 3 {
-			rgb = colorSpace.chclt?.display(vector) ?? vector
+		if let colorSpace = colorSpace, let chclt = colorSpace.chclt {
+			rgb = chclt.display(vector)
 			space = colorSpace
+		} else if
+			#available(macOS 10.11, iOS 9.0, *),
+			let colorSpace = colorSpace,
+			let linear = color(alpha:alpha)
+		{
+			return linear.converted(to:colorSpace, intent:.absoluteColorimetric, options:nil) ?? linear
 		} else {
 			rgb = vector
 			space = CHCLT.LinearRGB.colorSpace
@@ -322,6 +328,32 @@ extension CHCLT {
 		if #available(macOS 11.0, iOS 14.0, *), name == CGColorSpace.extendedDisplayP3 { return CHCLT_sRGB.displayP3 }
 		
 		return nil
+	}
+	
+	public func labColorSpace() -> CGColorSpace? {
+		let w = whitepoint()
+		let a:[CGFloat] = [CGFloat(w.x), CGFloat(w.y), CGFloat(w.z)]
+		
+		return CGColorSpace(labWhitePoint:a, blackPoint:nil, range:nil)
+	}
+	
+	public func xyzColorSpace(gamma g:CGFloat) -> CGColorSpace? {
+		let w = whitepoint()
+		let a:[CGFloat] = [CGFloat(w.x), CGFloat(w.y), CGFloat(w.z)]
+		let gamma:[CGFloat] = [g, g, g]
+		let matrix:[CGFloat] = [
+			CGFloat(toXYZ.columns.0.x), CGFloat(toXYZ.columns.0.y), CGFloat(toXYZ.columns.0.z),
+			CGFloat(toXYZ.columns.1.x), CGFloat(toXYZ.columns.1.y), CGFloat(toXYZ.columns.1.z),
+			CGFloat(toXYZ.columns.2.x), CGFloat(toXYZ.columns.2.y), CGFloat(toXYZ.columns.2.z)
+		]
+		
+		return CGColorSpace(calibratedRGBWhitePoint:a, blackPoint:nil, gamma:gamma, matrix:matrix)
+	}
+}
+
+extension CHCLT_Pure {
+	public func xyzColorSpace() -> CGColorSpace? {
+		return xyzColorSpace(gamma:CGFloat(exponent))
 	}
 }
 

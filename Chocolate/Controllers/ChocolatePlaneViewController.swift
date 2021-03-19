@@ -128,7 +128,7 @@ class ChocolatePlaneViewController: BaseViewController {
 		
 		indicator.color = platformColor
 		lineContrast.color = platformColor
-		positionLineContrast.vertical = .fraction(1 - linearContrast.luminance(chclt))
+		positionLineContrast.vertical = .fraction(1 - linearContrast.luma(chclt))
 		
 		complement.color = linearComplement.color()?.platformColor
 		positionComplement.horizontal = .fraction(coordinatesComplement.x)

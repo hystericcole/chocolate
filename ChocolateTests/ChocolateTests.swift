@@ -46,7 +46,7 @@ class ChocolateTests: XCTestCase {
 		}
 	}
 	
-	func testColorModelTransforms() {
+	func testColorModelCoordinates() {
 		let v = CHCLT.Scalar.vector3(0.3125, 0.625, 0.9)
 		let n = 144
 		
