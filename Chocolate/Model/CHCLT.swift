@@ -234,8 +234,15 @@ extension CHCLT {
 
 extension CHCLT {
 	public struct Adjustment {
+		public static let half = Adjustment(contrast:0.5, chroma:0.5)
+		
 		public let contrast:Scalar
 		public let chroma:Scalar
+		
+		public init(contrast:Scalar = 1.0, chroma:Scalar = 1.0) {
+			self.contrast = contrast
+			self.chroma = chroma
+		}
 	}
 }
 

@@ -10,10 +10,20 @@ import Foundation
 import QuartzCore
 
 class ChocolateThemeViewController: BaseViewController {
+	struct Input {
+		let axis:Int
+		let model:ColorModel
+		let chclt:CHCLT
+		let palette:Palette
+		let coordinates:CHCLT.Scalar.Vector3
+	}
+	
 	let deriveCount = 5
+	var palette = Palette(primary:.black)
 	
 	let group = Viewable.Group()
 	let sampleScroll = Viewable.Scroll()
+	var samples:[Viewable.Color] = []
 	
 	let themeView = ChocolateThemeViewable()
 	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged))
@@ -90,46 +100,67 @@ class ChocolateThemeViewController: BaseViewController {
 		applyPositions(animated:recognizer is PlatformTapGestureRecognizer)
 	}
 	
-	func indicatorLayout() -> [Positionable] {
-		let radius = 12.0
+	func current() -> Input {
 		let axis = self.axis
 		let chclt = self.chclt
+		let model = colorModel
+		let coordinates = CHCLT.Scalar.vector3(primaryPosition.x.native, 1 - primaryPosition.y.native, sliderHue.value)
+		let primary = model.linearColor(axis:axis, coordinates:coordinates, chclt:chclt)
+		let adjustment = CHCLT.Adjustment(contrast:sliderDeriveContrast.value, chroma:sliderDeriveChroma.value)
+		let contrasting = CHCLT.Adjustment(contrast:sliderContrasting.value, chroma:sliderChroma.value)
+		let palette = Palette(chclt:chclt, primary:primary, contrasting:contrasting, primaryAdjustment:adjustment, contrastingAdjustment:adjustment)
+		
+		return Input(axis:axis, model:model, chclt:chclt, palette:palette, coordinates:coordinates)
+	}
+	
+	func sampleLayout(_ input:Input, count:Int) -> Positionable {
+		if samples.count < count {
+			let intrinsicSize = CGSize(square:100)
+			
+			for _ in samples.count ..< count {
+				samples.append(Viewable.Color(color:nil, intrinsicSize:intrinsicSize))
+			}
+		}
+		
+		for index in 0 ..< count {
+			samples[index].color = input.palette.background(Double(index) / Double(count - 1)).color().platformColor
+		}
+		
+		return Layout.Orient(
+			targets:samples,
+			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
+			axis:.horizontal,
+			ratio:1.0
+		)
+	}
+	
+	func indicatorLayout(_ input:Input, count:Int) -> [Positionable] {
+		let radius = 12.0
+		let palette = input.palette
+		let deriveLimit = count - 1
 		
 		var colors:[(color:CHCLT.LinearRGB, border:CHCLT.LinearRGB, neagted:Bool, scale:Layout.Native)] = []
 		var layout:[Layout.Align] = []
 		
-		let primaryCoordinates = CHCLT.Scalar.vector3(primaryPosition.x.native, 1 - primaryPosition.y.native, sliderHue.value)
-		let primaryColor = colorModel.linearColor(axis:axis, coordinates:primaryCoordinates, chclt:chclt)
-		let primaryChroma = primaryColor.chroma(chclt)
-		
-		let reverseChroma = sliderChroma.value * primaryChroma
-		let reverseContrast = sliderContrasting.value
-		let reverseColor = primaryColor.contrasting(chclt, value:reverseContrast).applyChroma(chclt, value:reverseChroma)
-		
-		colors.append((primaryColor, reverseColor, false, 4))
-		
-		let deriveLimit = deriveCount - 1
-		let deriveChroma = sliderDeriveChroma.value
-		let deriveContrast = sliderDeriveContrast.value
+		colors.append((palette.primary, palette.contrasting, false, 4))
 		
 		for index in 1 ... deriveLimit {
-			let n = Double(index) / Double(deriveLimit)
-			let s = 1 - n * (1 - deriveChroma)
-			let c = 1 - n * (1 - deriveContrast)
-			let color = primaryColor.scaleContrast(chclt, by:c).applyChroma(chclt, value:s * primaryChroma)
+			let value = Double(index) / Double(deriveLimit)
+			let scale:Layout.Native = index == deriveLimit ? 2 : 1
+			let s = 1 - value * (1 - palette.primaryAdjustment.chroma)
 			
-			colors.append((color, reverseColor, s < 0, index == deriveLimit ? 2 : 1))
+			colors.append((palette.foreground(value), palette.contrasting, s < 0, scale))
 		}
 		
-		colors.append((reverseColor, primaryColor, reverseChroma < 0, 3))
+		colors.append((palette.contrasting, palette.primary, palette.contrastingChroma < 0, 3))
 		
 		for index in 1 ... deriveLimit {
-			let n = Double(index) / Double(deriveLimit)
-			let s = 1 - n * (1 - deriveChroma)
-			let c = 1 - n * (1 - deriveContrast)
-			let color = reverseColor.scaleContrast(chclt, by:c).applyChroma(chclt, value:s * reverseChroma.magnitude)
+			let value = Double(index) / Double(deriveLimit)
+			let scale:Layout.Native = index == deriveLimit ? 2 : 1
+			let s = 1 - value * (1 - palette.contrastingAdjustment.chroma)
 			
-			colors.append((color, primaryColor, reverseChroma * s < 0, index == deriveLimit ? 2 : 1))
+			colors.append((palette.background(value), palette.primary, palette.contrastingChroma * s < 0, scale))
 		}
 		
 		if indicators.count < colors.count {
@@ -141,7 +172,7 @@ class ChocolateThemeViewController: BaseViewController {
 		for index in colors.indices {
 			let (color, border, negated, scale) = colors[index]
 			let indicator = indicators[index]
-			let coordinates = index == 0 ? primaryCoordinates : colorModel.coordinates(axis:axis, color:color, chclt:chclt)
+			let coordinates = index == 0 ? input.coordinates : input.model.coordinates(axis:input.axis, color:color, chclt:input.chclt)
 			
 			indicator.color = color.color().platformColor
 			indicator.layer?.borderColor = border.color()
@@ -158,10 +189,13 @@ class ChocolateThemeViewController: BaseViewController {
 	}
 	
 	func layout() -> Positionable {
+		let input = current()
+		
 		let controls = Layout.Vertical(
 			spacing:4,
 			alignment:.fill,
 			position:.stretch,
+			Layout.EmptySpace(width:1, height:1),
 			sliderHue,
 			sliderDeriveContrast,
 			sliderDeriveChroma,
@@ -169,12 +203,27 @@ class ChocolateThemeViewController: BaseViewController {
 			sliderChroma
 		)
 		
-		return Layout.Vertical(
+		let picker = Layout.Vertical(
 			spacing:4,
 			alignment:.fill,
 			position:.stretch,
 			controls.minimum(width:200).padding(horizontal:20, vertical:0),
-			Layout.Overlay(targets:[themeView] + indicatorLayout(), primary:0).padding(36)
+			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0)
+				.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200)
+				.padding(36)
+		)
+		
+		return picker
+		
+		sampleScroll.content = sampleLayout(input, count:4)
+		
+		return Layout.Orient(
+			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
+			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
+			axis:.vertical,
+			ratio:0.5,
+			picker,
+			sampleScroll.minimum(width:120, height:120)
 		)
 	}
 	
