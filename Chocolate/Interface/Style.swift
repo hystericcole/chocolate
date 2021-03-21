@@ -50,6 +50,7 @@ struct Style {
 		case system, bold
 		case title, body, monospaceDigits
 		case name(String)
+		case face(PlatformFont)
 		case descriptor(PlatformFontDescriptor)
 		case attributes([PlatformFontDescriptor.AttributeName:Any])
 		case family(FamilyName, PlatformFontDescriptor.SymbolicTraits?)
@@ -81,6 +82,8 @@ struct Style {
 				return PlatformFont.systemFont(ofSize:size ?? Font.commonSize)
 			case .bold:
 				return PlatformFont.boldSystemFont(ofSize:size ?? Font.commonSize)
+			case .face(let font):
+				return size != nil ? displayFont(descriptor:font.fontDescriptor, size:size) : font
 			case .name(let name):
 				return PlatformFont(name:name, size:size ?? Font.commonSize) ?? Font.commonFont(size)
 			case .descriptor(let descriptor):

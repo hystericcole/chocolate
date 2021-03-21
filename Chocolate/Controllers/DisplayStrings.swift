@@ -21,6 +21,10 @@ enum DisplayStrings {
 		static func example(foreground:Int, fc:String, background:Int, bc:String, contrast:String) -> String { return "Fore \(foreground) \(fc)◑, Back \(background) \(bc)◑, G18◑ \(contrast)" }
 	}
 	
+	enum Palette {
+		static let title = "Palette"
+	}
+	
 	enum Picker {
 		static let title = "Picker"
 	}

@@ -72,4 +72,8 @@ extension NumberFormatter {
 		self.init()
 		self.fractionDigits = fractionDigits
 	}
+	
+	func string(_ value:Int) -> String { return string(from:value as NSNumber) ?? "" }
+	func string(_ value:Float) -> String { return string(from:value as NSNumber) ?? "" }
+	func string(_ value:Double) -> String { return string(from:value as NSNumber) ?? "" }
 }

@@ -213,6 +213,18 @@ class ChocolateViewController: BaseViewController {
 		group.view?.invalidateLayout()
 	}
 	
+#if os(macOS)
+	@objc
+	func changeFont(_ manager:PlatformFontManager) {
+		let font = Style.example.font.displayFont()
+		let changed = manager.convert(font)
+		
+		for sample in samples {
+			sample.applyFont(changed)
+		}
+	}
+#endif
+	
 	@objc
 	func deriveChanged() {
 		applyColor(model.primary)
@@ -427,6 +439,12 @@ extension ChocolateViewController {
 			super.init()
 			sliderChroma.model.target = self
 			sliderContrast.model.target = self
+		}
+		
+		func applyFont(_ font:PlatformFont) {
+			for label in foregrounds {
+				label.style = label.style.with(font:.descriptor(font.fontDescriptor), size:font.pointSize)
+			}
 		}
 		
 		@objc

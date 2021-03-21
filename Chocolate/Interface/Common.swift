@@ -12,6 +12,7 @@ import Foundation
 import Cocoa
 
 typealias PlatformFont = NSFont
+typealias PlatformFontManager = NSFontManager
 typealias PlatformFontDescriptor = NSFontDescriptor
 typealias PlatformColor = NSColor
 typealias PlatformImage = NSImage

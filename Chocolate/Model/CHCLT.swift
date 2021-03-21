@@ -1231,8 +1231,16 @@ public class CHCLT_sRGB: CHCLT {
 		return CHCLT_sRGB.transfer(value)
 	}
 	
-	public static func contrastingG18(_ vector:Linear.Vector3, luminance v:Linear, ratio:Linear = 4.5, offset:Linear = 0.05) -> Linear.Vector3 {
+	public static func ratioG18(_ u:Linear.Vector3, _ v:Linear.Vector3, offset:Linear = 0.05) -> Linear {
+		let u = CHCLT_sRGB.standard.luminance(u)
+		let v = CHCLT_sRGB.standard.luminance(v)
+		
+		return max(u + offset, v + offset) / min(u + offset, v + offset)
+	}
+	
+	public static func contrastingG18(_ linear:Linear.Vector3, ratio:Linear = 4.5, offset:Linear = 0.05) -> Linear.Vector3 {
 		let m = 1 / (ratio + 1)
+		let v = CHCLT_sRGB.standard.luminance(linear)
 		
 		guard v > 0 else { return Linear.vector3(m, m, m) }
 		
@@ -1241,7 +1249,7 @@ public class CHCLT_sRGB: CHCLT {
 		let u = uo - offset
 		let s = u / v
 		
-		return vector * s
+		return linear * s
 	}
 }
 

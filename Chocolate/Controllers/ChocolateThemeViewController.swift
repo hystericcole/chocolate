@@ -18,12 +18,56 @@ class ChocolateThemeViewController: BaseViewController {
 		let coordinates:CHCLT.Scalar.Vector3
 	}
 	
+	class Sample {
+		let background = Viewable.Color(color:nil)
+		var foregrounds:[Style.Label] = []
+		
+		func layout() -> Positionable {
+			return Layout.Overlay(
+				background,
+				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.fill).padding(10)
+			).minimum(width:300, height:60)
+		}
+		
+		func applyFont(_ font:PlatformFont) {
+			for label in foregrounds {
+				label.style = label.style.with(font:.descriptor(font.fontDescriptor), size:font.pointSize)
+			}
+		}
+		
+		func applyPalette(_ palette:Palette, value:CHCLT.Scalar, count:Int) {
+			let reverse = palette.background(value)
+			let reverseContrast = reverse.contrast(palette.chclt)
+			let formatter = NumberFormatter(fractionDigits:2 ... 2)
+			
+			for index in 0 ..< count {
+				let fraction = Double(index) / Double(count - 1)
+				let linear = palette.foreground(fraction)
+				let name = linear.display(palette.chclt).web()
+				let color = linear.color().platformColor
+				let contrast = formatter.string(linear.contrast(palette.chclt) + reverseContrast)
+				let g18 = formatter.string(CHCLT_sRGB.ratioG18(reverse.vector, linear.vector))
+				let text = "•\(index)/\(count - 1) \(name) G18 \(g18)◐ \(contrast)◐"
+				//let text = "The quick brown fox jumps over a lazy dog."
+				
+				if index < foregrounds.count {
+					foregrounds[index].style = foregrounds[index].style.color(color)
+					foregrounds[index].text = text
+				} else {
+					foregrounds.append(Style.Label(text:text, style:Style.example.centered.color(color)))
+				}
+			}
+			
+			background.border(.init(width:2, radius:0, color:palette.primary.color()))
+			background.color = reverse.color().platformColor
+		}
+	}
+	
 	let deriveCount = 5
-	var palette = Palette(primary:.black)
 	
 	let group = Viewable.Group()
 	let sampleScroll = Viewable.Scroll()
-	var samples:[Viewable.Color] = []
+	var samples:[Sample] = []
 	
 	let themeView = ChocolateThemeViewable()
 	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged))
@@ -42,6 +86,7 @@ class ChocolateThemeViewController: BaseViewController {
 	override func prepare() {
 		super.prepare()
 		
+		title = DisplayStrings.Palette.title
 		themeView.hue = sliderHue.value
 		sliderHue.applyModel(model:colorModel, axis:axis, chclt:chclt, hue:themeView.hue)
 	}
@@ -100,35 +145,46 @@ class ChocolateThemeViewController: BaseViewController {
 		applyPositions(animated:recognizer is PlatformTapGestureRecognizer)
 	}
 	
+#if os(macOS)
+	@objc
+	func changeFont(_ manager:PlatformFontManager) {
+		let font = Style.example.font.displayFont()
+		let changed = manager.convert(font)
+		
+		for sample in samples {
+			sample.applyFont(changed)
+		}
+	}
+#endif
+	
 	func current() -> Input {
 		let axis = self.axis
 		let chclt = self.chclt
 		let model = colorModel
 		let coordinates = CHCLT.Scalar.vector3(primaryPosition.x.native, 1 - primaryPosition.y.native, sliderHue.value)
 		let primary = model.linearColor(axis:axis, coordinates:coordinates, chclt:chclt)
-		let adjustment = CHCLT.Adjustment(contrast:sliderDeriveContrast.value, chroma:sliderDeriveChroma.value)
-		let contrasting = CHCLT.Adjustment(contrast:sliderContrasting.value, chroma:sliderChroma.value)
-		let palette = Palette(chclt:chclt, primary:primary, contrasting:contrasting, primaryAdjustment:adjustment, contrastingAdjustment:adjustment)
+		let adjust = CHCLT.Adjustment(contrast:sliderDeriveContrast.value, chroma:sliderDeriveChroma.value)
+		let adjustment = CHCLT.Adjustment(contrast:0.5 - 0.6 * (adjust.contrast - 0.5), chroma:adjust.chroma)
+		let contrasting = CHCLT.Adjustment(contrast:sliderContrasting.value + (1.0 - adjust.contrast) * 0.2, chroma:sliderChroma.value)
+		let palette = Palette(chclt:chclt, primary:primary, contrasting:contrasting, primaryAdjustment:adjust, contrastingAdjustment:adjustment)
 		
 		return Input(axis:axis, model:model, chclt:chclt, palette:palette, coordinates:coordinates)
 	}
 	
 	func sampleLayout(_ input:Input, count:Int) -> Positionable {
-		if samples.count < count {
-			let intrinsicSize = CGSize(square:100)
-			
-			for _ in samples.count ..< count {
-				samples.append(Viewable.Color(color:nil, intrinsicSize:intrinsicSize))
-			}
-		}
-		
 		for index in 0 ..< count {
-			samples[index].color = input.palette.background(Double(index) / Double(count - 1)).color().platformColor
+			let value = count > 1 ? Double(index) / Double(count - 1) : 1
+			
+			if index >= samples.count {
+				samples.append(Sample())
+			}
+			
+			samples[index].applyPalette(input.palette, value:value, count:deriveCount)
 		}
 		
 		return Layout.Orient(
-			targets:samples,
-			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
+			targets:samples.map { $0.layout().padding(4) },
+			rowTemplate:Layout.Horizontal(alignment:.fill, position:.uniform),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal,
 			mode:.containerRatio(1.0)
@@ -208,9 +264,7 @@ class ChocolateThemeViewController: BaseViewController {
 			alignment:.fill,
 			position:.stretch,
 			controls.minimum(width:200).padding(horizontal:20, vertical:0),
-			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0)
-				.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200)
-				.padding(36)
+			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0).padding(36)
 		)
 		
 		sampleScroll.content = sampleLayout(input, count:4)
@@ -219,8 +273,8 @@ class ChocolateThemeViewController: BaseViewController {
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.vertical,
-			mode:.ratio(0.5),
-			picker,
+			mode:.ratio(0.75),
+			picker.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200),
 			sampleScroll.minimum(width:120, height:120)
 		)
 	}
