@@ -131,7 +131,7 @@ class ChocolateThemeViewController: BaseViewController {
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal,
-			ratio:1.0
+			mode:.containerRatio(1.0)
 		)
 	}
 	
@@ -213,15 +213,13 @@ class ChocolateThemeViewController: BaseViewController {
 				.padding(36)
 		)
 		
-		return picker
-		
 		sampleScroll.content = sampleLayout(input, count:4)
 		
 		return Layout.Orient(
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.vertical,
-			ratio:0.5,
+			mode:.ratio(0.5),
 			picker,
 			sampleScroll.minimum(width:120, height:120)
 		)
@@ -314,7 +312,7 @@ class ChocolateThemeViewable: ViewablePositionable {
 		view.hue = model.hue
 	}
 	
-	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 		return Layout.Size(prefer:model.intrinsicSize)
 	}
 }

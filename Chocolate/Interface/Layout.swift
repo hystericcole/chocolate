@@ -22,7 +22,7 @@ protocol Positionable {
 	/// The final value, once the available space is known, will be computed as `constant + fraction × available`, clamped between minimum and maximum.
 	/// The requested size will be provided when possible.
 	/// - Parameter limit: The limit of available space.
-	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size
+	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size
 	
 	/// Apply a frame to the element.
 	///	# Layout
@@ -76,8 +76,15 @@ struct Layout {
 		case existing, create, attach
 	}
 	
-	enum Axis {
+	enum Axis: CustomStringConvertible {
 		case horizontal, vertical
+		
+		var description:String {
+			switch self {
+			case .horizontal: return "―"
+			case .vertical: return "|"
+			}
+		}
 	}
 	
 	/// Position of a single element along an axis within a container.
@@ -281,6 +288,21 @@ struct Layout {
 		var environment:Environment
 		
 		var description:String { return "\(bounds) @\(scale)x \(isDownPositive ? "↓+" : "↑+") \(environment)" }
+		var data:Data { return withUnsafeBytes(of:self) { Data($0) } }
+		
+		init(bounds:CGRect, safeBounds:CGRect, isDownPositive:Bool, scale:CGFloat = 1, environment:Layout.Environment) {
+			self.bounds = bounds
+			self.safeBounds = safeBounds
+			self.isDownPositive = isDownPositive
+			self.scale = scale
+			self.environment = environment
+		}
+		
+		init!(data:Data) {
+			guard let binaryValue:Context = data.withUnsafeBytes({ $0.baseAddress?.assumingMemoryBound(to:Self.self).pointee }) else { return nil }
+			
+			self = binaryValue
+		}
 		
 		func viewFrame(_ box:CGRect) -> CGRect {
 #if os(macOS)
@@ -523,10 +545,10 @@ struct Layout {
 			self.height = Dimension(minimum:minimum.height.native, prefer:prefer.height.native, maximum:maximum.height.native)
 		}
 		
-		init?(data:Data) {
-			guard let size:Size = data.withUnsafeBytes({ $0.baseAddress?.assumingMemoryBound(to:Self.self).pointee }) else { return nil }
+		init!(data:Data) {
+			guard let binaryValue:Size = data.withUnsafeBytes({ $0.baseAddress?.assumingMemoryBound(to:Self.self).pointee }) else { return nil }
 			
-			self = size
+			self = binaryValue
 		}
 		
 		init(stringSize:CGSize, stringLength:Int, maximumHeight:Layout.Native?, maximumLines:Int = 0) {
@@ -729,7 +751,7 @@ struct Layout {
 		init(width:Native = 0, height:Native = 0) { self.size = CGSize(width:width, height:height) }
 		init(_ size:CGSize) { self.size = size }
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			return Layout.Size(prefer:size, maximum:size)
 		}
 		
@@ -757,13 +779,13 @@ struct Layout {
 			self.insets = EdgeInsets(uniform:uniform)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			let paddingLimit = Limit(
 				width:limit.width?.advanced(by:-insets.horizontal),
 				height:limit.height?.advanced(by:-insets.vertical)
 			)
 			
-			var result = target.positionableSize(fitting:paddingLimit)
+			var result = target.positionableSize(fitting:paddingLimit, context:context)
 			
 			result.width.add(value:insets.horizontal)
 			result.height.add(value:insets.vertical)
@@ -796,13 +818,13 @@ struct Layout {
 			self.init(target, width:Dimension(value:width), height:Dimension(value:height))
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			if let width = width, let height = height {
 				return Layout.Size(width:width, height:height)
 			}
 			
 			let limit = Limit(width:width?.limit(fitting:limit.width) ?? limit.width, height:height?.limit(fitting:limit.height) ?? limit.height)
-			let size = target.positionableSize(fitting:limit)
+			let size = target.positionableSize(fitting:limit, context:context)
 			
 			return Layout.Size(width:width ?? size.width, height:height ?? size.height)
 		}
@@ -823,36 +845,17 @@ struct Layout {
 			self.init(target, width:minimumWidth ... Dimension.unbound, height:minimumHeight ... Dimension.unbound)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			if width.lowerBound == width.upperBound && height.lowerBound == height.upperBound {
 				return Layout.Size(width:Dimension(constant:0, range:width), height:Dimension(constant:0, range:height))
 			}
 			
 			let limit = limit.minimize(width:width.upperBound, height:height.upperBound)
-			var size = target.positionableSize(fitting:limit)
+			var size = target.positionableSize(fitting:limit, context:context)
 			
 			size.width.intersect(width)
 			size.height.intersect(height)
 			
-			return size
-		}
-	}
-	
-	/// Record the measured dimensions of the target
-	struct Measured: PositionableWithTarget {
-		let target:Positionable
-		let size:Size
-		
-		init(_ target:Positionable, size:Size) {
-			self.target = target
-			self.size = size
-		}
-		
-		init(_ target:Positionable, limit:Limit) {
-			self.init(target, size:target.positionableSize(fitting:limit))
-		}
-		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
 			return size
 		}
 	}
@@ -877,8 +880,8 @@ struct Layout {
 			self.position = position
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			let size = target.positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			let size = target.positionableSize(fitting:limit, context:context)
 			
 			return size.constrainingWithRatio(ratio)
 		}
@@ -919,7 +922,7 @@ struct Layout {
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			let isFilling = vertical.isFill && horizontal.isFill
 			let limit = Layout.Limit(width:box.size.width.native, height:box.size.height.native)
-			let size = isFilling ? Layout.Size.zero : target.positionableSize(fitting:limit)
+			let size = isFilling ? Layout.Size.zero : target.positionableSize(fitting:limit, context:context)
 			let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
 			
 			target.applyPositionableFrame(frame, context:context)
@@ -994,13 +997,13 @@ struct Layout {
 			self.primaryIndex = primary
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].positionableSize(fitting:limit) }
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			guard !targets.indices.contains(primaryIndex) else { return targets[primaryIndex].positionableSize(fitting:limit, context:context) }
 			
 			var result:Layout.Size = .zero
 			
 			for target in targets {
-				let size = target.positionableSize(fitting:limit)
+				let size = target.positionableSize(fitting:limit, context:context)
 				
 				result.width.increase(size.width)
 				result.height.increase(size.height)
@@ -1015,7 +1018,7 @@ struct Layout {
 			let zero = Layout.Size.zero
 			
 			if targets.indices.contains(primaryIndex) {
-				let size = isFilling ? zero : targets[primaryIndex].positionableSize(fitting:limit)
+				let size = isFilling ? zero : targets[primaryIndex].positionableSize(fitting:limit, context:context)
 				let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
 				
 				for target in targets {
@@ -1023,7 +1026,7 @@ struct Layout {
 				}
 			} else {
 				for target in targets {
-					let size = isFilling ? zero : target.positionableSize(fitting:limit)
+					let size = isFilling ? zero : target.positionableSize(fitting:limit, context:context)
 					let frame = Alignment.frame(for:size, box:box, horizontal:horizontal, vertical:vertical, environment:context.environment)
 					
 					target.applyPositionableFrame(frame, context:context)
@@ -1092,11 +1095,11 @@ struct Layout {
 			self.direction = direction
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
-			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting: limit, context:context) }
 			
-			return Axial.sizeVertical(targets:targets, limit:limit, spacing:spacing, position:position)
+			return Axial.sizeVertical(targets:targets, limit:limit, context:context, spacing:spacing, position:position)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
@@ -1118,13 +1121,19 @@ struct Layout {
 			axial.applyFrames(targets:targets, sizes:sizes, context:context)
 		}
 		
+		func approximateLimit(_ box:CGRect, isFloating:Bool) -> Limit {
+			let approximateHeight = Axial.approximateLimit(box.size.height.native, count:isFloating ? 1 : targets.count)
+			let limit = Limit(width:box.size.width.native, height:approximateHeight)
+			
+			return limit
+		}
+		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			
 			let isFloating = self.isFloating
-			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
-			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			let sizes = Axial.sizes(targets:targets, fitting:approximateLimit(box, isFloating:isFloating), context:context, isUnused:isUniform)
 			var axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, position:position)
 			
 			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
@@ -1132,9 +1141,8 @@ struct Layout {
 		
 		func availableSizeAxial(_ box:CGRect, context:Context) -> AvailableSizeAxial {
 			let isFloating = self.isFloating
-			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.height.native : box.size.height.native
-			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			let sizes = Axial.sizes(targets:targets, fitting:approximateLimit(box, isFloating:isFloating), context:context, isUnused:isUniform)
 			let axial = Axial(sizes.map { $0.height }, available:available, spacing:spacing, position:position)
 			
 			return AvailableSizeAxial(available:available, sizes:sizes, axial:axial)
@@ -1205,11 +1213,11 @@ struct Layout {
 			self.direction = direction
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
-			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit, context:context) }
 			
-			return Axial.sizeHorizontal(targets:targets, limit:limit, spacing:spacing, position:position)
+			return Axial.sizeHorizontal(targets:targets, limit:limit, context:context, spacing:spacing, position:position)
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context, axial:inout Axial, sizes:[Size], available:Native, isFloating:Bool) {
@@ -1231,13 +1239,19 @@ struct Layout {
 			axial.applyFrames(targets:targets, sizes:sizes, context:context)
 		}
 		
+		func approximateLimit(_ box:CGRect, isFloating:Bool) -> Limit {
+			let approximateWidth = Axial.approximateLimit(box.size.width.native, count:isFloating ? 1 : targets.count)
+			let limit = Limit(width:approximateWidth, height:box.size.height.native)
+			
+			return limit
+		}
+		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			
 			let isFloating = self.isFloating
-			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
-			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			let sizes = Axial.sizes(targets:targets, fitting:approximateLimit(box, isFloating:isFloating), context:context, isUnused:isUniform)
 			var axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, position:position)
 			
 			applyPositionableFrame(box, context:context, axial:&axial, sizes:sizes, available:available, isFloating:isFloating)
@@ -1245,9 +1259,8 @@ struct Layout {
 		
 		func availableSizeAxial(_ box:CGRect, context:Context) -> AvailableSizeAxial {
 			let isFloating = self.isFloating
-			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
 			let available = isFloating ? context.bounds.size.width.native : box.size.width.native
-			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
+			let sizes = Axial.sizes(targets:targets, fitting:approximateLimit(box, isFloating:isFloating), context:context, isUnused:isUniform)
 			let axial = Axial(sizes.map { $0.width }, available:available, spacing:spacing, position:position)
 			
 			return AvailableSizeAxial(available:available, sizes:sizes, axial:axial)
@@ -1334,13 +1347,14 @@ struct Layout {
 			rowTemplate.targets.removeAll()
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
-			guard columnCount > 1 else { return singleColumn.positionableSize(fitting:limit) }
-			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
+			guard columnCount > 1 else { return singleColumn.positionableSize(fitting:limit, context:context) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit, context:context) }
 			
 			return Axial.sizeColumns(
 				fitting:limit,
+				context:context,
 				splittingTargets:targets,
 				intoColumns:columnCount,
 				columnMajor:columnMajor,
@@ -1350,17 +1364,22 @@ struct Layout {
 			)
 		}
 		
+		func approximateLimit(_ box:CGRect, rowCount:Int) -> Limit {
+			let approximateHeight = Axial.approximateLimit(box.size.height.native, count:rowCount)
+			let limit = Limit(width:box.size.width.native, height:approximateHeight)
+			
+			return limit
+		}
+		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			guard columnCount > 1 else { return singleColumn.applyPositionableFrame(box, context:context) }
-			
-			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
 			
 			let itemLimit = targets.count - 1
 			let rowCount = 1 + itemLimit / columnCount
 			var rowHeights = Array(repeating:Dimension.zero, count:rowCount)
 			var columnWidths = Array(repeating:Dimension.zero, count:columnCount)
+			let sizes = Axial.sizes(targets:targets, fitting:approximateLimit(box, rowCount:rowCount), context:context, isUnused:isUniform)
 			
 			if columnMajor {
 				for index in sizes.indices {
@@ -1526,13 +1545,14 @@ struct Layout {
 			self.direction = direction
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
-			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit) }
-			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit) }
+			guard rowCount > 1 else { return singleRow.positionableSize(fitting:limit, context:context) }
+			guard !isFloating else { return targets[primaryIndex].positionableSize(fitting:limit, context:context) }
 			
 			return Axial.sizeRows(
 				fitting:limit,
+				context:context,
 				splittingTargets:targets,
 				intoRows:rowCount,
 				rowMajor:rowMajor,
@@ -1542,17 +1562,22 @@ struct Layout {
 			)
 		}
 		
+		func approximateLimit(_ box:CGRect, columnCount:Int) -> Limit {
+			let approximateWidth = Axial.approximateLimit(box.size.width.native, count:columnCount)
+			let limit = Limit(width:approximateWidth, height:box.size.height.native)
+			
+			return limit
+		}
+		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			guard rowCount > 1 else { return singleRow.applyPositionableFrame(box, context:context) }
-			
-			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			let sizes = Axial.sizes(targets:targets, fitting:limit, isUnused:isUniform)
 			
 			let itemLimit = targets.count - 1
 			let columnCount = 1 + itemLimit / rowCount
 			var rowHeights = Array(repeating:Dimension.zero, count:rowCount)
 			var columnWidths = Array(repeating:Dimension.zero, count:columnCount)
+			let sizes = Axial.sizes(targets:targets, fitting:approximateLimit(box, columnCount:columnCount), context:context, isUnused:isUniform)
 			
 			if rowMajor {
 				for index in sizes.indices {
@@ -1843,11 +1868,15 @@ struct Layout {
 			}
 		}
 		
-		static func sizes(targets:[Positionable], fitting limit:Layout.Limit, isUnused:Bool) -> [Layout.Size] {
-			return isUnused ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit) }
+		static func approximateLimit(_ limit:Native, count:Int) -> Native {
+			return limit / max(1.0, Native(count).squareRoot())
 		}
 		
-		static func sizeHorizontal(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
+		static func sizes(targets:[Positionable], fitting limit:Layout.Limit, context:Layout.Context, isUnused:Bool) -> [Layout.Size] {
+			return isUnused ? Array(repeating:.zero, count:targets.count) : targets.map { $0.positionableSize(fitting:limit, context:context) }
+		}
+		
+		static func sizeHorizontal(targets:[Positionable], limit:Layout.Limit, context:Layout.Context, spacing:Native, position:Position) -> Layout.Size {
 			var limit = limit
 			var result:Layout.Size = .zero
 			var spaceCount = -1
@@ -1859,7 +1888,7 @@ struct Layout {
 			switch position {
 			case .uniform, .uniformAlign, .uniformWithEnds:
 				for target in targets {
-					let size = target.positionableSize(fitting:limit)
+					let size = target.positionableSize(fitting:limit, context:context)
 					
 					result.height.increase(size.height)
 					result.width.increase(size.width)
@@ -1869,7 +1898,7 @@ struct Layout {
 				result.width.multiply(Native(targets.count))
 			case .float, .stretch, .distribute, .fraction, .adaptiveFraction:
 				for target in targets {
-					let size = target.positionableSize(fitting:limit)
+					let size = target.positionableSize(fitting:limit, context:context)
 					
 					result.width.add(size.width)
 					result.height.increase(size.height)
@@ -1884,7 +1913,7 @@ struct Layout {
 			return result
 		}
 		
-		static func sizeVertical(targets:[Positionable], limit:Layout.Limit, spacing:Native, position:Position) -> Layout.Size {
+		static func sizeVertical(targets:[Positionable], limit:Layout.Limit, context:Layout.Context, spacing:Native, position:Position) -> Layout.Size {
 			var limit = limit
 			var result:Layout.Size = .zero
 			var spaceCount = -1
@@ -1896,7 +1925,7 @@ struct Layout {
 			switch position {
 			case .uniform, .uniformAlign, .uniformWithEnds:
 				for target in targets {
-					let size = target.positionableSize(fitting: limit)
+					let size = target.positionableSize(fitting: limit, context:context)
 					
 					result.height.increase(size.height)
 					result.width.increase(size.width)
@@ -1906,7 +1935,7 @@ struct Layout {
 				result.height.multiply(Native(targets.count))
 			case .float, .stretch, .distribute, .fraction, .adaptiveFraction:
 				for target in targets {
-					let size = target.positionableSize(fitting: limit)
+					let size = target.positionableSize(fitting: limit, context:context)
 					
 					result.height.add(size.height)
 					result.width.increase(size.width)
@@ -1923,6 +1952,7 @@ struct Layout {
 		
 		static func sizeRows(
 			fitting limit:Layout.Limit,
+			context:Layout.Context,
 			splittingTargets:[Positionable],
 			intoRows rowCount:Int,
 			rowMajor:Bool,
@@ -1948,7 +1978,7 @@ struct Layout {
 					targets = Array(splittingTargets.suffix(from:index * rowCount).prefix(rowCount))
 				}
 				
-				let size = sizeVertical(targets:targets, limit:limit, spacing:columnSpacing, position:columnPosition)
+				let size = sizeVertical(targets:targets, limit:limit, context:context, spacing:columnSpacing, position:columnPosition)
 				
 				result.width.add(size.width)
 				result.height.increase(size.height)
@@ -1964,6 +1994,7 @@ struct Layout {
 		
 		static func sizeColumns(
 			fitting limit:Layout.Limit,
+			context:Layout.Context,
 			splittingTargets:[Positionable],
 			intoColumns columnCount:Int,
 			columnMajor:Bool,
@@ -1989,7 +2020,7 @@ struct Layout {
 					targets = Array(splittingTargets.suffix(from:index * columnCount).prefix(columnCount))
 				}
 				
-				let size = sizeHorizontal(targets:targets, limit:limit, spacing:rowSpacing, position:rowPosition)
+				let size = sizeHorizontal(targets:targets, limit:limit, context:context, spacing:rowSpacing, position:rowPosition)
 				
 				result.width.increase(size.width)
 				result.height.add(size.height)
@@ -2221,7 +2252,7 @@ struct Layout {
 			self.axis = axis
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			
 			var result:Layout.Size = .zero
@@ -2233,11 +2264,12 @@ struct Layout {
 					var itemCount = 0
 					
 					for target in targets {
-						let size = target.positionableSize(fitting:limit)
+						let size = target.positionableSize(fitting:limit, context:context)
 						var sum = rowSize.width
 						
 						if size.width.maximum + sum.maximum > width {
-							rowSize.height.increase(target.positionableSize(fitting:Limit(width:min(width, size.width.resolve(width)), height:limit.height)).height)
+							let fit = Limit(width:min(width, size.width.resolve(width)), height:limit.height)
+							rowSize.height.increase(target.positionableSize(fitting:fit, context:context).height)
 						}
 						
 						sum.add(size.width)
@@ -2264,7 +2296,7 @@ struct Layout {
 					
 					row.targets = targets
 					
-					result = row.positionableSize(fitting:limit)
+					result = row.positionableSize(fitting:limit, context:context)
 				}
 			
 			case .vertical:
@@ -2273,11 +2305,12 @@ struct Layout {
 					var itemCount = 0
 					
 					for target in targets {
-						let size = target.positionableSize(fitting:limit)
+						let size = target.positionableSize(fitting:limit, context:context)
 						var sum = columnSize.height
 						
 						if size.height.maximum + sum.maximum > height {
-							columnSize.width.increase(target.positionableSize(fitting:Limit(width:limit.width, height:min(height, size.height.resolve(height)))).width)
+							let fit = Limit(width:limit.width, height:min(height, size.height.resolve(height)))
+							columnSize.width.increase(target.positionableSize(fitting:fit, context:context).width)
 						}
 						
 						sum.add(size.height)
@@ -2304,7 +2337,7 @@ struct Layout {
 					
 					column.targets = targets
 					
-					return column.positionableSize(fitting:limit)
+					return column.positionableSize(fitting:limit, context:context)
 				}
 			}
 			
@@ -2314,7 +2347,7 @@ struct Layout {
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			let isPositive = direction.isPositive(axis:axis, environment:context.environment)
 			let limit = Limit(width:box.size.width.native, height:box.size.height.native)
-			var measured = targets.map { Measured($0, limit:limit) }
+			var measured:[(target:Positionable, size:Size)] = targets.map { ($0, $0.positionableSize(fitting:limit, context:context)) }
 			var vertical = columnTemplate
 			var horizontal = rowTemplate
 			
@@ -2376,38 +2409,69 @@ struct Layout {
 	}
 	
 	struct Orient: PositionableWithTargets {
+		enum Mode {
+			/// Measure along axis.
+			case axis
+			/// Measure each axis and choose least compression if primary axis is compressed.
+			case fit
+			/// Use opposite axis if ratio is not satisfied by available area.
+			case ratio(Native)
+			/// Use opposite axis if ratio is not satisfied by available area of container.
+			case containerRatio(Native)
+		}
+		
+		/// The elements to arrange into a row or column.
 		var targets:[Positionable]
+		/// The layout to use for horizontal orientation.
 		var rowTemplate:Horizontal
+		/// The layout to use for vertical orientation.
 		var columnTemplate:Vertical
+		/// The preferred layout axis.
 		var axis:Axis
-		var ratio:Native
+		/// When to orient opposite axis.
+		var mode:Mode
 		
 		init(
 			targets:[Positionable],
 			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
 			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
 			axis:Axis = .horizontal,
-			ratio:Native = 0)
+			mode:Mode)
 		{
 			self.targets = targets
 			self.columnTemplate = columnTemplate
 			self.rowTemplate = rowTemplate
 			self.axis = axis
-			self.ratio = ratio
+			self.mode = mode
 		}
 		
 		init(
 			rowTemplate:Horizontal = Horizontal(alignment:.leading, position:.leading),
 			columnTemplate:Vertical = Vertical(alignment:.leading, position:.leading),
 			axis:Axis = .horizontal,
-			ratio:Native = 0,
+			mode:Mode,
 			_ targets:Positionable...)
 		{
 			self.targets = targets
 			self.columnTemplate = columnTemplate
 			self.rowTemplate = rowTemplate
 			self.axis = axis
-			self.ratio = ratio
+			self.mode = mode
+		}
+		
+		func axisForSize(_ size:CGSize, containerSize:CGSize) -> Axis {
+			let ratio, width, height:Native
+			
+			switch mode {
+			case .axis, .fit: return axis
+			case .ratio(let value): ratio = value; width = size.width.native; height = size.height.native
+			case .containerRatio(let value): ratio = value; width = containerSize.width.native; height = containerSize.height.native
+			}
+			
+			switch axis {
+			case .horizontal: return width < height * ratio ? .vertical : .horizontal
+			case .vertical: return height < width * ratio ? .horizontal : .vertical
+			}
 		}
 		
 		func template(isHorizontal:Bool) -> Positionable {
@@ -2422,44 +2486,32 @@ struct Layout {
 			}
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			guard !targets.isEmpty else { return .zero }
 			
-			if ratio > 0, let width = limit.width, width < Limit.unlimited, let height = limit.height, height < Limit.unlimited {
-				let isHorizontal:Bool
-				
-				switch axis {
-				case .horizontal: isHorizontal = width > height * ratio
-				case .vertical: isHorizontal = !(height > width * ratio)
-				}
-				
-				return template(isHorizontal:isHorizontal).positionableSize(fitting:limit)
-			}
+			let axisToTryFirst = axisForSize(CGSize(width:limit.width ?? Limit.unlimited, height:limit.height ?? Limit.unlimited), containerSize:context.safeBounds.size)
+			let isHorizontal = axisToTryFirst == .horizontal
 			
-			let isHorizontal = axis == .horizontal
-			let mainSize = template(isHorizontal:isHorizontal).positionableSize(fitting:limit)
+			let size1 = template(isHorizontal:isHorizontal).positionableSize(fitting:limit, context:context)
+			guard case .fit = mode else { return size1 }
+			guard let maximum1 = isHorizontal ? limit.width : limit.height else { return size1 }
+			let require1 = isHorizontal ? size1.width.resolve(maximum1) : size1.height.resolve(maximum1)
+			guard require1 > maximum1 else { return size1 }
 			
-			guard let mainLimit = isHorizontal ? limit.width : limit.height, mainLimit < Limit.unlimited else { return mainSize }
+			let size2 = template(isHorizontal:!isHorizontal).positionableSize(fitting:limit, context:context)
+			guard let maximum2 = !isHorizontal ? limit.width : limit.height else { return size2 }
+			let require2 = !isHorizontal ? size2.width.resolve(maximum2) : size2.height.resolve(maximum2)
+			guard require2 > maximum2 else { return size2 }
 			
-			let mainRequire = isHorizontal ? mainSize.width.resolve(mainLimit) : mainSize.height.resolve(mainLimit)
-			
-			guard mainLimit < mainRequire else { return mainSize }
-			
-			let turnSize = template(isHorizontal:!isHorizontal).positionableSize(fitting:limit)
-			
-			guard let turnLimit = isHorizontal ? limit.height : limit.width, turnLimit < Limit.unlimited else { return turnSize }
-			
-			let turnRequire = isHorizontal ? mainSize.height.resolve(turnLimit) : mainSize.width.resolve(turnLimit)
-			
-			guard turnLimit < turnRequire else { return turnSize }
-			
-			return turnLimit * mainRequire > mainLimit * turnRequire ? turnSize : mainSize
+			return maximum2 * require1 > maximum1 * require2 ? size2 : size1
 		}
 		
 		func applyPositionableFrame(_ box:CGRect, context:Context) {
 			guard !targets.isEmpty else { return }
 			
-			switch axis {
+			let axisToTryFirst = axisForSize(box.size, containerSize:context.safeBounds.size)
+			
+			switch axisToTryFirst {
 			case .horizontal:
 				var preferTemplate = rowTemplate
 				preferTemplate.targets = targets
@@ -2521,10 +2573,10 @@ struct Layout {
 			self.clockwise = clockwise
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			let count = targets.count
 			
-			guard count > 1 else { return targets.first?.positionableSize(fitting:limit) ?? .zero }
+			guard count > 1 else { return targets.first?.positionableSize(fitting:limit, context:context) ?? .zero }
 			
 			if radius > 0 {
 				let dimension = Dimension(value:radius * 2)
@@ -2536,7 +2588,7 @@ struct Layout {
 			let ratio = 1.0 + 1.0 / (scalar * sin(.pi / Native(count)))
 			
 			for target in targets {
-				let size = target.positionableSize(fitting:limit)
+				let size = target.positionableSize(fitting:limit, context:context)
 				
 				result.width.increase(size.width)
 				result.height.increase(size.height)
@@ -2633,8 +2685,8 @@ extension PositionableWithTarget {
 	var frame:CGRect { return target.frame }
 	var compressionResistance:CGPoint { return target.compressionResistance }
 	
-	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-		return target.positionableSize(fitting:limit)
+	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+		return target.positionableSize(fitting:limit, context:context)
 	}
 	
 	func applyPositionableFrame(_ box:CGRect, context:Layout.Context) {
@@ -2679,14 +2731,14 @@ extension PlatformView: Positionable {
 	}
 	
 	@objc
-	func positionableSizeFitting(_ size:CGSize) -> Data {
+	func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
 		let intrinsicSize = intrinsicContentSize
 		
 		return Layout.Size(intrinsic:intrinsicSize).data
 	}
 	
-	func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-		return Layout.Size(data:positionableSizeFitting(limit.size)) ?? .zero
+	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+		return Layout.Size(data:positionableSizeFitting(limit.size, context:context.data)) ?? .zero
 	}
 	
 	@objc
@@ -2722,6 +2774,23 @@ extension PlatformView: Positionable {
 
 //	MARK: -
 
+#if os(macOS)
+extension PlatformWindow {
+	var positionableContext:Layout.Context {
+		let isDownPositive = false
+		let isRTL = PlatformApplication.shared.userInterfaceLayoutDirection == .rightToLeft
+		let scale = convertToBacking(CGRect(x:0, y:0, width:1, height:1)).size.minimum
+		let bounds = CGRect(origin:.zero, size:screen?.frame.size ?? frame.size)
+		let safeBounds = CGRect(origin:.zero, size:contentRect(forFrameRect:screen?.visibleFrame ?? frame).size)
+		let environment = Layout.Environment(isRTL:isRTL)
+		
+		return Layout.Context(bounds:bounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:scale, environment:environment)
+	}
+}
+#endif
+
+//	MARK: -
+
 extension PlatformView: PositionableContainer {
 	var positionableEnvironment:Layout.Environment {
 #if os(macOS)
@@ -2750,7 +2819,13 @@ extension PlatformView: PositionableContainer {
 		let isDownPositive = true
 #endif
 		
-		return Layout.Context(bounds:stableBounds, safeBounds:safeBounds, isDownPositive:isDownPositive, scale:positionableScale, environment:positionableEnvironment)
+		return Layout.Context(
+			bounds:stableBounds,
+			safeBounds:safeBounds,
+			isDownPositive:isDownPositive,
+			scale:positionableScale,
+			environment:positionableEnvironment
+		)
 	}
 	
 	func insertSubviews<S:Sequence>(_ views:S, at index:Int) where S.Element == PlatformView {
@@ -2879,8 +2954,8 @@ extension PlatformView: PositionableContainer {
 //	MARK: -
 
 extension PlatformLabel {
-	override func positionableSizeFitting(_ size:CGSize) -> Data {
-		guard let text = text else { return super.positionableSizeFitting(size) }
+	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
+		guard let text = text else { return super.positionableSizeFitting(size, context:context) }
 		
 #if os(macOS)
 		let insets = alignmentRectInsets

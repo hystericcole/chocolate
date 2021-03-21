@@ -371,7 +371,7 @@ class ChocolateViewController: BaseViewController {
 			rowTemplate:Layout.Horizontal(spacing:20, alignment:.fill, position:.stretch),
 			columnTemplate:Layout.Vertical(spacing:10, alignment:.fill, position:.leading),
 			axis:.vertical,
-			ratio:1.2,
+			mode:.ratio(0.5),
 			colorPicker,
 			Layout.Vertical(
 				spacing:10,

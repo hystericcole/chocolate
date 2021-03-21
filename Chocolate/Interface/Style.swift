@@ -211,8 +211,8 @@ extension Style {
 			view.prepareViewableLabel(intrinsicWidth:model.intrinsicWidth, maximumLines:model.maximumLines)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? model.positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return view?.positionableSize(fitting:limit, context:context) ?? model.positionableSize(fitting:limit)
 		}
 		
 		func text(_ string:String) -> Self { text = string; return self }

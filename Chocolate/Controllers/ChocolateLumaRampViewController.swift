@@ -197,71 +197,71 @@ class ChocolateGradientView: PlatformTaggableView {
 //	MARK: -
 
 class ChocolateGradientViewable: ViewablePositionable {
-		typealias ViewType = ChocolateGradientView
-		typealias Descriptor = CAGradientLayer.Gradient
-		typealias Direction = CAGradientLayer.Direction
+	typealias ViewType = ChocolateGradientView
+	typealias Descriptor = CAGradientLayer.Gradient
+	typealias Direction = CAGradientLayer.Direction
+	
+	struct Model {
+		let tag:Int
+		var gradient:Descriptor
+		var intrinsicSize:CGSize
 		
-		struct Model {
-			let tag:Int
-			var gradient:Descriptor
-			var intrinsicSize:CGSize
-			
-			init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize) {
-				self.tag = tag
-				self.gradient = gradient
-				self.intrinsicSize = intrinsicSize
-			}
+		init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize) {
+			self.tag = tag
+			self.gradient = gradient
+			self.intrinsicSize = intrinsicSize
 		}
+	}
+	
+	weak var view:ViewType?
+	var model:Model
+	var tag:Int { get { return view?.tag ?? model.tag } }
+	var gradientLayer:ChocolateGradientLayer? { return view?.gradientLayer }
+	
+	var descriptor:Descriptor {
+		get { return gradientLayer?.descriptor ?? model.gradient }
+		set { model.gradient = newValue; gradientLayer?.descriptor = newValue }
+	}
+	
+	var colors:[CGColor] {
+		get { return gradientLayer?.colors ?? model.gradient.colors }
+		set { model.gradient.colors = newValue; gradientLayer?.colors = newValue }
+	}
+	
+	var colorSpace:CGColorSpace? {
+		get { return gradientLayer?.descriptor.colorSpace ?? model.gradient.colorSpace }
+		set { model.gradient.colorSpace = newValue; gradientLayer?.descriptor.colorSpace = newValue }
+	}
+	
+	var direction:Direction {
+		get { return gradientLayer?.direction ?? model.gradient.direction }
+		set { model.gradient.direction = newValue; gradientLayer?.direction = newValue }
+	}
+	
+	var intrinsicSize:CGSize {
+		get { return model.intrinsicSize }
+		set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() }
+	}
+	
+	init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
+		self.model = Model(tag:tag, gradient:gradient, intrinsicSize:intrinsicSize)
+	}
+	
+	convenience init(tag:Int = 0, colors:[PlatformColor], locations:[NSNumber]? = nil, direction:Direction = .maxY, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
+		self.init(tag:tag, gradient:Descriptor(colors:colors.map { $0.cgColor }, locations:locations, direction:direction), intrinsicSize:intrinsicSize)
+	}
+	
+	func applyToView(_ view:ChocolateGradientView) {
+		view.tag = model.tag
+		view.prepareViewableColor(isOpaque:false)
 		
-		weak var view:ViewType?
-		var model:Model
-		var tag:Int { get { return view?.tag ?? model.tag } }
-		var gradientLayer:ChocolateGradientLayer? { return view?.gradientLayer }
-		
-		var descriptor:Descriptor {
-			get { return gradientLayer?.descriptor ?? model.gradient }
-			set { model.gradient = newValue; gradientLayer?.descriptor = newValue }
+		if let layer = view.gradientLayer {
+			layer.descriptor = model.gradient
+			layer.needsDisplayOnBoundsChange = true
 		}
-		
-		var colors:[CGColor] {
-			get { return gradientLayer?.colors ?? model.gradient.colors }
-			set { model.gradient.colors = newValue; gradientLayer?.colors = newValue }
-		}
-		
-		var colorSpace:CGColorSpace? {
-			get { return gradientLayer?.descriptor.colorSpace ?? model.gradient.colorSpace }
-			set { model.gradient.colorSpace = newValue; gradientLayer?.descriptor.colorSpace = newValue }
-		}
-		
-		var direction:Direction {
-			get { return gradientLayer?.direction ?? model.gradient.direction }
-			set { model.gradient.direction = newValue; gradientLayer?.direction = newValue }
-		}
-		
-		var intrinsicSize:CGSize {
-			get { return model.intrinsicSize }
-			set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() }
-		}
-		
-		init(tag:Int = 0, gradient:Descriptor, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
-			self.model = Model(tag:tag, gradient:gradient, intrinsicSize:intrinsicSize)
-		}
-		
-		convenience init(tag:Int = 0, colors:[PlatformColor], locations:[NSNumber]? = nil, direction:Direction = .maxY, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
-			self.init(tag:tag, gradient:Descriptor(colors:colors.map { $0.cgColor }, locations:locations, direction:direction), intrinsicSize:intrinsicSize)
-		}
-		
-		func applyToView(_ view:ChocolateGradientView) {
-			view.tag = model.tag
-			view.prepareViewableColor(isOpaque:false)
-			
-			if let layer = view.gradientLayer {
-				layer.descriptor = model.gradient
-				layer.needsDisplayOnBoundsChange = true
-			}
-		}
-		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return Layout.Size(prefer:model.intrinsicSize, maximum:model.intrinsicSize)
-		}
+	}
+	
+	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+		return Layout.Size(prefer:model.intrinsicSize, maximum:model.intrinsicSize)
+	}
 }

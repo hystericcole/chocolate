@@ -179,8 +179,8 @@ enum Viewable {
 			attachToView(view)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return model.content.positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return model.content.positionableSize(fitting:limit, context:context)
 		}
 	}
 	
@@ -223,7 +223,7 @@ enum Viewable {
 			view.backgroundColor = model.color
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			return Layout.Size(prefer:model.intrinsicSize, maximum:model.intrinsicSize)
 		}
 	}
@@ -265,8 +265,8 @@ enum Viewable {
 			view?.applyVieawbleAction(target:target, action:action)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return model.content.positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return model.content.positionableSize(fitting:limit, context:context)
 		}
 	}
 	
@@ -346,8 +346,8 @@ enum Viewable {
 			}
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? model.positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return view?.positionableSize(fitting:limit, context:context) ?? model.positionableSize(fitting:limit)
 		}
 	}
 	
@@ -398,7 +398,7 @@ enum Viewable {
 			load()
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			let imageSize = view?.image?.size ?? model.image?.size ?? .zero
 			
 			return Layout.Size(prefer:imageSize, maximum:imageSize)
@@ -486,8 +486,8 @@ enum Viewable {
 #endif
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? .zero
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return view?.positionableSize(fitting:limit, context:context) ?? .zero
 		}
 	}
 	
@@ -555,8 +555,8 @@ enum Viewable {
 			view?.flashScrollers()
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			var size = model.content.positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			var size = model.content.positionableSize(fitting:limit, context:context)
 			
 			size.minimize(minimum:model.minimum, maximum:model.maximum)
 			
@@ -625,8 +625,8 @@ enum Viewable {
 			view?.applyVieawbleAction(target:target, action:action)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsic:model.intrinsicSize)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return view?.positionableSize(fitting:limit, context:context) ?? Layout.Size(intrinsic:model.intrinsicSize)
 		}
 	}
 	
@@ -725,7 +725,7 @@ enum Viewable {
 			}
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			return Layout.Size(prefer:model.lazyBoundingBox().size)
 		}
 		
@@ -807,7 +807,7 @@ enum Viewable {
 			}
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 			return Layout.Size(prefer:model.intrinsicSize, maximum:model.intrinsicSize)
 		}
 	}
@@ -858,8 +858,8 @@ enum Viewable {
 			model.intrinsicSize = view.intrinsicContentSize
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsic:model.intrinsicSize)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return view?.positionableSize(fitting:limit, context:context) ?? Layout.Size(intrinsic:model.intrinsicSize)
 		}
 	}
 	
@@ -906,8 +906,8 @@ enum Viewable {
 			view?.applyVieawbleAction(target:target, action:action)
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			return view?.positionableSize(fitting:limit) ?? Layout.Size(intrinsic:model.intrinsicSize)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			return view?.positionableSize(fitting:limit, context:context) ?? Layout.Size(intrinsic:model.intrinsicSize)
 		}
 	}
 	
@@ -958,7 +958,7 @@ enum Viewable {
 		
 		func rowHeight(tableView:PlatformTableView, row:Int) -> CGFloat {
 			let limit = tableView.bounds.size
-			let size = model.cells[row].positionableSize(fitting:Layout.Limit(size:limit))
+			let size = model.cells[row].positionableSize(fitting:Layout.Limit(size:limit), context:tableView.positionableContext)
 			
 			return CGFloat(size.height.resolve(limit.height.native))
 		}
@@ -976,8 +976,8 @@ enum Viewable {
 			return cell
 		}
 		
-		func positionableSize(fitting limit:Layout.Limit) -> Layout.Size {
-			var size = Layout.Vertical(targets:model.cells, spacing:0).positionableSize(fitting:limit)
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			var size = Layout.Vertical(targets:model.cells, spacing:0).positionableSize(fitting:limit, context:context)
 			
 			size.minimize(minimum:model.minimum, maximum:model.maximum)
 			
@@ -1254,8 +1254,8 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 	func invalidateLayout() { priorSize = .zero }
 	func sizeChanged() { positionableContext.performLayout(content) }
 	
-	override func positionableSizeFitting(_ size:CGSize) -> Data {
-		return content.positionableSize(fitting:Layout.Limit(size:size)).data
+	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
+		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
 	}
 }
 
@@ -1267,7 +1267,7 @@ class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	override var intrinsicContentSize:CGSize {
-		return content.positionableSize(fitting:Layout.Limit()).resolve(.zero)
+		return content.positionableSize(fitting:Layout.Limit(), context:positionableContext).resolve(.zero)
 	}
 	
 	func orderContent(_ content:Positionable) {
@@ -1290,8 +1290,8 @@ class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
 	func invalidateLayout() { priorSize = .zero }
 	func sizeChanged() { positionableContext.performLayout(content) }
 	
-	override func positionableSizeFitting(_ size:CGSize) -> Data {
-		return content.positionableSize(fitting:Layout.Limit(size:size)).data
+	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
+		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
 	}
 }
 
@@ -1486,7 +1486,7 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 #if os(macOS)
 		let limit = bounds.size
 		let inset = PlatformScrollingView.frameSize(forContentSize:.zero, horizontalScrollerClass:PlatformScroller.self, verticalScrollerClass:PlatformScroller.self, borderType:.noBorder, controlSize:verticalScroller?.controlSize ?? .regular, scrollerStyle:scrollerStyle)
-		let intrinsicSize = content.positionableSize(fitting:Layout.Limit(size:limit))
+		let intrinsicSize = content.positionableSize(fitting:Layout.Limit(size:limit), context:positionableContext)
 		let minimum = intrinsicSize.minimum
 		let available = CGSize(
 			width:minimum.height > limit.height ? limit.width - inset.width : limit.width,
@@ -1512,7 +1512,7 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 		let available = bounds.size
 		let insets = contentInsetAdjustmentBehavior == .always ? adjustedContentInset : safeAreaInsets
 		let limit = CGRect(origin:.zero, size:available).inset(by:insets).size
-		let intrinsicSize = content.positionableSize(fitting:Layout.Limit(size:limit))
+		let intrinsicSize = content.positionableSize(fitting:Layout.Limit(size:limit), context:positionableContext)
 		let resolved = intrinsicSize.resolve(limit)
 		let size = CGSize(width:max(resolved.width, limit.width), height:max(resolved.height, limit.height))
 		let displaySize = size.display(scale:positionableScale)
@@ -1524,8 +1524,8 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 		applyLayout()
 	}
 	
-	override func positionableSizeFitting(_ size:CGSize) -> Data {
-		return content.positionableSize(fitting:Layout.Limit(size:size)).data
+	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
+		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
 	}
 }
 
@@ -1677,8 +1677,8 @@ class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
 	func invalidateLayout() { priorSize = .zero }
 	func sizeChanged() { positionableContext.performLayout(content) }
 	
-	override func positionableSizeFitting(_ size:CGSize) -> Data {
-		return content.positionableSize(fitting:Layout.Limit(size:size)).data
+	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
+		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
 	}
 }
 
