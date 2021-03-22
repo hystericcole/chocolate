@@ -82,7 +82,7 @@ enum ChocolateDrawing {
 	
 	static func drawHueGraphs(_ chclt:CHCLT, count:Int, context:CGContext, box:CGRect, polar:Bool) {
 		let hues = chclt.hueRange(start:0.0, shift:1.0 / CHCLT.Scalar(count), count:count)
-		let domain = (0 ..< count).map { Double($0) / Double(count - 1) }
+		let domain = (0 ..< count).map { CHCLT.Scalar($0) / CHCLT.Scalar(count - 1) }
 		let mode:CGPathDrawingMode = polar ? .fillStroke : .stroke
 		let opacity:CGFloat = 0.25
 		
@@ -128,7 +128,7 @@ enum ChocolateDrawing {
 		context.addLines(between:chroma)
 		context.drawPath(using:.stroke)
 		
-		let saturations = hues.map { chclt.saturation($0) }
+		let saturations = hues.map { chclt.saturation($0, luminance:chclt.luminance($0)) }
 		let saturation:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:saturations[$0]) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(saturations[$0])) }
@@ -217,7 +217,7 @@ enum ChocolateDrawing {
 	
 	static func generateIcons() {
 		let sizes:[CGFloat] = [120, 180, 76, 152, 167, 16, 32, 64, 128, 256, 512, 1024]
-		let axisValue:[(Int, Double)] = [(1, 0.75)]
+		let axisValue:[(Int, CHCLT.Scalar)] = [(1, 0.75)]
 		let spaceName:[(CHCLT, String)] = [(CHCLT_Pure.y709, "y709n")]
 		let path = ("~/Desktop/Chocolate" as NSString).expandingTildeInPath
 		let folder = URL(fileURLWithPath:path)

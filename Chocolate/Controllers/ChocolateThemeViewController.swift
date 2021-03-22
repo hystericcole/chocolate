@@ -123,7 +123,6 @@ class ChocolateThemeViewController: BaseViewController {
 	
 	@objc
 	func deriveChanged() {
-		
 		applyPositions()
 	}
 	
@@ -146,6 +145,8 @@ class ChocolateThemeViewController: BaseViewController {
 	}
 	
 #if os(macOS)
+	private var isAccessingColorPanel:Bool = false
+	
 	@objc
 	func changeFont(_ manager:PlatformFontManager) {
 		let font = Style.example.font.displayFont()
@@ -155,7 +156,35 @@ class ChocolateThemeViewController: BaseViewController {
 			sample.applyFont(changed)
 		}
 	}
+	
+	@objc
+	func changeColor(_ panel:PlatformColorPanel) {
+		guard !isAccessingColorPanel, let color = panel.color.chocolateColor(chclt:chclt) else { return }
+		
+		isAccessingColorPanel = true
+		applyColor(color.normalize(), animated:false)
+		isAccessingColorPanel = false
+	}
+	
+	func applyColorToPanel(_ palette:Palette) {
+		guard !isAccessingColorPanel else { return }
+		
+		isAccessingColorPanel = true
+		PlatformColorPanel.shared.color = palette.primary.color().platformColor
+		isAccessingColorPanel = false
+	}
+#else
+	func applyColorToPanel(_ palette:Palette) {}
 #endif
+	
+	func applyColor(_ color:CHCLT.Color, animated:Bool) {
+		let coordinates = colorModel.coordinates(axis:axis, color:color)
+		
+		themeView.hue = coordinates.z
+		sliderHue.value = coordinates.z
+		primaryPosition = CGPoint(x:coordinates.x, y:1 - coordinates.y)
+		applyPositions(animated:animated)
+	}
 	
 	func current() -> Input {
 		let axis = self.axis
@@ -241,6 +270,8 @@ class ChocolateThemeViewController: BaseViewController {
 			))
 		}
 		
+		applyColorToPanel(input.palette)
+		
 		return layout
 	}
 	
@@ -275,7 +306,7 @@ class ChocolateThemeViewController: BaseViewController {
 			axis:.vertical,
 			mode:.ratio(0.75),
 			picker.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200),
-			sampleScroll.minimum(width:120, height:120)
+			sampleScroll.ignoringSafeBounds().minimum(width:120, height:120)
 		)
 	}
 	

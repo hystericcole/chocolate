@@ -135,7 +135,7 @@ extension CGRect {
 	public func relative(x:CGFloat, y:CGFloat, relativeSize:CGSize) -> CGRect { return relative(CGPoint(x:x, y:y), size:size * relativeSize) }
 	
 	public func polar(turns:Double, radius:Double) -> CGPoint {
-		let sc = __sincospi_stret(2 * turns)
+		let sc = turns.sincosturns()
 		
 		return CGPoint(
 			x:origin.x + CGFloat(1 + radius * sc.__cosval) * size.width * 0.5,

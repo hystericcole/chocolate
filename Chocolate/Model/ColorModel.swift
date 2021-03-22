@@ -113,7 +113,7 @@ enum ColorModel: Int {
 	}
 	
 	static func linearXYZ(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
-		return CHCLT.LinearRGB(chclt.rgb(xyz:components(coordinates:coordinates, axis:axis)))
+		return CHCLT.LinearRGB(chclt.linearRGB(xyz:components(coordinates:coordinates, axis:axis)))
 	}
 	
 	static func platformXYZ(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
@@ -121,7 +121,7 @@ enum ColorModel: Int {
 	}
 	
 	static func linearLCH(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
-		return CHCLT.LinearRGB(chclt.rgb(lch:components(coordinates:coordinates, axis:axis)))
+		return CHCLT.LinearRGB(chclt.linearRGB(lch:components(coordinates:coordinates, axis:axis)))
 	}
 	
 	static func platformLCH(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
@@ -152,26 +152,34 @@ enum ColorModel: Int {
 		}
 	}
 	
+	func coordinates(axis:Int, color:CHCLT.Color) -> CHCLT.Scalar.Vector3 {
+		switch self {
+		case .rgb: return ColorModel.coordinates(components:color.display.xyz, axis:axis)
+		case .hsb: return ColorModel.coordinates(components:color.hsba.xyz, axis:axis)
+		case .chclt: return ColorModel.coordinates(components:color.hcl, axis:axis)
+		}
+	}
+	
 	func coordinates(axis:Int, color:CHCLT.LinearRGB, chclt:CHCLT) -> CHCLT.Scalar.Vector3 {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display(chclt).vector.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.display(chclt).hsb().xyz, axis:axis)
-		case .chclt: return ColorModel.coordinates(components:chclt.hcl(rgb:color.vector), axis:axis)
+		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.vector), axis:axis)
 		}
 	}
-	
+
 	func coordinates(axis:Int, color:DisplayRGB, chclt:CHCLT) -> CHCLT.Scalar.Vector3 {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.vector.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.hsb().xyz, axis:axis)
-		case .chclt: return ColorModel.coordinates(components:chclt.hcl(rgb:color.linear(chclt).vector), axis:axis)
+		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.linear(chclt).vector), axis:axis)
 		}
 	}
 	
 	func coordinates(axis:Int, color:PlatformColor, chclt:CHCLT) -> CHCLT.Scalar.Vector3? {
-		guard let display = color.displayRGB else { return nil }
+		guard let color = color.chocolateColor(chclt:chclt) else { return nil }
 		
-		return coordinates(axis:axis, color:display, chclt:chclt)
+		return coordinates(axis:axis, color:color)
 	}
 	
 	func linearColors(axis:Int, chclt:CHCLT, hue:CHCLT.Scalar, count:Int) -> [CHCLT.LinearRGB] {

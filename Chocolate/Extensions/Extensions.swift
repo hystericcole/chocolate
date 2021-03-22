@@ -16,6 +16,22 @@ extension BinaryFloatingPoint {
 
 //	MARK: -
 
+extension Double {
+	func sincosturns() -> __double2 { return __sincospi_stret(self * 2.0) }
+	func sincospi() -> __double2 { return __sincospi_stret(self) }
+	func sincos() -> __double2 { return __sincos_stret(self) }
+}
+
+//	MARK: -
+
+extension Float {
+	func sincosturns() -> __float2 { return __sincospif_stret(self * 2.0) }
+	func sincospi() -> __float2 { return __sincospif_stret(self) }
+	func sincos() -> __float2 { return __sincosf_stret(self) }
+}
+
+//	MARK: -
+
 extension ClosedRange where Bound: AdditiveArithmetic {
 	var length:Bound { return upperBound - lowerBound }
 }
@@ -68,7 +84,7 @@ extension NumberFormatter {
 		set { minimumSignificantDigits = newValue.lowerBound; maximumSignificantDigits = newValue.upperBound; usesSignificantDigits = true }
 	}
 	
-	convenience init(fractionDigits:ClosedRange<Int>) {
+	public convenience init(fractionDigits:ClosedRange<Int>) {
 		self.init()
 		self.fractionDigits = fractionDigits
 	}

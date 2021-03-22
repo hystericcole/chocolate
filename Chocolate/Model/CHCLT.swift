@@ -85,36 +85,48 @@ public class CHCLT {
 		return toXYZ * Vector3.one
 	}
 	
-	public func xyz(rgb:Vector3) -> Vector3 {
-		return toXYZ * rgb
+	public func xyz(linearRGB:Vector3) -> Vector3 {
+		return toXYZ * linearRGB
 	}
 	
-	public func rgb(xyz:Vector3) -> Vector3 {
+	public func linearRGB(xyz:Vector3) -> Vector3 {
 		return fromXYZ * xyz
 	}
 	
-	public func lab(rgb:Vector3) -> Vector3 {
-		return Lab.fromXYZ(xyz:xyz(rgb:rgb), white:whitepoint())
+	public func lab(linearRGB:Vector3) -> Vector3 {
+		return Lab.fromXYZ(xyz:xyz(linearRGB:linearRGB), white:whitepoint())
 	}
 	
-	public func rgb(lab:Vector3) -> Vector3 {
-		return rgb(xyz:Lab.toXYZ(lab:lab, white:whitepoint()))
+	public func linearRGB(lab:Vector3) -> Vector3 {
+		return linearRGB(xyz:Lab.toXYZ(lab:lab, white:whitepoint()))
 	}
 	
-	public func lch(rgb:Vector3) -> Vector3 {
-		var lch = Lab.toLCH(lab:lab(rgb:rgb) / 100.0)
+	public func lch(linearRGB:Vector3) -> Vector3 {
+		var lch = Lab.toLCH(lab:lab(linearRGB:linearRGB) / 100.0)
 		
 		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
 		
 		return lch
 	}
 	
-	public func rgb(lch:Vector3) -> Vector3 {
+	public func linearRGB(lch:Vector3) -> Vector3 {
 		var lch = lch
 		
 		lch.z = lch.z * 2.0 * .pi
 		
-		return rgb(lab:Lab.fromLCH(lch:lch) * 100.0)
+		return linearRGB(lab:Lab.fromLCH(lch:lch) * 100.0)
+	}
+	
+	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
+		if toXYZ == chclt.toXYZ {
+			return linearRGB
+		} else {
+			return self.linearRGB(xyz:chclt.xyz(linearRGB:linearRGB))
+		}
+	}
+	
+	public func convert(rgb:Vector3, from chclt:CHCLT) -> Vector3 {
+		return display(convert(linearRGB:chclt.linear(rgb), from:chclt))
 	}
 }
 
@@ -410,7 +422,7 @@ extension CHCLT {
 		let u = luminance(color)
 		let n = 1 - value
 		let c = contrast(luminance:v) * n + contrast(luminance:u) * value
-		let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
+		let s:Scalar = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
 		
 		return applyContrast(linear, luminance:v, apply:c * s)
 	}
@@ -439,7 +451,7 @@ extension CHCLT {
 	
 	public static func rotate(_ linear:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
 		//	use rodrigues rotation to rotate vector around normalized axis
-		let sc = __sincospi_stret(turns * 2)
+		let sc = turns.sincosturns()
 		let v1 = linear * sc.__cosval
 		let v2 = simd_cross(axis, linear) * sc.__sinval
 		let v3 = axis * simd_dot(axis, linear) * (1 - sc.__cosval)
@@ -520,7 +532,7 @@ extension CHCLT {
 	}
 	
 	public func hueRange(start:Scalar = 0, shift:Scalar, count:Int) -> [Linear.Vector3] {
-		let v = 1.0
+		let v:Scalar = 1.0
 		let reference = hueReference(luminance:v)
 		let hueSaturation = reference - v
 		let axis = hueAxis()
@@ -541,7 +553,7 @@ extension CHCLT {
 	}
 	
 	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance from:Scalar, _ to:Scalar, count:Int) -> [Linear.Vector3] {
-		let v = 0.25
+		let v:Scalar = 0.25
 		let reference = hueReference(luminance:v)
 		let hueSaturation = reference - v
 		let axis = hueAxis()
@@ -565,7 +577,7 @@ extension CHCLT {
 	}
 	
 	public func pure(hue:Scalar) -> Linear.Vector3 {
-		let u = 1.0
+		let u:Scalar = 1.0
 		let axis = hueAxis()
 		let reference = hueReference(luminance:u)
 		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
@@ -586,8 +598,8 @@ extension CHCLT {
 		return normalized
 	}
 	
-	public func saturation(_ vector:Linear.Vector3) -> Scalar {
-		return simd_length(vector - luminance(vector))
+	public func saturation(_ vector:Linear.Vector3, luminance v:Linear) -> Scalar {
+		return simd_length(vector - v)
 	}
 	
 	/// Apply the maximum saturation that preserves the hue of the color.
@@ -709,10 +721,10 @@ extension CHCLT {
 	
 	// MARK: Transform
 	
-	public func hcl(rgb:Linear.Vector3) -> Linear.Vector3 {
-		let l = luminance(rgb)
-		let h = hue(rgb, luminance:l)
-		let c = chroma(rgb, luminance:l)
+	public func hcl(linear:Linear.Vector3) -> Linear.Vector3 {
+		let l = luminance(linear)
+		let h = hue(linear, luminance:l)
+		let c = chroma(linear, luminance:l)
 		
 		return Linear.vector3(h, c, transfer(l))
 	}
@@ -1107,14 +1119,16 @@ extension CHCLT {
 
 extension CHCLT {
 	public enum Lab {
+		public static let genericWhite = XYZ.d50
+		
 		public static func toXYZ(_ t:CHCLT.Linear) -> CHCLT.Linear {
-			let o = 6.0 / 29.0
+			let o:Linear = 6.0 / 29.0
 			
 			if t > o {
 				return t * t * t
 			} else {
-				let d = 3.0 * o * o
-				let p = 4.0 / 29.0
+				let d:Linear = 3.0 * o * o
+				let p:Linear = 4.0 / 29.0
 				
 				return d * (t - p)
 			}
@@ -1129,15 +1143,15 @@ extension CHCLT {
 		}
 		
 		public static func fromXYZ(_ t:CHCLT.Linear) -> CHCLT.Linear {
-			let o = 6.0 / 29.0
+			let o:Linear = 6.0 / 29.0
 			let o2 = o * o
 			let o3 = o2 * o
 			
 			if t > o3 {
 				return cbrt(t)
 			} else {
-				let d = 3.0 * o2
-				let p = 4.0 / 29.0
+				let d:Linear = 3.0 * o2
+				let p:Linear = 4.0 / 29.0
 				
 				return t / d + p
 			}
@@ -1157,7 +1171,7 @@ extension CHCLT {
 		}
 		
 		public static func fromLCH(lch:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
-			let sc = __sincos_stret(lch.z)
+			let sc = lch.z.sincos()
 			
 			return CHCLT.Linear.vector3(lch.x, lch.y * sc.__cosval, lch.y * sc.__sinval)
 		}
@@ -1168,7 +1182,13 @@ extension CHCLT {
 
 extension CHCLT {
 	public static var `default` = CHCLT_sRGB.standard
-	public static let sRGB_linear = CHCLT(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT_sRGB.contrast)
+}
+
+//	MARK: -
+
+public class CHCLT_Linear: CHCLT {
+	public static let sRGB = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT_sRGB.contrast)
+	public static let aces = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_acescg, contrast:CHCLT.Contrast(0.5, power:1.0))
 }
 
 //	MARK: -

@@ -15,6 +15,7 @@ typealias PlatformFont = NSFont
 typealias PlatformFontManager = NSFontManager
 typealias PlatformFontDescriptor = NSFontDescriptor
 typealias PlatformColor = NSColor
+typealias PlatformColorPanel = NSColorPanel
 typealias PlatformImage = NSImage
 typealias PlatformPasteboard = NSPasteboard
 typealias PlatformEvent = NSEvent

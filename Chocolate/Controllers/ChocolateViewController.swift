@@ -208,12 +208,15 @@ class ChocolateViewController: BaseViewController {
 		)
 		
 		applyColorToCircle(color)
+		applyColorToPanel()
 		
 		sampleScroll.view?.interfaceStyle = color.linear(chocolate).isDark(chocolate) ? .light : .dark
 		group.view?.invalidateLayout()
 	}
 	
 #if os(macOS)
+	private var isAccessingColorPanel:Bool = false
+	
 	@objc
 	func changeFont(_ manager:PlatformFontManager) {
 		let font = Style.example.font.displayFont()
@@ -223,6 +226,26 @@ class ChocolateViewController: BaseViewController {
 			sample.applyFont(changed)
 		}
 	}
+	
+	@objc
+	func changeColor(_ panel:PlatformColorPanel) {
+		guard !isAccessingColorPanel, let color = panel.color.chocolateColor(chclt:model.chocolate) else { return }
+		
+		isAccessingColorPanel = true
+		model.primary = color.normalize().displayRGB
+		applyColorInput(.unknown, value:0)
+		isAccessingColorPanel = false
+	}
+	
+	func applyColorToPanel() {
+		guard !isAccessingColorPanel else { return }
+		
+		isAccessingColorPanel = true
+		PlatformColorPanel.shared.color = model.primary.color().platformColor
+		isAccessingColorPanel = false
+	}
+#else
+	func applyColorToPanel() {}
 #endif
 	
 	@objc

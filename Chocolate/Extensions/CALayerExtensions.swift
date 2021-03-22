@@ -118,6 +118,27 @@ extension CALayer {
 		contentsGravity = .resizeAspectFill
 		contentsRect = CGRect(origin:origin, size:unit)
 	}
+	
+	public func removeAnimations(keys:[String]? = nil, recursive:Bool = false, applyPresentationValue:Bool = false) {
+		if recursive, let layers = sublayers {
+			for layer in layers {
+				layer.removeAnimations(keys:keys, recursive:recursive, applyPresentationValue:applyPresentationValue)
+			}
+		}
+		
+		guard keys != nil || applyPresentationValue else { return removeAllAnimations() }
+		guard let keys = keys ?? animationKeys(), !keys.isEmpty else { return }
+		
+		for key in keys {
+			guard let animation = animation(forKey:key) else { continue }
+			
+			if applyPresentationValue, let keyPath = (animation as? CAPropertyAnimation)?.keyPath, let current = presentation() {
+				setValue(current.value(forKeyPath:keyPath), forKeyPath:keyPath)
+			}
+			
+			removeAnimation(forKey:key)
+		}
+	}
 }
 
 // MARK: -
@@ -322,8 +343,8 @@ extension CAGradientLayer {
 			let sc:__double2
 			
 			switch self {
-			case .angle(let value): sc = __sincos_stret(value.native)
-			case .turn(let value): sc = __sincospi_stret(value.native * 2)
+			case .angle(let value): sc = value.native.sincos()
+			case .turn(let value): sc = value.native.sincosturns()
 			}
 			
 			let (s, c) = (sc.__sinval, sc.__cosval)
