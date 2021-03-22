@@ -109,7 +109,7 @@ enum ColorModel: Int {
 	}
 	
 	static func platformCHCLT(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT, alpha:CGFloat = 1.0) -> PlatformColor {
-		return linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt).display(chclt, alpha:alpha.native).color().platformColor
+		return linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt).color(chclt, alpha:alpha.native).platformColor
 	}
 	
 	static func linearXYZ(axis:Int, coordinates:CHCLT.Scalar.Vector3, chclt:CHCLT) -> CHCLT.LinearRGB {
@@ -155,7 +155,7 @@ enum ColorModel: Int {
 	func coordinates(axis:Int, color:CHCLT.Color) -> CHCLT.Scalar.Vector3 {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display.xyz, axis:axis)
-		case .hsb: return ColorModel.coordinates(components:color.hsba.xyz, axis:axis)
+		case .hsb: return ColorModel.coordinates(components:color.hsb, axis:axis)
 		case .chclt: return ColorModel.coordinates(components:color.hcl, axis:axis)
 		}
 	}
@@ -168,14 +168,6 @@ enum ColorModel: Int {
 		}
 	}
 
-	func coordinates(axis:Int, color:DisplayRGB, chclt:CHCLT) -> CHCLT.Scalar.Vector3 {
-		switch self {
-		case .rgb: return ColorModel.coordinates(components:color.vector.xyz, axis:axis)
-		case .hsb: return ColorModel.coordinates(components:color.hsb().xyz, axis:axis)
-		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.linear(chclt).vector), axis:axis)
-		}
-	}
-	
 	func coordinates(axis:Int, color:PlatformColor, chclt:CHCLT) -> CHCLT.Scalar.Vector3? {
 		guard let color = color.chocolateColor(chclt:chclt) else { return nil }
 		

@@ -46,7 +46,7 @@ class ChocolateThemeViewController: BaseViewController {
 				let name = linear.display(palette.chclt).web()
 				let color = linear.color().platformColor
 				let contrast = formatter.string(linear.contrast(palette.chclt) + reverseContrast)
-				let g18 = formatter.string(CHCLT_sRGB.ratioG18(reverse.vector, linear.vector))
+				let g18 = formatter.string(CHCLT_sRGB.ratioG18(reverse.luminance(CHCLT_sRGB.g18), linear.luminance(CHCLT_sRGB.g18)))
 				let text = "•\(index)/\(count - 1) \(name) G18 \(g18)◐ \(contrast)◐"
 				//let text = "The quick brown fox jumps over a lazy dog."
 				
@@ -326,7 +326,7 @@ class ChocolateThemeViewController: BaseViewController {
 
 class ChocolateThemeLayer: CALayer {
 	var chclt:CHCLT = CHCLT.default
-	var hue:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
+	var hue:CHCLT.Scalar = 0.5 { didSet { if hue != oldValue { setNeedsDisplay() } } }
 	var axis:Int = 48
 	
 	override func draw(in ctx: CGContext) {

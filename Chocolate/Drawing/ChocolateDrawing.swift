@@ -278,16 +278,16 @@ public struct CHCLTShading {
 		self.colors = colors
 	}
 	
-	public init(model:CHCLT, colors:[DisplayRGB]) {
+	public init(model:CHCLT, colors:[CHCLT.Color]) {
 		let scalar = CHCLT.Scalar(colors.count - 1)
 		
-		self.init(model:model, colors:colors.indices.map { ColorLocation(color:colors[$0].linear(model), alpha:colors[$0].vector.w, location:CHCLT.Scalar($0) / scalar) })
+		self.init(model:model, colors:colors.indices.map { ColorLocation(color:colors[$0].linearRGB, alpha:colors[$0].alpha, location:CHCLT.Scalar($0) / scalar) })
 	}
 	
-	public init(model:CHCLT, colors:[DisplayRGB], locations:[CHCLT.Scalar]) {
+	public init(model:CHCLT, colors:[CHCLT.Color], locations:[CHCLT.Scalar]) {
 		let indices = 0 ..< min(colors.count, locations.count)
 		
-		self.init(model:model, colors:indices.map { ColorLocation(color:colors[$0].linear(model), alpha:colors[$0].vector.w, location:locations[$0]) })
+		self.init(model:model, colors:indices.map { ColorLocation(color:colors[$0].linearRGB, alpha:colors[$0].alpha, location:locations[$0]) })
 	}
 	
 	public mutating func interpolate(by scalar:CHCLT.Scalar) -> CHCLT.Scalar.Vector4 {

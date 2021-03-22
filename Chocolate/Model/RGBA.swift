@@ -11,17 +11,36 @@ import Foundation
 import simd
 
 extension CHCLT {
-	public struct Color {
+	public struct Color: CustomStringConvertible {
 		public var display:CHCLT.Vector4
 		public var linear:CHCLT.Vector4
 		public let chclt:CHCLT
 		
+		public var displayRGB:DisplayRGB { return DisplayRGB(display) }
+		public var linearRGB:CHCLT.LinearRGB { return CHCLT.LinearRGB(linear.xyz) }
+		public var red:CHCLT.Scalar { return display.x }
+		public var green:CHCLT.Scalar { return display.y }
+		public var blue:CHCLT.Scalar { return display.z }
+		public var alpha:CHCLT.Scalar { return display.w }
+		public var hue:CHCLT.Scalar { return chclt.hue(linear.xyz, luminance:linear.w) }
+		public var chroma:CHCLT.Scalar { return chclt.chroma(linear.xyz, luminance:linear.w) }
+		public var saturation:CHCLT.Scalar { return chclt.saturation(linear.xyz, luminance:linear.w) }
+		public var luma:CHCLT.Scalar { return chclt.transfer(linear.w) }
+		public var luminance:CHCLT.Scalar { return linear.w }
+		public var isDark:Bool { return linear.w < chclt.contrast.mediumLuminance }
+		public var contrast:CHCLT.Scalar { return chclt.contrast(luminance:linear.w) }
+		public var rgb:CHCLT.Vector3 { return display.xyz }
+		public var hcl:CHCLT.Vector3 { return CHCLT.Scalar.vector3(hue, chroma, luma) }
+		public var hsb:CHCLT.Vector3 { let (h, s, b) = ColorModel.hsb_from_rgb(r:red, g:green, b:blue); return CHCLT.Scalar.vector3(h, s, b) }
+		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
+		public var description:String { return rgba() }
+		
 		public init(_ chclt:CHCLT, display:CHCLT.Vector4) {
-			let l = chclt.linear(display.xyz)
+			let linearRGB:CHCLT.Vector3 = chclt.linear(display.xyz)
 			
 			self.chclt = chclt
 			self.display = display
-			self.linear = CHCLT.Scalar.vector4(l, chclt.luminance(l))
+			self.linear = CHCLT.Scalar.vector4(linearRGB, chclt.luminance(linearRGB))
 		}
 		
 		public init(_ chclt:CHCLT, linear:CHCLT.Vector3, alpha:CHCLT.Scalar = 1) {
@@ -30,25 +49,15 @@ extension CHCLT {
 			self.linear = CHCLT.Scalar.vector4(linear, chclt.luminance(linear))
 		}
 		
-		public init?(_ chclt:CHCLT, _ color:CGColor) {
-			guard let linear = CHCLT.LinearRGB(color, chclt:chclt) else { return nil }
-			
-			self.init(chclt, linear:linear.vector, alpha:color.alpha.native)
-		}
-		
-		public init?(_ color:CGColor, chclt:CHCLT = CHCLT.default) {
-			self.init(color.colorSpace?.chclt ?? chclt, color)
-		}
-		
-		init?(_ chclt:CHCLT, _ color:PlatformColor) {
-			self.init(chclt, color.cgColor)
+		public init(_ chclt:CHCLT, _ color:Color) {
+			self.init(chclt, linear:chclt.convert(linearRGB:color.linear.xyz, from:color.chclt))
 		}
 		
 		public init(_ chclt:CHCLT, _ color:DisplayRGB) {
 			self.init(chclt, display:color.vector)
 		}
 		
-		public init(_ chclt:CHCLT, _ color:CHCLT.LinearRGB, alpha:CHCLT.Scalar) {
+		public init(_ chclt:CHCLT, _ color:CHCLT.LinearRGB, alpha:CHCLT.Scalar = 1) {
 			self.init(chclt, linear:color.vector, alpha:alpha)
 		}
 		
@@ -64,27 +73,7 @@ extension CHCLT {
 			self.init(chclt, linear:CHCLT.LinearRGB(chclt, hue:hue, chroma:chroma, luma:luma).vector, alpha:alpha)
 		}
 		
-		public var description:String { return rgba() }
-		
-		var platformColor:PlatformColor { return color.platformColor }
-		public var color:CGColor { return linearRGB.color(chclt:chclt, alpha:CGFloat(display.w)) }
-		public var displayRGB:DisplayRGB { return DisplayRGB(display) }
-		public var linearRGB:CHCLT.LinearRGB { return CHCLT.LinearRGB(linear.xyz) }
-		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
-		
-		public var red:CHCLT.Scalar { return display.x }
-		public var green:CHCLT.Scalar { return display.y }
-		public var blue:CHCLT.Scalar { return display.z }
-		public var alpha:CHCLT.Scalar { return display.w }
-		public var hue:CHCLT.Scalar { return chclt.hue(linear.xyz, luminance:linear.w) }
-		public var chroma:CHCLT.Scalar { return chclt.chroma(linear.xyz, luminance:linear.w) }
-		public var saturation:CHCLT.Scalar { return chclt.saturation(linear.xyz, luminance:linear.w) }
-		public var luma:CHCLT.Scalar { return chclt.transfer(linear.w) }
-		public var luminance:CHCLT.Scalar { return linear.w }
-		public var contrast:CHCLT.Scalar { return chclt.contrast(luminance:linear.w) }
-		public var hcl:CHCLT.Vector3 { return chclt.hcl(linear:linear.xyz) }
-		public var hsba:CHCLT.Vector4 { return displayRGB.hsb() }
-		
+		public func convert(_ chclt:CHCLT) -> Color { return Color(chclt, self) }
 		public func hueShifted(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.hueShift(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }
 		public func applyHue(_ value:CHCLT.Scalar) -> Self { return hueShifted(value - hue) }
 		public func scaleChroma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.scaleChroma(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }
@@ -96,6 +85,7 @@ extension CHCLT {
 		public func scaleContrast(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.scaleContrast(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }
 		public func applyContrast(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyContrast(linear.xyz, luminance:linear.w, apply:value), alpha:display.w) }
 		public func contrasting(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.contrasting(linear.xyz, luminance:linear.w, value:value), alpha:display.w) }
+		public func opposing(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyContrast(linear.xyz, luminance:linear.w, apply:-value), alpha:display.w) }
 		public func normalize() -> Self { return Color(chclt, linear:CHCLT.normalize(linear.xyz, luminance:linear.w, leavePositive:false), alpha:display.w) }
 		public func transform(_ transform:CHCLT.Transform) -> Self { return Color(chclt, linear:chclt.transform(linear.xyz, luminance:linear.w, transform:transform), alpha:display.w) }
 		public func invert()  -> Self { return Color(chclt, linear:1 - linear.xyz, alpha:display.w) }
@@ -127,12 +117,7 @@ extension CHCLT {
 public struct DisplayRGB {
 	public typealias Scalar = CHCLT.Scalar
 	
-	public static let black = DisplayRGB(Scalar.vector4(Scalar.Vector3.zero, 1.0))
-	public static let white = DisplayRGB(Scalar.Vector4.one)
-	
 	public let vector:CHCLT.Vector4
-	public var clamped:DisplayRGB { return DisplayRGB(simd_min(simd_max(.zero, vector), .one)) }
-	public var inverted:DisplayRGB { return DisplayRGB(Scalar.vector4(1 - vector.xyz, vector.w)) }
 	
 	public var red:Scalar { return vector.x }
 	public var green:Scalar { return vector.y }
@@ -165,14 +150,12 @@ public struct DisplayRGB {
 		vector = Scalar.vector4(gray, gray, gray, alpha)
 	}
 	
-	public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luma:Scalar, alpha:Scalar = 1) {
-		let linear = CHCLT.LinearRGB(chclt, hue:hue, chroma:chroma, luminance:luma)
-		
-		vector = Scalar.vector4(chclt.display(simd_max(linear.vector, Scalar.Vector3.zero)), alpha)
-	}
-	
 	public init(hexagonal hue:Scalar, saturation:Scalar, brightness:Scalar, alpha:Scalar = 1) {
 		vector = Scalar.vector4(DisplayRGB.hexagonal(hue:hue, saturation:saturation, brightness:brightness), alpha)
+	}
+	
+	public func color(_ chclt:CHCLT) -> CHCLT.Color {
+		return CHCLT.Color(chclt, display:vector)
 	}
 	
 	public func web(allowFormat:Int = 0) -> String {
@@ -225,76 +208,16 @@ public struct DisplayRGB {
 	
 	public func pixel() -> UInt32 {
 		var v = vector * 255.0
-		
+
 		v.round(.toNearestOrAwayFromZero)
-		
+
 		let u = simd_uint(v)
 		let a = u.w << 24
 		let r = u.x << 16
 		let g = u.y << 8
 		let b = u.z << 0
-		
+
 		return r | g | b | a
-	}
-	
-	public func linear(_ chclt:CHCLT) -> CHCLT.LinearRGB {
-		return CHCLT.LinearRGB(chclt.linear(vector.xyz))
-	}
-	
-	public func scaled(_ scalar:Scalar) -> DisplayRGB {
-		return DisplayRGB(Scalar.vector4(vector.xyz * scalar, vector.w))
-	}
-	
-	public func normalized(_ chclt:CHCLT) -> DisplayRGB {
-		return linear(chclt).normalized(chclt).display(chclt, alpha:vector.w)
-	}
-	
-	public func luma(_ chclt:CHCLT) -> Scalar {
-		return linear(chclt).luma(chclt)
-	}
-	
-	public func scaleLuma(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
-		return linear(chclt).scaleLuma(chclt, by:scalar).display(chclt, alpha:vector.w)
-	}
-	
-	public func applyLuma(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
-		return linear(chclt).applyLuma(chclt, value:value).display(chclt, alpha:vector.w)
-	}
-	
-	public func contrast(_ chclt:CHCLT) -> Scalar {
-		return linear(chclt).contrast(chclt)
-	}
-	
-	public func scaleContrast(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
-		return linear(chclt).scaleContrast(chclt, by:scalar).display(chclt, alpha:vector.w)
-	}
-	
-	public func applyContrast(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
-		return linear(chclt).applyContrast(chclt, value:value).display(chclt, alpha:vector.w)
-	}
-	
-	public func contrasting(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
-		return linear(chclt).contrasting(chclt, value:value).display(chclt, alpha:vector.w)
-	}
-	
-	public func chroma(_ chclt:CHCLT) -> Scalar {
-		return linear(chclt).chroma(chclt)
-	}
-	
-	public func scaleChroma(_ chclt:CHCLT, by scalar:Scalar) -> DisplayRGB {
-		return linear(chclt).scaleChroma(chclt, by:scalar).display(chclt, alpha:vector.w)
-	}
-	
-	public func applyChroma(_ chclt:CHCLT, value:Scalar) -> DisplayRGB {
-		return linear(chclt).applyChroma(chclt, value:value).display(chclt, alpha:vector.w)
-	}
-	
-	public func vectorHue(_ chclt:CHCLT) -> Scalar {
-		return linear(chclt).hue(chclt)
-	}
-	
-	public func hueShifted(_ chclt:CHCLT, by shift:Scalar) -> DisplayRGB {
-		return linear(chclt).hueShifted(chclt, by:shift).display(chclt, alpha:vector.w)
 	}
 	
 	//	MARK: Hexagonal
@@ -320,12 +243,6 @@ public struct DisplayRGB {
 		
 		return Scalar.vector4(h, s, b, vector.w)
 	}
-	
-	public func hcl(_ chclt:CHCLT) -> Scalar.Vector4 {
-		let hcl = chclt.hcl(linear:linear(chclt).vector)
-		
-		return Scalar.vector4(hcl, vector.w)
-	}
 }
 
 //	MARK: -
@@ -341,24 +258,10 @@ extension DisplayRGB {
 		return CGColorSpace(name:CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
 	}
 	
-	public var cg:CGColor? { return color() }
-	
-	public init?(_ color:CGColor?, chclt:CHCLT) {
-		guard let color = color, let linearRGB = CHCLT.LinearRGB(color, chclt:chclt) else { return nil }
-		
-		let rgb = chclt.display(linearRGB.vector)
-		
-		self.init(CHCLT.Scalar.vector4(rgb, color.alpha.native))
-	}
-	
 	public init?(_ color:CGColor?) {
-		guard
-			let color = color,
-			color.numberOfComponents == 4,
-			let components = color.components
-		else { return nil }
+		guard let components = color?.componentsVector4 else { return nil }
 		
-		self.init(components[0].native, components[1].native, components[2].native, components[3].native)
+		self.init(components)
 	}
 	
 	public func color(colorSpace:CGColorSpace? = nil) -> CGColor! {
@@ -370,9 +273,7 @@ extension DisplayRGB {
 			space = DisplayRGB.colorSpace
 		}
 		
-		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), CGFloat(vector.w)]
-		
-		return CGColor(colorSpace:space, components:&components)
+		return CGColor.with(colorSpace:space, componentsVector4:vector)
 	}
 }
 
@@ -390,74 +291,61 @@ extension CHCLT.LinearRGB {
 	}
 	
 	public init?(_ color:CGColor?) {
-		if let chclt = color?.colorSpace?.chclt, let components = color?.components {
-			let rgb = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			
-			self.init(chclt.linear(rgb))
-		} else {
-			self.init(color, linearColorSpace:nil)
-		}
-	}
-	
-	public init?(linearColor color:CGColor?) {
-		guard let color = color, color.numberOfComponents == 4, let components = color.components else { return nil }
+		guard let components = color?.componentsVector3 else { return nil }
 		
-		self.init(components[0].native, components[1].native, components[2].native)
+		self.init(components)
 	}
 	
-	public init?(_ color:CGColor?, linearColorSpace:CGColorSpace?) {
+	public init?(_ color:CGColor?, convertingToLinearColorSpace colorSpace:CGColorSpace?) {
 		if
-			color?.colorSpace != nil,
 			#available(macOS 10.11, iOS 9.0, *),
-			let converted = color?.converted(to:linearColorSpace ?? CHCLT.LinearRGB.colorSpace, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
-			let components = converted.components
+			let converted = color?.converted(to:colorSpace ?? CHCLT.LinearRGB.colorSpace, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
+			let components = converted.componentsVector3
 		{
-			let rgb = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			
-			self.init(rgb)
+			self.init(components)
 		} else {
-			self.init(linearColor:color)
+			self.init(color)
 		}
 	}
 	
-	public init?(_ color:CGColor?, chclt:CHCLT) {
+	public func color(alpha:CGFloat = 1) -> CGColor! {
+		return CGColor.with(colorSpace:CHCLT.LinearRGB.colorSpace, componentsVector3:vector, alpha:alpha)
+	}
+}
+
+//	MARK: -
+
+extension CHCLT.Color {
+	public init?(_ chclt:CHCLT, _ color:CGColor?, useSpaceFromColorWhenAvailable:Bool = false) {
 		guard let color = color else { return nil }
 		
-		if color.colorSpace == nil && color.numberOfComponents == 4, let components = color.components {
-			let rgb = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			
-			self.init(rgb)
-		} else if let other = color.colorSpace?.chclt, let components = color.components {
-			let rgb = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			
-			self.init(chclt.convert(linearRGB:other.linear(rgb), from:other))
+		if color.colorSpace == nil, let components = color.componentsVector4 {
+			self.init(chclt, display:components)
+		} else if let other = color.colorSpace?.chclt, let components = color.componentsVector4 {
+			if useSpaceFromColorWhenAvailable || chclt === other {
+				self.init(other, display:components)
+			} else {
+				self.init(chclt, linear:chclt.convert(linearRGB:other.linear(components.xyz), from:other), alpha:components.w)
+			}
 		} else if
 			#available(macOS 10.11, iOS 9.0, *),
 			let rgbColorSpace = chclt.rgbColorSpace(),
 			let converted = color.converted(to:rgbColorSpace, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
-			let components = converted.components
+			let components = converted.componentsVector4
 		{
-			let rgb = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			let linearRGB = chclt.linear(rgb)
-			
-			self.init(linearRGB)
+			self.init(chclt, display:components)
 		} else if
 			#available(macOS 10.11, iOS 9.0, *),
 			let labColorSpace = chclt.labColorSpace(),
 			let converted = color.converted(to:labColorSpace, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
-			let components = converted.components
+			let components = converted.componentsVector4
 		{
-			let lab = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			let linearRGB = chclt.linearRGB(lab:lab)
-			
-			self.init(linearRGB)
-		} else if color.numberOfComponents == 4, let components = color.components, let model = color.colorSpace?.model {
-			let c = CHCLT.Linear.vector3(components[0].native, components[1].native, components[2].native)
-			
+			self.init(chclt, linear:chclt.linearRGB(lab:components.xyz), alpha:components.w)
+		} else if let components = color.componentsVector4, let model = color.colorSpace?.model {
 			switch model {
-			case .rgb: self.init(chclt.linear(c))
-			case .lab: self.init(chclt.linearRGB(lab:c))
-			case .XYZ: self.init(chclt.linearRGB(xyz:c))
+			case .rgb: self.init(chclt, display:components)
+			case .lab: self.init(chclt, linear:chclt.linearRGB(xyz:CHCLT.Lab.toXYZ(lab:components.xyz, white:CHCLT.Lab.genericWhite)), alpha:components.w)
+			case .XYZ: self.init(chclt, linear:chclt.linearRGB(xyz:components.xyz), alpha:components.w)
 			default: return nil
 			}
 		} else {
@@ -465,100 +353,116 @@ extension CHCLT.LinearRGB {
 		}
 	}
 	
-	public func color(chclt:CHCLT, alpha:CGFloat = 1) -> CGColor! {
-		let space:CGColorSpace
-		let c:CHCLT.Vector3
+	public init?(_ color:CGColor?) {
+		guard let chclt = color?.colorSpace?.chclt, let components = color?.componentsVector4 else { return nil }
 		
+		self.init(chclt, display:components)
+	}
+	
+	init?(_ chclt:CHCLT, _ color:PlatformColor?, useSpaceFromColorWhenAvailable:Bool = false) {
+		self.init(chclt, color?.cgColor, useSpaceFromColorWhenAvailable:useSpaceFromColorWhenAvailable)
+	}
+	
+	init?(_ color:PlatformColor?) {
+		self.init(color?.cgColor)
+	}
+	
+	var platformColor:PlatformColor { return color.platformColor }
+	
+	public var color:CGColor! {
 		if let colorSpace = chclt.rgbColorSpace() {
-			c = chclt.display(vector)
-			space = colorSpace
+			return CGColor.with(colorSpace:colorSpace, componentsVector4:display)
 		} else if let colorSpace = chclt.labColorSpace() {
-			c = chclt.lab(linearRGB:vector)
-			space = colorSpace
+			return CGColor.with(colorSpace:colorSpace, componentsVector3:chclt.lab(linearRGB:linear.xyz), alpha:CGFloat(alpha))
 		} else {
-			c = vector
-			space = CHCLT.LinearRGB.colorSpace
+			return CGColor.with(colorSpace:CHCLT.LinearRGB.colorSpace, componentsVector3:linear.xyz, alpha:CGFloat(alpha))
 		}
-		
-		var components:[CGFloat] = [CGFloat(c.x), CGFloat(c.y), CGFloat(c.z), alpha]
-		
-		return CGColor(colorSpace:space, components:&components)
 	}
 	
-	public func color(linearColorSpace:CGColorSpace, alpha:CGFloat = 1) -> CGColor? {
-		guard linearColorSpace.numberOfComponents <= 3 else { return nil }
-		
-		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), alpha]
-		
-		return CGColor(colorSpace:linearColorSpace, components:&components)
-	}
-	
-	public func color(alpha:CGFloat = 1) -> CGColor! {
-		var components:[CGFloat] = [CGFloat(vector.x), CGFloat(vector.y), CGFloat(vector.z), alpha]
-		
-		return CGColor(colorSpace:CHCLT.LinearRGB.colorSpace, components:&components)
+	public var linearColor:CGColor! {
+		return linearRGB.color(alpha:CGFloat(alpha))
 	}
 }
 
 //	MARK: -
 
 extension CHCLT {
-	public static func named(_ name:CFString) -> CHCLT? {
-		if name == CGColorSpace.sRGB || name == "kCGColorSpaceGenericRGB" as CFString { return CHCLT_sRGB.standard }
-		if name == CGColorSpace.genericRGBLinear { return CHCLT_Linear.sRGB }
-		if name == CGColorSpace.adobeRGB1998 { return CHCLT_Pure.adobeRGB }
-		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.itur_709 { return CHCLT_BT.y709 }
-		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.itur_2020 { return CHCLT_BT.y2020 }
-		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.dcip3 { return CHCLT_Pure.dciP3 }
-		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.acescgLinear { return CHCLT_Linear.aces }
-		if #available(macOS 10.11, iOS 9.0, *), name == CGColorSpace.rommrgb { return CHCLT_ROMM.standard }
-		if #available(macOS 10.11.2, iOS 9.3, *), name == CGColorSpace.displayP3 { return CHCLT_sRGB.displayP3 }
-		if #available(macOS 10.12, iOS 10.0, *), name == CGColorSpace.extendedSRGB { return CHCLT_sRGB.standard }
-		if #available(macOS 10.12, iOS 10.0, *), name == CGColorSpace.linearSRGB { return CHCLT_Linear.sRGB }
-		if #available(macOS 10.12, iOS 10.0, *), name == CGColorSpace.extendedLinearSRGB { return CHCLT_Linear.sRGB }
-		if #available(macOS 11.0, iOS 14.0, *), name == CGColorSpace.extendedITUR_2020 { return CHCLT_BT.y2020 }
-		if #available(macOS 11.0, iOS 14.0, *), name == CGColorSpace.extendedDisplayP3 { return CHCLT_sRGB.displayP3 }
+	public static let colorSpaceNameByCHCLT = availableColorSpaceNameByCHCLT()
+	public static let colorSpaceByCHCLT = colorSpaceNameByCHCLT.compactMapValues(CGColorSpace.init)
+	public static let colorSpaceNameToCHCLT = availableColorSpaceNameToCHCLT()
+	public static let colorSpaceCommonKeyCHCLT = availableColorSpaceKeyToCHCLT(colorSpaceNameToCHCLT)
+	
+	private static func availableColorSpaceNameByCHCLT() -> [CHCLT:CFString] {
+		var result:[CHCLT:CFString] = [:]
 		
-		return nil
+		result[CHCLT_Linear.sRGB] = CGColorSpace.genericRGBLinear
+		if #available(macOS 10.12, iOS 10.0, *) { result[CHCLT_Linear.sRGB] = CGColorSpace.linearSRGB }
+		//if #available(macOS 10.12, iOS 10.0, *) { result[CHCLT_Linear.sRGB] = CGColorSpace.extendedLinearSRGB }
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_Linear.aces] = CGColorSpace.acescgLinear }
+		
+		result[CHCLT_Pure.sRGB] = CGColorSpace.sRGB
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_Pure.dciP3] = CGColorSpace.dcip3 }
+		result[CHCLT_Pure.adobeRGB] = CGColorSpace.adobeRGB1998
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_Pure.y709] = CGColorSpace.itur_709 }
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_Pure.y2020] = CGColorSpace.itur_2020 }
+		//if #available(macOS 11.0, iOS 14.0, *) { result[CHCLT_Pure.y2020] = CGColorSpace.extendedITUR_2020 }
+		
+		result[CHCLT_sRGB.standard] = CGColorSpace.sRGB
+		result[CHCLT_sRGB.g18] = CGColorSpace.sRGB
+		if #available(macOS 10.11.2, iOS 9.3, *) { result[CHCLT_sRGB.displayP3] = CGColorSpace.displayP3 }
+		//if #available(macOS 11.0, iOS 14.0, *) { result[CHCLT_sRGB.displayP3] = CGColorSpace.extendedDisplayP3 }
+		
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_ROMM.standard] = CGColorSpace.rommrgb }
+		
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_BT.y709] = CGColorSpace.itur_709 }
+		if #available(macOS 10.11, iOS 9.0, *) { result[CHCLT_BT.y2020] = CGColorSpace.itur_2020 }
+		
+		return result
 	}
 	
-	public func colorSpaceName(preferExtended:Bool = false) -> CFString? {
-		switch toXYZ {
-		case CHCLT.XYZ.rgb_to_xyz_bt709_d65:
-			if #available(macOS 10.12, iOS 10.0, *), self is CHCLT_Linear { return CGColorSpace.extendedLinearSRGB }
-			if self is CHCLT_Linear { return CGColorSpace.genericRGBLinear }
-			if #available(macOS 10.11, iOS 9.0, *), self is CHCLT_BT { return CGColorSpace.itur_709 }
-			if #available(macOS 10.11, iOS 9.0, *), (self as? CHCLT_Pure)?.exponent == CHCLT_Pure.y709.exponent { return CGColorSpace.itur_709 }
-			if preferExtended, #available(macOS 10.12, iOS 10.0, *) { return CGColorSpace.extendedSRGB }
+	private static func availableColorSpaceNameToCHCLT() -> [CFString:CHCLT] {
+		var result:[CFString:CHCLT] = [:]
+		
+		result[CGColorSpace.genericRGBLinear] = CHCLT_Linear.sRGB
+		if #available(macOS 10.12, iOS 10.0, *) { result[CGColorSpace.linearSRGB] = CHCLT_Linear.sRGB }
+		if #available(macOS 10.12, iOS 10.0, *) { result[CGColorSpace.extendedLinearSRGB] = CHCLT_Linear.sRGB }
+		if #available(macOS 10.11, iOS 9.0, *) { result[CGColorSpace.acescgLinear] = CHCLT_Linear.aces }
+		
+		result[CGColorSpace.adobeRGB1998] = CHCLT_Pure.adobeRGB
+		if #available(macOS 10.11, iOS 9.0, *) { result[CGColorSpace.dcip3] = CHCLT_Pure.dciP3 }
+		
+		result["kCGColorSpaceGenericRGB" as CFString] = CHCLT_sRGB.standard
+		result[CGColorSpace.sRGB] = CHCLT_sRGB.standard
+		if #available(macOS 10.12, iOS 10.0, *) { result[CGColorSpace.extendedSRGB] = CHCLT_sRGB.standard }
+		if #available(macOS 10.11.2, iOS 9.3, *) { result[CGColorSpace.displayP3] = CHCLT_sRGB.displayP3 }
+		if #available(macOS 10.14.3, iOS 12.3, *) { result[CGColorSpace.extendedLinearDisplayP3] = nil }
+		if #available(macOS 11.0, iOS 14.0, *) { result[CGColorSpace.extendedDisplayP3] = CHCLT_sRGB.displayP3 }
+		
+		if #available(macOS 10.11, iOS 9.0, *) { result[CGColorSpace.rommrgb] = CHCLT_ROMM.standard }
+		
+		if #available(macOS 10.11, iOS 9.0, *) { result[CGColorSpace.itur_709] = CHCLT_BT.y709 }
+		if #available(macOS 10.11, iOS 9.0, *) { result[CGColorSpace.itur_2020] = CHCLT_BT.y2020 }
+		if #available(macOS 11.0, iOS 14.0, *) { result[CGColorSpace.extendedITUR_2020] = CHCLT_BT.y2020 }
+		if #available(macOS 10.14.3, iOS 12.3, *) { result[CGColorSpace.extendedLinearITUR_2020] = nil }
+		
+		return result
+	}
+	
+	private static func availableColorSpaceKeyToCHCLT(_ nameToCHCLT:[CFString:CHCLT]) -> [CFData:CHCLT] {
+		var result:[CFData:CHCLT] = [:]
+		
+		for (name, chclt) in nameToCHCLT {
+			guard let key = CGColorSpace(name:name)?.commonKey else { continue }
 			
-			return CGColorSpace.sRGB
-		case CHCLT.XYZ.rgb_to_xyz_displayP3_d65:
-			if #available(macOS 10.14.3, iOS 12.3, *), self is CHCLT_Linear { return CGColorSpace.extendedLinearDisplayP3 }
-			if preferExtended, #available(macOS 11.0, iOS 14.0, *) { return CGColorSpace.extendedDisplayP3 }
-			if #available(macOS 10.11.2, iOS 9.3, *) { return CGColorSpace.displayP3 }
-		case CHCLT.XYZ.rgb_to_xyz_bt2020_d65:
-			if #available(macOS 10.14.3, iOS 12.3, *), self is CHCLT_Linear { return CGColorSpace.extendedLinearITUR_2020 }
-			if preferExtended, #available(macOS 11.0, iOS 14.0, *) { return CGColorSpace.extendedITUR_2020 }
-			if #available(macOS 10.11, iOS 9.0, *) { return CGColorSpace.itur_2020 }
-		case CHCLT.XYZ.rgb_to_xyz_theaterP3_dci:
-			if #available(macOS 10.11, iOS 9.0, *) { return CGColorSpace.dcip3 }
-		case CHCLT.XYZ.rgb_to_xyz_adobeRGB_d65:
-			return CGColorSpace.adobeRGB1998
-		case CHCLT.XYZ.rgb_to_xyz_romm_d50:
-			if #available(macOS 10.11, iOS 9.0, *) { return CGColorSpace.rommrgb }
-		case CHCLT.XYZ.rgb_to_xyz_acescg:
-			if #available(macOS 10.11, iOS 9.0, *) { return CGColorSpace.acescgLinear }
-		default:
-			break
+			//	Extended and truncated variants may have identical keys
+			result[key] = chclt
 		}
 		
-		return nil
+		return result
 	}
 	
 	public func rgbColorSpace() -> CGColorSpace? {
-		guard let name = colorSpaceName() else { return nil }
-		
-		return CGColorSpace(name:name)
+		return CHCLT.colorSpaceByCHCLT[self]
 	}
 	
 	public func labColorSpace() -> CGColorSpace? {
@@ -593,8 +497,6 @@ extension CHCLT_Pure {
 //	MARK: -
 
 extension CGColorSpace {
-	static var nameByCommonKey:[CFData:CFString] = availableNamesByCommonKey()
-	
 	var commonKey:CFData? {
 		if #available(OSX 10.12, *) {
 			return copyICCData()
@@ -603,52 +505,36 @@ extension CGColorSpace {
 		}
 	}
 	
-	var commonKeyName:CFString? {
-		guard let key = commonKey else { return nil }
-		
-		return CGColorSpace.nameByCommonKey[key]
-	}
-	
-	static func availableNames() -> [CFString] {
-		var names:[CFString] = [
-			"kCGColorSpaceGenericRGB" as CFString,
-			CGColorSpace.sRGB,
-			CGColorSpace.genericRGBLinear,
-			CGColorSpace.adobeRGB1998
-		]
-		
-		if #available(macOS 10.11, iOS 9.0, *) { names.append(CGColorSpace.itur_709) }
-		if #available(macOS 10.11, iOS 9.0, *) { names.append(CGColorSpace.itur_2020) }
-		if #available(macOS 10.11, iOS 9.0, *) { names.append(CGColorSpace.dcip3) }
-		if #available(macOS 10.11, iOS 9.0, *) { names.append(CGColorSpace.acescgLinear) }
-		if #available(macOS 10.11, iOS 9.0, *) { names.append(CGColorSpace.rommrgb) }
-		if #available(macOS 10.11.2, iOS 9.3, *) { names.append(CGColorSpace.displayP3) }
-		if #available(macOS 10.12, iOS 10.0, *) { names.append(CGColorSpace.extendedSRGB) }
-		if #available(macOS 10.12, iOS 10.0, *) { names.append(CGColorSpace.linearSRGB) }
-		if #available(macOS 10.12, iOS 10.0, *) { names.append(CGColorSpace.extendedLinearSRGB) }
-		if #available(macOS 10.14.3, iOS 12.3, *) { names.append(CGColorSpace.extendedLinearITUR_2020) }
-		if #available(macOS 10.14.3, iOS 12.3, *) { names.append(CGColorSpace.extendedLinearDisplayP3) }
-		if #available(macOS 11.0, iOS 14.0, *) { names.append(CGColorSpace.extendedITUR_2020) }
-		if #available(macOS 11.0, iOS 14.0, *) { names.append(CGColorSpace.extendedDisplayP3) }
-		
-		return names
-	}
-	
-	static func availableNamesByCommonKey(_ names:[CFString] = availableNames()) -> [CFData:CFString] {
-		var namesByCommonKey:[CFData:CFString] = [:]
-		
-		for name in names {
-			guard let space = CGColorSpace(name:name), let key = space.commonKey else { continue }
-			
-			namesByCommonKey[key] = name
-		}
-		
-		return namesByCommonKey
-	}
-	
 	public var chclt:CHCLT? {
-		guard model == .rgb, let name = name ?? commonKeyName else { return nil }
+		guard model == .rgb else { return nil }
 		
-		return CHCLT.named(name)
+		if let name = name, let chclt = CHCLT.colorSpaceNameToCHCLT[name] { return chclt }
+		if let key = commonKey, let chclt = CHCLT.colorSpaceCommonKeyCHCLT[key] { return chclt }
+		
+		return nil
+	}
+}
+
+//	MARK: -
+
+extension CGColor {
+	var componentsVector4:CGFloat.Vector4? {
+		guard numberOfComponents == 4, let components = components else { return nil }
+		
+		return CGFloat.vector4(components[0], components[1], components[2], components[3])
+	}
+	
+	var componentsVector3:CGFloat.Vector3? {
+		guard numberOfComponents == 4, let components = components else { return nil }
+		
+		return CGFloat.vector3(components[0], components[1], components[2])
+	}
+	
+	static func with(colorSpace:CGColorSpace, componentsVector4:CGFloat.Vector4) -> CGColor? {
+		return withUnsafeBytes(of:componentsVector4) { CGColor(colorSpace:colorSpace, components:$0.baseAddress!.assumingMemoryBound(to:CGFloat.self)) }
+	}
+	
+	static func with(colorSpace:CGColorSpace, componentsVector3:CGFloat.Vector3, alpha:CGFloat = 1) -> CGColor? {
+		return with(colorSpace:colorSpace, componentsVector4:CGFloat.vector4(componentsVector3, alpha))
 	}
 }

@@ -128,13 +128,28 @@ public class CHCLT {
 	public func convert(rgb:Vector3, from chclt:CHCLT) -> Vector3 {
 		return display(convert(linearRGB:chclt.linear(rgb), from:chclt))
 	}
+	
+	public func isEqual(to chclt:CHCLT) -> Bool {
+		return coefficients == chclt.coefficients && contrast == chclt.contrast && type(of:self) == type(of:chclt)
+	}
+	
+	public func hash(into hasher: inout Hasher) {
+		hasher.combine(coefficients)
+		hasher.combine(contrast)
+	}
+}
+
+extension CHCLT: Equatable, Hashable {
+	public static func == (lhs: CHCLT, rhs: CHCLT) -> Bool {
+		return lhs.isEqual(to:rhs)
+	}
 }
 
 //	MARK: -
 
 extension CHCLT {
 	/// Parameters use to compute contrast
-	public struct Contrast {
+	public struct Contrast: Equatable, Hashable {
 		/// The luminance value separating light and dark colors.
 		/// Contrast in CHCLT is a measure of distance from medium luminance.
 		/// 
@@ -858,6 +873,10 @@ extension CHCLT {
 			return DisplayRGB(Scalar.vector4(chclt.display(vector), alpha))
 		}
 		
+		public func color(_ chclt:CHCLT, alpha:Scalar = 1) -> CHCLT.Color {
+			return CHCLT.Color(chclt, linear:vector, alpha:alpha)
+		}
+		
 		/// Interpolate each component towards the component in the target color
 		public func interpolated(towards:LinearRGB, by scalar:Scalar) -> LinearRGB {
 			let t = 1 - scalar
@@ -1220,6 +1239,15 @@ public class CHCLT_Pure: CHCLT {
 	public override func transfer(_ value:Linear) -> Scalar {
 		return pow(value, 1.0 / exponent)
 	}
+	
+	public override func hash(into hasher: inout Hasher) {
+		super.hash(into:&hasher)
+		hasher.combine(exponent)
+	}
+	
+	public override func isEqual(to chclt:CHCLT) -> Bool {
+		return exponent == (chclt as? CHCLT_Pure)?.exponent ?? 1 && super.isEqual(to:chclt)
+	}
 }
 
 //	MARK: -
@@ -1251,10 +1279,7 @@ public class CHCLT_sRGB: CHCLT {
 		return CHCLT_sRGB.transfer(value)
 	}
 	
-	public static func ratioG18(_ u:Linear.Vector3, _ v:Linear.Vector3, offset:Linear = 0.05) -> Linear {
-		let u = CHCLT_sRGB.standard.luminance(u)
-		let v = CHCLT_sRGB.standard.luminance(v)
-		
+	public static func ratioG18(_ u:Linear, _ v:Linear, offset:Linear = 0.05) -> Linear {
 		return max(u + offset, v + offset) / min(u + offset, v + offset)
 	}
 	

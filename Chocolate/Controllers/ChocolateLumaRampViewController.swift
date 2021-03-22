@@ -69,7 +69,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 		)
 	}
 	
-	func applyColorStops(_ colors:[CHCLT.LinearRGB]) {
+	func applyColorStops(_ colors:[CHCLT.Color]) {
 		let count = colors.count
 		let current = colorStops.count
 		
@@ -86,7 +86,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 		}
 		
 		for index in 0 ..< count {
-			colorStops[index].color = colors[index].color(chclt:chclt)?.platformColor
+			colorStops[index].color = colors[index].platformColor
 		}
 	}
 	
@@ -104,16 +104,16 @@ class ChocolateLumaRampViewController: BaseViewController {
 			chroma:chroma,
 			luminance:lumaLower, lumaUpper,
 			count:count
-		).map(CHCLT.LinearRGB.init)
+		).map { CHCLT.Color(chclt, linear:$0) }
 		
 		applyColorStops(colors)
-		applyColorToPanel(colors[0].color(chclt:chclt).platformColor)
+		applyColorToPanel(colors[0].platformColor)
 		
 		//let all = colors.flatMap { [CHCLT.LinearRGB.black, $0] }.dropFirst()
 		let all = colors
 		
 		gradient.colorSpace = CHCLT.LinearRGB.colorSpace
-		gradient.colors = all.compactMap { $0.color() }
+		gradient.colors = all.compactMap { $0.color }
 	}
 	
 	@objc

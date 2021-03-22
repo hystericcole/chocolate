@@ -10,9 +10,9 @@ import CoreGraphics
 import Foundation
 
 extension CGColor {
-	static var chocolate = CHCLT_sRGB.standard
+	static var chocolate:CHCLT = CHCLT_sRGB.standard
 	
-	func chocolateColor(chclt:CHCLT? = nil) -> CHCLT.Color? { return CHCLT.Color(chclt ?? colorSpace?.chclt ?? CGColor.chocolate, self) }
+	func chocolateColor(chclt:CHCLT? = nil) -> CHCLT.Color? { return CHCLT.Color(chclt ?? colorSpace?.chclt ?? CGColor.chocolate, self, useSpaceFromColorWhenAvailable:chclt == nil) }
 	
 	func chocolateTransform(_ transform:CHCLT.Transform, chclt:CHCLT? = nil) -> CGColor? {
 		chocolateColor(chclt:chclt)?.transform(transform).color

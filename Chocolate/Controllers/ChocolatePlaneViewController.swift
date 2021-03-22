@@ -115,7 +115,7 @@ class ChocolatePlaneViewController: BaseViewController {
 		
 		if mode.model == .chclt {
 			linearColor = mode.linearColor(chclt:chclt, coordinates:coordinates)
-			platformColor = linearColor.color(chclt:chclt).platformColor
+			platformColor = CHCLT.Color(chclt, linearColor).platformColor
 			borderColor = linearColor.contrasting(chclt, value:borderContrasting).color()
 		} else {
 			platformColor = mode.platformColor(chclt:chclt, coordinates:coordinates)

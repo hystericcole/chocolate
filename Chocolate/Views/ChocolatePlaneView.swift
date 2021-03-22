@@ -29,8 +29,8 @@ class ChocolatePlaneLayer: CALayer {
 		}
 	}
 	
-	var chclt:CHCLT = CHCLT.default
-	var scalar:CHCLT.Scalar = 0.5 { didSet { setNeedsDisplay() } }
+	var chclt:CHCLT = CHCLT.default { didSet { if chclt !== oldValue { setNeedsDisplay() } } }
+	var scalar:CHCLT.Scalar = 0.5 { didSet { if scalar != oldValue { setNeedsDisplay() } } }
 	var mode = Mode.standard { didSet { setNeedsDisplay() } }
 	
 	override func draw(in ctx: CGContext) {

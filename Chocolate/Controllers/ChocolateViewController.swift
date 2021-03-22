@@ -18,8 +18,8 @@ class ChocolateViewController: BaseViewController {
 		static let sampleCount = 3
 		
 		var chocolate:CHCLT = ColorSpace.default.chocolate
-		var primary = DisplayRGB(0.2, 0.4, 0.6)
-		var foregrounds:[DisplayRGB] = []
+		var primary = CHCLT.Color(ColorSpace.default.chocolate, red:0.2, green:0.4, blue:0.6, alpha:1.0)
+		var foregrounds:[CHCLT.Color] = []
 	}
 	
 	enum Input: Int {
@@ -130,45 +130,39 @@ class ChocolateViewController: BaseViewController {
 		}
 	}
 	
-	func generateForegrounds(primary:DisplayRGB, contrast:Double, chroma:Double, count:Int) -> [DisplayRGB] {
+	func generateForegrounds(primary:CHCLT.Color, contrast:Double, chroma:Double, count:Int) -> [CHCLT.Color] {
 		let limit = Double(count - 1)
-		let chocolate = model.chocolate
 		
 		return (0 ..< count).map { index in
 			let n = Double(index) / limit
 			let s = 1 - n * (1 - chroma)
 			let c = 1 - n * (1 - contrast)
 			
-			return primary.linear(chocolate)
-				.scaleContrast(chocolate, by:c)
-				.scaleChroma(chocolate, by:s)
-				//.normalized(chocolate)
-				.display(chocolate)
+			return primary.scaleContrast(c).scaleChroma(s)
 		}
 	}
 	
-	func applyColorToCircle(_ color:DisplayRGB) {
+	func applyColorToCircle(_ color:CHCLT.Color) {
 		let hues:[CHCLT.LinearRGB] = [.red, .orange, .yellow, .chartreuse, .green, .spring, .cyan, .azure, .blue, .violet, .magenta, .rose]
 		let chocolate = model.chocolate
-		let primary = color.linear(chocolate)
-		let contrast = primary.contrast(chocolate)
+		let primary = color
+		let contrast = primary.contrast
 		
-		colorCircleCenter.color = primary.color()?.platformColor
-		colorCircleBackground.color = primary.opposing(chocolate, value:1).color()?.platformColor
+		colorCircleCenter.color = primary.platformColor
+		colorCircleBackground.color = primary.opposing(1).platformColor
 		
 		for index in colorCircles.indices {
 			colorCircles[index].color = hues[index]
-				.matchLuminance(chocolate, to:primary, by:0.625 - 0.125 * contrast)
-				.matchChroma(chocolate, to:primary, by:0.75 - 0.5 * contrast)
-				.huePushed(chocolate, from:primary, minimumShift:0.05)
+				.matchLuminance(chocolate, to:primary.linearRGB, by:0.625 - 0.125 * contrast)
+				.matchChroma(chocolate, to:primary.linearRGB, by:0.75 - 0.5 * contrast)
+				.huePushed(chocolate, from:primary.linearRGB, minimumShift:0.05)
 				.color()?.platformColor
 		}
 	}
 	
-	func applyColor(_ color:DisplayRGB) {
-		colorBox.color = color.cg?.platformColor
+	func applyColor(_ color:CHCLT.Color) {
+		colorBox.color = color.platformColor
 		
-		let chocolate = model.chocolate
 		let formatter = NumberFormatter()
 		let contrast = sliderDeriveContrast.value
 		let chroma = sliderDeriveChroma.value
@@ -182,24 +176,24 @@ class ChocolateViewController: BaseViewController {
 		
 		formatter.minimumFractionDigits = 1
 		formatter.maximumFractionDigits = 3
-		stringRed.text = formatter.string(from:color.red as NSNumber)
-		stringGreen.text = formatter.string(from:color.green as NSNumber)
-		stringBlue.text = formatter.string(from:color.blue as NSNumber)
-		stringChroma.text = formatter.string(from:sliderChroma.value as NSNumber)
-		stringLuma.text = (formatter.string(from:sliderLuma.value as NSNumber) ?? "") + "☼"
-		stringPrimaryContrast.text = (formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "") + "◑"
+		stringRed.text = formatter.string(color.red)
+		stringGreen.text = formatter.string(color.green)
+		stringBlue.text = formatter.string(color.blue)
+		stringChroma.text = formatter.string(sliderChroma.value)
+		stringLuma.text = formatter.string(sliderLuma.value) + "☼"
+		stringPrimaryContrast.text = formatter.string(color.contrast) + "◑"
 		stringWeb.text = color.web()
 		
-		stringDeriveContrast.text = formatter.string(from:sliderDeriveContrast.value as NSNumber)
-		stringDeriveChroma.text = formatter.string(from:sliderDeriveChroma.value as NSNumber)
+		stringDeriveContrast.text = formatter.string(sliderDeriveContrast.value)
+		stringDeriveChroma.text = formatter.string(sliderDeriveChroma.value)
 		
 		formatter.maximumFractionDigits = 1
-		stringHue.text = (formatter.string(from:sliderHue.value * 360.0 as NSNumber) ?? "") + "°"
+		stringHue.text = formatter.string(sliderHue.value * 360.0) + "°"
 		
 		foregrounds.content = Layout.Overlay(
 			Viewable.Gradient(colors:[.black, .white]),
 			Layout.Horizontal(
-				targets:model.foregrounds.map { Viewable.Color(color:$0.color()?.platformColor).aspect(ratio:2) },
+				targets:model.foregrounds.map { Viewable.Color(color:$0.platformColor).aspect(ratio:2) },
 				spacing:4,
 				alignment:.fill,
 				position:.uniform,
@@ -210,7 +204,7 @@ class ChocolateViewController: BaseViewController {
 		applyColorToCircle(color)
 		applyColorToPanel()
 		
-		sampleScroll.view?.interfaceStyle = color.linear(chocolate).isDark(chocolate) ? .light : .dark
+		sampleScroll.view?.interfaceStyle = color.isDark ? .light : .dark
 		group.view?.invalidateLayout()
 	}
 	
@@ -232,7 +226,7 @@ class ChocolateViewController: BaseViewController {
 		guard !isAccessingColorPanel, let color = panel.color.chocolateColor(chclt:model.chocolate) else { return }
 		
 		isAccessingColorPanel = true
-		model.primary = color.normalize().displayRGB
+		model.primary = color.normalize()
 		applyColorInput(.unknown, value:0)
 		isAccessingColorPanel = false
 	}
@@ -241,7 +235,7 @@ class ChocolateViewController: BaseViewController {
 		guard !isAccessingColorPanel else { return }
 		
 		isAccessingColorPanel = true
-		PlatformColorPanel.shared.color = model.primary.color().platformColor
+		PlatformColorPanel.shared.color = model.primary.platformColor
 		isAccessingColorPanel = false
 	}
 #else
@@ -263,7 +257,7 @@ class ChocolateViewController: BaseViewController {
 	}
 	
 	func applyColorInput(_ input:Input, value:Double) {
-		let color:DisplayRGB
+		let color:CHCLT.Color
 		let chocolate = model.chocolate
 		let previousColor = model.primary
 		
@@ -271,30 +265,30 @@ class ChocolateViewController: BaseViewController {
 		case .unknown:
 			color = previousColor
 		case .red:
-			color = DisplayRGB(value, previousColor.vector.y, previousColor.vector.z)
+			color = DisplayRGB(value, previousColor.display.y, previousColor.display.z).color(chocolate)
 		case .green:
-			color = DisplayRGB(previousColor.vector.x, value, previousColor.vector.z)
+			color = DisplayRGB(previousColor.display.x, value, previousColor.display.z).color(chocolate)
 		case .blue:
-			color = DisplayRGB(previousColor.vector.x, previousColor.vector.y, value)
+			color = DisplayRGB(previousColor.display.x, previousColor.display.y, value).color(chocolate)
 		case .hue:
 			if stableChroma {
-				color = DisplayRGB(chocolate, hue:value, chroma:sliderChroma.value, luma:sliderLuma.value)
+				color = CHCLT.Color(chocolate, hue:value, chroma:sliderChroma.value, luma:sliderLuma.value)
 			} else {
-				color = previousColor.hueShifted(chocolate, by:value - previousColor.vectorHue(chocolate))
+				color = previousColor.applyHue(value)
 			}
 		case .chroma:
 			if previousInput != .chroma { stableChroma = !stableChroma }
 			
-			if previousColor.chroma(chocolate) > 0 {
-				color = previousColor.applyChroma(chocolate, value:value)
+			if previousColor.chroma > 0 {
+				color = previousColor.applyChroma(value)
 			} else {
-				color = DisplayRGB(chocolate, hue:sliderHue.value, chroma:value, luma:sliderLuma.value)
+				color = CHCLT.Color(chocolate, hue:sliderHue.value, chroma:value, luma:sliderLuma.value)
 			}
 		case .luma:
 			if stableChroma {
-				color = DisplayRGB(chocolate, hue:sliderHue.value, chroma:sliderChroma.value, luma:value)
+				color = CHCLT.Color(chocolate, hue:sliderHue.value, chroma:sliderChroma.value, luma:value)
 			} else {
-				color = previousColor.applyLuma(chocolate, value:value)
+				color = previousColor.applyLuma(value)
 			}
 		}
 		
@@ -305,12 +299,12 @@ class ChocolateViewController: BaseViewController {
 		}
 		
 		if input != .hue && input != .chroma && input != .luma {
-			sliderHue.value = color.vectorHue(chocolate)
-			sliderChroma.value = color.chroma(chocolate)
-			sliderLuma.value = color.luma(chocolate)
+			sliderHue.value = color.hue
+			sliderChroma.value = color.chroma
+			sliderLuma.value = color.luma
 		} else if input != .chroma && !stableChroma {
-			sliderHue.value = color.vectorHue(chocolate)
-			sliderChroma.value = color.chroma(chocolate)
+			sliderHue.value = color.hue
+			sliderChroma.value = color.chroma
 		}
 		
 		previousInput = input
@@ -450,11 +444,10 @@ extension ChocolateViewController {
 		let stringContrast = Style.small.label("")
 		let stringChroma = Style.small.label("")
 		
-		var color:DisplayRGB {
+		var color:CHCLT.Color {
 			return model.primary
-				.contrasting(model.chocolate, value:sliderContrast.value)
-				//.applyContrast(model.chocolate, value:model.primary.contrast(model.chocolate) - sliderContrast.value - 1)
-				.applyChroma(model.chocolate, value:sliderChroma.value)
+				.contrasting(sliderContrast.value)
+				.applyChroma(sliderChroma.value)
 		}
 		
 		init(_ model:ChocolateViewController.Model) {
@@ -472,7 +465,7 @@ extension ChocolateViewController {
 		
 		@objc
 		func applyColor() {
-			background.color = color.color()?.platformColor
+			background.color = color.platformColor
 			
 			applyForegrounds()
 		}
@@ -495,7 +488,7 @@ extension ChocolateViewController {
 			}
 			
 			let formatter = NumberFormatter(fractionDigits:1 ... 3)
-			let legible = model.primary.applyContrast(model.chocolate, value:1).color()?.platformColor
+			let legible = model.primary.applyContrast(1).platformColor
 			stringContrast.text = formatter.string(from:sliderContrast.value as NSNumber)
 			stringContrast.textColor = legible
 			stringChroma.text = formatter.string(from:sliderChroma.value as NSNumber)
@@ -505,21 +498,18 @@ extension ChocolateViewController {
 		func applyForegrounds() {
 			let color = self.color
 			let sRGB = CHCLT_sRGB.g18
-			let chocolate = model.chocolate
+			let bl = color.convert(sRGB)
 			let formatter = NumberFormatter(fractionDigits:2 ... 2)
-			let bc = formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "?"
-			let bl = color.linear(chocolate).luminance(sRGB)
+			let bc = formatter.string(color.contrast)
 			
 			applyForegrounds(model.foregrounds.enumerated().map { order, color in
-				let fc = formatter.string(from:color.contrast(chocolate) as NSNumber) ?? "?"
-				let fl = color.linear(chocolate).luminance(sRGB)
-				let g18n = max(fl, bl) + 0.05
-				let g18d = min(fl, bl) + 0.05
-				let g18 = g18n / g18d
-				let contrast = formatter.string(from:g18 as NSNumber) ?? "?"
+				let fc = formatter.string(color.contrast)
+				let fl = color.convert(sRGB)
+				let g18 = CHCLT_sRGB.ratioG18(bl.luminance, fl.luminance)
+				let contrast = formatter.string(g18)
 				let text = DisplayStrings.Chocolate.example(foreground:order + 1, fc:fc, background:index + 1, bc:bc, contrast:contrast)
 				
-				return (text, color.color()?.platformColor)
+				return (text, color.platformColor)
 			})
 		}
 		
