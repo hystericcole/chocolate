@@ -28,10 +28,11 @@ extension CHCLT {
 		public var luma:CHCLT.Scalar { return chclt.transfer(linear.w) }
 		public var luminance:CHCLT.Scalar { return linear.w }
 		public var isDark:Bool { return linear.w < chclt.contrast.mediumLuminance }
+		public var isNormal:Bool { return linear.min() >= 0.0 && linear.max() <= 1.0 }
 		public var contrast:CHCLT.Scalar { return chclt.contrast(luminance:linear.w) }
 		public var rgb:CHCLT.Vector3 { return display.xyz }
 		public var hcl:CHCLT.Vector3 { return CHCLT.Scalar.vector3(hue, chroma, luma) }
-		public var hsb:CHCLT.Vector3 { let (h, s, b) = ColorModel.hsb_from_rgb(r:red, g:green, b:blue); return CHCLT.Scalar.vector3(h, s, b) }
+		public var hsb:CHCLT.Vector3 { return ColorModel.hsb_from_rgb(r:red, g:green, b:blue) }
 		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
 		public var description:String { return rgba() }
 		
@@ -94,7 +95,7 @@ extension CHCLT {
 		public func web(allowFormat:Int = 0) -> String { return displayRGB.web(allowFormat:allowFormat) }
 		public func css(withAlpha:Int = 0) -> String { return displayRGB.css(withAlpha:withAlpha) }
 		public func chcl(withAlpha:Int = 0, formatter:NumberFormatter = NumberFormatter(fractionDigits:1 ... 1)) -> [String] {
-			let symbol = linear.w < chclt.contrast.mediumLuminance ? "◐" : "◑"
+			let symbol = isDark ? "◐" : "◑"
 			
 			var result = [
 				formatter.string(hue * 360.0) + "°",
@@ -151,7 +152,7 @@ public struct DisplayRGB {
 	}
 	
 	public init(hexagonal hue:Scalar, saturation:Scalar, brightness:Scalar, alpha:Scalar = 1) {
-		vector = Scalar.vector4(DisplayRGB.hexagonal(hue:hue, saturation:saturation, brightness:brightness), alpha)
+		vector = Scalar.vector4(ColorModel.rgb_from_hsb(h:hue, s:saturation, b:brightness), alpha)
 	}
 	
 	public func color(_ chclt:CHCLT) -> CHCLT.Color {
@@ -222,26 +223,10 @@ public struct DisplayRGB {
 	
 	//	MARK: Hexagonal
 	
-	public static func hexagonal(hue:Scalar, saturation:Scalar, brightness:Scalar) -> Scalar.Vector3 {
-		let hue = saturation < 0 ? hue + 0.5 : hue
-		let saturation = saturation.magnitude
-		
-		guard brightness > 0 && saturation > 0 else { return Scalar.vector3(brightness, brightness, brightness) }
-		
-		let hue1:Scalar.Vector3 = Scalar.vector3(hue, hue - 1.0/3.0, hue - 2.0/3.0)
-		let hue2:Scalar.Vector3 = hue1 - hue1.rounded(.down) - 0.5
-		let hue3:Scalar.Vector3 = simd_abs(hue2) * 6.0 - 1.0
-		let hue4:Scalar.Vector3 = simd_clamp(hue3, Scalar.Vector3.zero, Scalar.Vector3.one)
-		let c:Scalar = saturation * brightness
-		let m:Scalar = brightness - c
-		
-		return hue4 * c + m
-	}
-	
 	public func hsb() -> Scalar.Vector4 {
-		let (h, s, b) = ColorModel.hsb_from_rgb(r:vector.x, g:vector.y, b:vector.z)
+		let hsb = ColorModel.hsb_from_rgb(r:vector.x, g:vector.y, b:vector.z)
 		
-		return Scalar.vector4(h, s, b, vector.w)
+		return Scalar.vector4(hsb, vector.w)
 	}
 }
 
@@ -381,6 +366,29 @@ extension CHCLT.Color {
 	
 	public var linearColor:CGColor! {
 		return linearRGB.color(alpha:CGFloat(alpha))
+	}
+	
+	public func convert(colorSpace:CGColorSpace?) -> CGColor! {
+		if
+			let space = colorSpace,
+			let chclt = space.chclt,
+			let color = CGColor.with(colorSpace:space, componentsVector4:convert(chclt).display)
+		{
+			return color
+		}
+		
+		guard let color = color else { return nil }
+		
+		if
+			#available(macOS 10.11, iOS 9.0, *),
+			let space = colorSpace,
+			space != color.colorSpace,
+			let converted = color.converted(to:space, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil)
+		{
+			return converted
+		} else {
+			return color
+		}
 	}
 }
 

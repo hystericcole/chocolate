@@ -16,6 +16,10 @@ class ChocolatePlaneLayer: CALayer {
 		var model:ColorModel
 		var axis:Int
 		
+		func color(chclt:CHCLT, coordinates:CHCLT.Scalar.Vector3) -> CHCLT.Color {
+			return model.color(axis:axis, coordinates:coordinates, chclt:chclt)
+		}
+		
 		func linearColor(chclt:CHCLT, coordinates:CHCLT.Scalar.Vector3) -> CHCLT.LinearRGB {
 			return model.linearColor(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
