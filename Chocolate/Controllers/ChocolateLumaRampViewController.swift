@@ -12,6 +12,7 @@ import QuartzCore
 class ChocolateLumaRampViewController: BaseViewController {
 	enum Input: Int { case unknown, hueStart, hueShift, chroma, lumaLower, lumaUpper }
 	
+	var chclt = CHCLT.default
 	let group = Viewable.Group()
 	let sliderHueStart = Viewable.Slider(tag:Input.hueStart.rawValue, value:0.5, action:#selector(colorSliderChanged))
 	let sliderHueRotations = Viewable.Slider(tag:Input.hueShift.rawValue, value:1, range:-4 ... 4, action:#selector(colorSliderChanged))
@@ -85,12 +86,11 @@ class ChocolateLumaRampViewController: BaseViewController {
 		}
 		
 		for index in 0 ..< count {
-			colorStops[index].color = colors[index].color()?.platformColor
+			colorStops[index].color = colors[index].color(chclt:chclt)?.platformColor
 		}
 	}
 	
 	func applyColorInput(_ input:Input, value:Double) {
-		let chocolate = CHCLT.default
 		let colorCount = ceil(sliderCount.value)
 		let count = Int(colorCount)
 		let rotations = sliderHueRotations.value
@@ -98,7 +98,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 		let lumaLower = sliderLumaLower.value
 		let lumaUpper = sliderLumaUpper.value
 		
-		let colors = chocolate.luminanceRamp(
+		let colors = chclt.luminanceRamp(
 			hueStart:sliderHueStart.value,
 			hueShift:count > 1 ? rotations / (colorCount - 1) : rotations,
 			chroma:chroma,
@@ -107,6 +107,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 		).map(CHCLT.LinearRGB.init)
 		
 		applyColorStops(colors)
+		applyColorToPanel(colors[0].color(chclt:chclt).platformColor)
 		
 		//let all = colors.flatMap { [CHCLT.LinearRGB.black, $0] }.dropFirst()
 		let all = colors
@@ -121,6 +122,34 @@ class ChocolateLumaRampViewController: BaseViewController {
 		
 		applyColorInput(input, value:slider.doubleValue)
 	}
+	
+#if os(macOS)
+	private var isAccessingColorPanel:Bool = false
+	
+	@objc
+	func changeColor(_ panel:PlatformColorPanel) {
+		guard !isAccessingColorPanel, let color = panel.color.chocolateColor() else { return }
+		
+		chclt = color.chclt
+		isAccessingColorPanel = true
+		sliderHueStart.value = color.hue
+		sliderChroma.value = color.chroma
+		sliderLumaLower.value = color.luma
+		sliderLumaUpper.value = 1 - color.luma
+		applyColorInput(.unknown, value:0.0)
+		isAccessingColorPanel = false
+	}
+	
+	func applyColorToPanel(_ color:PlatformColor) {
+		guard !isAccessingColorPanel else { return }
+		
+		isAccessingColorPanel = true
+		PlatformColorPanel.shared.color = color
+		isAccessingColorPanel = false
+	}
+#else
+	func applyColorToPanel(_ color:PlatformColor) {}
+#endif
 	
 	func copyToPasteboard() {
 		let colors = colorStops.compactMap { $0.color?.chocolateColor()?.displayRGB }

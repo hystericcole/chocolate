@@ -1181,7 +1181,7 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
-	public static var `default` = CHCLT_sRGB.standard
+	public static var `default`:CHCLT = CHCLT_sRGB.standard
 }
 
 //	MARK: -
