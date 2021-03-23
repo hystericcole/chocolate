@@ -14,7 +14,7 @@ import Cocoa
 import UIKit
 #endif
 
-class BaseView: CommonView, PlatformSizeChangeView, ViewControllerAttachable {
+class BaseView: CommonView, ViewControllerAttachable {
 #if os(macOS)
 	class var layerClass:CALayer.Type { return CALayer.self }
 	
@@ -47,7 +47,7 @@ class BaseView: CommonView, PlatformSizeChangeView, ViewControllerAttachable {
 #if os(macOS)
 	override func layout() {
 		super.layout()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 	
 	override func makeBackingLayer() -> CALayer {
@@ -56,12 +56,11 @@ class BaseView: CommonView, PlatformSizeChangeView, ViewControllerAttachable {
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 #endif
 	
-	func invalidateLayout() { priorSize = .zero }
-	func sizeChanged() {}
+	func arrangeContents() {}
 }
 
 //	MARK: -

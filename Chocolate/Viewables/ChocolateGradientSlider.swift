@@ -110,7 +110,7 @@ class ChocolateGradientSlider: Viewable.Group {
 		value = fraction
 		
 		if !isTracking {
-			Common.animate(duration:0.25, animations:{ view.sizeChanged() }, completion:nil)
+			Common.animate(duration:0.25, animations:{ view.arrangeContents() }, completion:nil)
 		}
 		
 		PlatformApplication.shared.sendAction(action, to:target, from:view)

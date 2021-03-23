@@ -154,7 +154,7 @@ class ChocolatePlaneViewController: BaseViewController {
 				self.refreshGradient()
 				
 				view.ordered = self.layout()
-				view.sizeChanged()
+				view.arrangeContents()
 			})
 		} else {
 			refreshIndicator(unit)

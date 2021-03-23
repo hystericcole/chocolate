@@ -372,7 +372,7 @@ struct Layout {
 			let width = min(width, self.width ?? Limit.unlimited)
 			let height = min(height, self.height ?? Limit.unlimited)
 			
-			return Limit(width: width < Limit.unlimited ? width : nil, height: height < Limit.unlimited ? height : nil)
+			return Limit(width:width < Limit.unlimited ? width : nil, height:height < Limit.unlimited ? height : nil)
 		}
 	}
 	
@@ -1882,7 +1882,7 @@ struct Layout {
 			var spaceCount = -1
 			
 			if let width = limit.width, width < Limit.unlimited {
-				limit = Layout.Limit(width:width / Native(targets.count), height:limit.height)
+				limit = Layout.Limit(width:approximateLimit(width, count:targets.count), height:limit.height)
 			}
 			
 			switch position {
@@ -1919,13 +1919,13 @@ struct Layout {
 			var spaceCount = -1
 			
 			if let height = limit.height, height < Limit.unlimited {
-				limit = Layout.Limit(width:limit.width, height:height / Native(targets.count))
+				limit = Layout.Limit(width:limit.width, height:approximateLimit(height, count:targets.count))
 			}
 			
 			switch position {
 			case .uniform, .uniformAlign, .uniformWithEnds:
 				for target in targets {
-					let size = target.positionableSize(fitting: limit, context:context)
+					let size = target.positionableSize(fitting:limit, context:context)
 					
 					result.height.increase(size.height)
 					result.width.increase(size.width)
@@ -1935,7 +1935,7 @@ struct Layout {
 				result.height.multiply(Native(targets.count))
 			case .float, .stretch, .distribute, .fraction, .adaptiveFraction:
 				for target in targets {
-					let size = target.positionableSize(fitting: limit, context:context)
+					let size = target.positionableSize(fitting:limit, context:context)
 					
 					result.height.add(size.height)
 					result.width.increase(size.width)

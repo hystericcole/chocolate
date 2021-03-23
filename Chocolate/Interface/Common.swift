@@ -846,22 +846,6 @@ class CommonControl: PlatformControl {
 
 //	MARK: -
 
-protocol PlatformSizeChangeView: PlatformView {
-	var priorSize:CGSize { get set }
-	func sizeChanged()
-}
-
-extension PlatformSizeChangeView {
-	func sizeMayHaveChanged(newSize:CGSize) {
-		guard newSize != priorSize else { return }
-		
-		priorSize = newSize
-		sizeChanged()
-	}
-}
-
-//	MARK: -
-
 enum Common {
 	struct AnimationTiming {
 		let c1, c2:CGPoint

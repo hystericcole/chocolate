@@ -26,7 +26,7 @@ class ChocolateThemeViewController: BaseViewController {
 			return Layout.Overlay(
 				background,
 				Layout.Vertical(targets:foregrounds, spacing:4, alignment:.fill).padding(10)
-			).minimum(width:300, height:60)
+			).minimum(width:200, height:60)
 		}
 		
 		func applyFont(_ font:PlatformFont) {
@@ -54,7 +54,7 @@ class ChocolateThemeViewController: BaseViewController {
 					foregrounds[index].style = foregrounds[index].style.color(color)
 					foregrounds[index].text = text
 				} else {
-					foregrounds.append(Style.Label(text:text, style:Style.example.centered.color(color)))
+					foregrounds.append(Style.Label(text:text, style:Style.monospace.centered.color(color)))
 				}
 			}
 			
@@ -66,7 +66,7 @@ class ChocolateThemeViewController: BaseViewController {
 	let deriveCount = 5
 	
 	let group = Viewable.Group()
-	let sampleScroll = Viewable.Scroll()
+	let sampleScroll = Viewable.Scroll(minimum:CGSize(square:240), maximum:CGSize(square:240))
 	var samples:[Sample] = []
 	
 	let themeView = ChocolateThemeViewable()
@@ -155,6 +155,8 @@ class ChocolateThemeViewController: BaseViewController {
 		for sample in samples {
 			sample.applyFont(changed)
 		}
+		
+		sampleScroll.view?.scheduleLayout()
 	}
 	
 	@objc
@@ -216,7 +218,7 @@ class ChocolateThemeViewController: BaseViewController {
 			rowTemplate:Layout.Horizontal(alignment:.fill, position:.uniform),
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.horizontal,
-			mode:.containerRatio(1.0)
+			mode:.ratio(3.0)
 		)
 	}
 	
@@ -283,11 +285,11 @@ class ChocolateThemeViewController: BaseViewController {
 			alignment:.fill,
 			position:.stretch,
 			Layout.EmptySpace(width:1, height:1),
-			sliderHue,
 			sliderDeriveContrast,
 			sliderDeriveChroma,
 			sliderContrasting,
-			sliderChroma
+			sliderChroma,
+			sliderHue
 		)
 		
 		let picker = Layout.Vertical(
@@ -295,7 +297,9 @@ class ChocolateThemeViewController: BaseViewController {
 			alignment:.fill,
 			position:.stretch,
 			controls.minimum(width:200).padding(horizontal:20, vertical:0),
-			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0).padding(36)
+			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0)
+				.minimum(width:120, height:120)
+				.padding(36)
 		)
 		
 		sampleScroll.content = sampleLayout(input, count:4)
@@ -306,7 +310,7 @@ class ChocolateThemeViewController: BaseViewController {
 			axis:.vertical,
 			mode:.ratio(0.75),
 			picker.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200),
-			sampleScroll.ignoringSafeBounds().minimum(width:120, height:120)
+			sampleScroll.ignoringSafeBounds()
 		)
 	}
 	
@@ -314,7 +318,7 @@ class ChocolateThemeViewController: BaseViewController {
 		if animated, let view = group.view {
 			Common.animate(duration:0.25, animations:{
 				view.ordered = self.layout()
-				view.sizeChanged()
+				view.arrangeContents()
 			})
 		} else {
 			group.view?.ordered = layout()

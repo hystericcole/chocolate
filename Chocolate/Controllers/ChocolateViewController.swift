@@ -205,7 +205,7 @@ class ChocolateViewController: BaseViewController {
 		applyColorToPanel()
 		
 		sampleScroll.view?.interfaceStyle = color.isDark ? .light : .dark
-		group.view?.invalidateLayout()
+		group.view?.scheduleLayout()
 	}
 	
 #if os(macOS)

@@ -1211,9 +1211,8 @@ class ViewableGradientView: PlatformTaggableView {
 
 //	MARK: -
 
-class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewControllerAttachable {
-	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
+class ViewableGroupView: PlatformTaggableView, ViewControllerAttachable {
+	var ordered:Positionable = Layout.empty { didSet { scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 #if os(macOS)
@@ -1237,22 +1236,16 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 #if os(macOS)
 	override func layout() {
 		super.layout()
-		sizeMayHaveChanged(newSize:bounds.size)
-	}
-	
-	override func viewDidMoveToWindow() {
-		super.viewDidMoveToWindow()
-		invalidateLayout()
+		arrangeContents()
 	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 #endif
 	
-	func invalidateLayout() { priorSize = .zero }
-	func sizeChanged() { positionableContext.performLayout(content) }
+	func arrangeContents() { positionableContext.performLayout(content) }
 	
 	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
 		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
@@ -1261,9 +1254,8 @@ class ViewableGroupView: PlatformTaggableView, PlatformSizeChangeView, ViewContr
 
 //	MARK: -
 
-class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
-	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
+class ViewableButton: PlatformEmptyButton {
+	var ordered:Positionable = Layout.empty { didSet { scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	override var intrinsicContentSize:CGSize {
@@ -1278,17 +1270,16 @@ class ViewableButton: PlatformEmptyButton, PlatformSizeChangeView {
 #if os(macOS)
 	override func layout() {
 		super.layout()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 #endif
 	
-	func invalidateLayout() { priorSize = .zero }
-	func sizeChanged() { positionableContext.performLayout(content) }
+	func arrangeContents() { positionableContext.performLayout(content) }
 	
 	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
 		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
@@ -1342,7 +1333,7 @@ class ViewableScrollingContainerView: PlatformView, PlatformScrollingDelegate {
 
 //	MARK: -
 
-class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, ViewControllerAttachable {
+class ViewableScrollingView: PlatformScrollingView, ViewControllerAttachable {
 #if os(macOS)
 	var _tag = 0
 	override var tag:Int { get { return _tag } set { _tag = newValue } }
@@ -1372,8 +1363,7 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 	let containerView = ViewableScrollingContainerView()
 #endif
 	
-	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
+	var ordered:Positionable = Layout.empty { didSet { scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 	func attachViewController(_ controller:PlatformViewController) {
@@ -1415,22 +1405,15 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 		containerView.orderPositionables([content], environment:positionableEnvironment, options:.set)
 	}
 	
-	func invalidateLayout() { priorSize = .zero }
-	
 #if os(macOS)
 	override func layout() {
 		super.layout()
-		sizeMayHaveChanged(newSize:bounds.size)
-	}
-	
-	override func viewDidMoveToWindow() {
-		super.viewDidMoveToWindow()
-		invalidateLayout()
+		arrangeContents()
 	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 		alignContent()
 	}
 	
@@ -1482,7 +1465,7 @@ class ViewableScrollingView: PlatformScrollingView, PlatformSizeChangeView, View
 #endif
 	}
 	
-	func sizeChanged() {
+	func arrangeContents() {
 #if os(macOS)
 		let limit = bounds.size
 		let inset = PlatformScrollingView.frameSize(forContentSize:.zero, horizontalScrollerClass:PlatformScroller.self, verticalScrollerClass:PlatformScroller.self, borderType:.noBorder, controlSize:verticalScroller?.controlSize ?? .regular, scrollerStyle:scrollerStyle)
@@ -1561,10 +1544,6 @@ class ViewableTableView: ViewableScrollingView {
 		return tableView
 	}
 	
-	override func sizeChanged() {
-		
-	}
-	
 	func reloadData() {
 		tableView.reloadData()
 	}
@@ -1615,11 +1594,10 @@ class ViewableTableView: PlatformTableView {
 
 //	MARK: -
 
-class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
+class ViewableTableCell: PlatformTableViewCell {
 	class var reuseIdentifier:String { return String(describing:self) }
 	
-	var priorSize:CGSize = .zero
-	var ordered:Positionable = Layout.empty { didSet { invalidateLayout(); scheduleLayout() } }
+	var ordered:Positionable = Layout.empty { didSet { scheduleLayout() } }
 	var content:Positionable { get { ordered } set { orderContent(newValue) } }
 	
 #if os(macOS)
@@ -1665,17 +1643,16 @@ class ViewableTableCell: PlatformTableViewCell, PlatformSizeChangeView {
 #if os(macOS)
 	override func layout() {
 		super.layout()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 #else
 	override func layoutSubviews() {
 		super.layoutSubviews()
-		sizeMayHaveChanged(newSize:bounds.size)
+		arrangeContents()
 	}
 #endif
 	
-	func invalidateLayout() { priorSize = .zero }
-	func sizeChanged() { positionableContext.performLayout(content) }
+	func arrangeContents() { positionableContext.performLayout(content) }
 	
 	override func positionableSizeFitting(_ size:CGSize, context:Data) -> Data {
 		return content.positionableSize(fitting:Layout.Limit(size:size), context:Layout.Context(data:context)).data
