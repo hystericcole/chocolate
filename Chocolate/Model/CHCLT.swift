@@ -144,41 +144,46 @@ extension CHCLT: Equatable, Hashable {
 //	MARK: -
 
 extension CHCLT {
-	/// Parameters use to compute contrast
+	/// Parameters used to compute contrast.
+	///
+	/// Contrast in CHCLT is the distance from medium luma.
+	/// Colors with luma below medium are dark and have better contrast against white than black.
+	/// Colors with luma above medium are light and have better contrast against black than white.
+	/// The typical value for medium luma is 0.5, the perceptual midpoint of luma.
+	/// The typical value for medium luminance is the linear value computed from mudium luma.
+	///
+	/// # Hue
+	/// Complementary colors, colors with oppisite hue, are described as having high contrast.
+	/// Contrast in CHCLT refers to luminance based contrast, not hue based contrast.
+	///
+	/// # Ratio
+	/// Some models of contrast, such as WCAG G18 and section508, use an offset luminance ratio to measure the contrast between colors.
+	///
+	/// Ratios are ambiguous and perceptually inconsistent.
+	///
+	/// The ratio (r) and offset (1/d) are related to the medium luminance (m) by the following equations:
+	/// ```
+	/// m = (√(d+1)-1) / d = 1/(r + 1)
+	/// d = (1 - 2m) / m² = r² - 1
+	/// r = √(d+1) = 1/m - 1
+	/// ```
+	///
+	/// # WCAG G18 and section508
+	/// The WCAG G18 and section508 standards for contrast specify a fixed offset of 1/20 and ratios of 3, 4.5, or 7.
+	/// To conforman with a ratio based standard, use a medium luma derived from the medium luminance for the ratio or offset being applied.
+	///
+	/// - offset 0.05 gives 1/(1+√21) ≅ 0.179 as medium luminance.
+	/// - ratio 3 gives a 1/10 ... 3/10 range for medium luminance.  Use 1/4 (0.25) as the medium luminance.
+	/// - ratio 4.5 gives a 21/120 ... 22/120 range for medium luminance.  Use 2/11 (0.182) as the medium luminance.
+	/// - ratio 7 gives a 3/10 ... 1/10 range for medium luminance, excluding values in 1/10 ... 3/10.  Use 1/8 (0.125) as the medium luminance.
+	///
+	/// When using a medium luma other than 0.5 there will be a range of colors that satisfy the chosen ratio but would have better perceptual contrast against opposite colors.
+	/// For sRGB and a 4.5 ratio this will be colors with luminance in the range 0.182 to 0.214.
 	public struct Contrast: Equatable, Hashable {
-		/// The luminance value separating light and dark colors.
-		/// Contrast in CHCLT is a measure of distance from medium luma.  Medium luminance is usually derived from medium luma.
-		/// 
-		/// Colors with luminance below this value are dark and have better contrast against white than black.
-		/// Colors with luminance above this value are light and have better contrast against black than white.
-		/// All the contrast methods of CHCLT are primarily controlled by this value.
-		///
-		/// The typical value for medium luminance is `linear(0.5)` where linear is the inverse transfer function.
-		/// 
-		/// # Ratio
-		/// Some models of contrast, such as WCAG G18 and section508, use a ratio of luminances to determine the contrast between colors.
-		/// The ratio (r) and offset (1/d) are related to the medium luminance (m) by the following equations:
-		/// ```
-		/// m = (√(d+1)-1) / d = 1/(r + 1)
-		/// d = (1 - 2m) / m² = r² - 1
-		/// r = √(d+1) = 1/m - 1
-		/// ```
-		/// CHCLT uses an invariant medium luminance instead of a ratio to determine contrast.
-		/// Using medium luminance is perceptually consistent and unambiguous.
-		///
-		/// # WCAG G18 and section508
-		/// The WCAG G18 and section508 standards for contrast specify a fixed offset of 1/20 and ratios of 3, 4.5, or 7.
-		/// With a linear power, an equivalent ratio and offset can be computed from the medium luminance.
-		/// 
-		/// - offset 0.5 gives 1/(1+√21) = 0.179 as medium luminance.
-		/// - ratio 3 gives a 1/10 ... 3/10 range for medium luminance.  Use 1/4 (0.25) as the medium luminance.
-		/// - ratio 4.5 gives a 21/120 ... 22/120 range for medium luminance.  Use 2/11 (0.182) as the medium luminance.
-		/// - ratio 7 gives a 3/10 ... 1/10 range for medium luminance, excluding values in 1/10 ... 3/10.  Use 1/8 (0.125) as the medium luminance.
-		///
-		/// There will usually be a small range of luminances below the medium luminance where CHCLT will choose a light contrasting color and G18 or section508 would suggest a dark contrasting color.
-		/// This will provide a visually higher contrast and fail the section508 and G18 standards.
-		/// For sRGB and a 4.5 ratio this range will be from 0.182 to 0.214.
-		public let mediumLuminance:Scalar
+		/// The luminance value separating light and dark colors.  Must equal `linear(mediumLuma)`
+		public let mediumLuminance:Linear
+		/// The luma value separating light and dark colors.  Must equal `transfer(mediumLuminance)`
+		public let mediumLuma:Scalar
 		
 		public var linearOffset:Scalar {
 			return mediumLuminance * mediumLuminance / (1 - 2 * mediumLuminance)
@@ -188,54 +193,97 @@ extension CHCLT {
 			return 1.0 / mediumLuminance - 1.0
 		}
 		
-		public init(_ mediumLuminance:Scalar) {
+		/// Create a Contrast
+		/// # Luma
+		/// To create a luma based contrast, choose the value for medium luma (typically 0.5) then compute the medium luminance.
+		/// ```
+		/// mediumLuminance:linear(mediumLuma)
+		/// ```
+		/// # Luminance
+		/// To create a luminance based contrast, choose the value for medium luminance (e.g. 2/11) then compute the medium luma.
+		/// ```
+		/// mediumLuma:transfer(mediumLuminance)
+		/// ```
+		///
+		/// - Parameters:
+		///   - mediumLuminance: The medium luminance, typically computed as `linear(0.5)`
+		///   - mediumLuma: The medium luma, typically 0.5
+		public init(_ mediumLuminance:Linear, mediumLuma:Scalar = 0.5) {
 			self.mediumLuminance = mediumLuminance
+			self.mediumLuma = mediumLuma
 		}
 		
+		/// True if the given luminance contrast better against white than black.
 		public func luminanceIsDark(_ luminance:Linear) -> Bool {
 			return luminance < mediumLuminance
 		}
 		
+		/// True if the given luma contrast better against white than black.
 		public func lumaIsDark(_ luma:Scalar) -> Bool {
-			return luma < 0.5
+			return luma < mediumLuma
 		}
 		
+		/// Contrast is a measure of the distance from medium luma.
+		/// Both black and white have a contrast of one, and medium colors have a contrast of zero.
+		/// - Parameters:
+		///   - luma: Luma value of a color, in 0 ... 1
+		/// - Returns: The contrast computed from luma
 		public func lumaContrast(_ luma:Scalar) -> Scalar {
-			let c = luma * 2 - 1
-			
-			return c.magnitude
+			return luma < mediumLuma ? (mediumLuma - luma) / mediumLuma : (luma - mediumLuma) / (1 - mediumLuma)
 		}
 		
+		/// Compute the luma that should be applied in order to scale the contrast of a color.
+		/// - Parameters:
+		///   - luma: Luma value of a color, in 0 ... 1
+		///   - scalar: Amount to scale contrast, in -1 ... 1
+		/// - Returns: The luma value for the scaled contrast.
 		public func lumaScaleContrast(_ luma:Scalar, by scalar:Scalar) -> Scalar {
-			let c = luma * 2 - 1
-			let w = 0.5 + copysign(0.5, luma - 0.5) * c.magnitude * scalar
-			
-			return w
+			return lumaApplyContrast(luma, value:lumaContrast(luma) * scalar)
 		}
 		
+		/// Compute the luma that should be applied in order to set the contrast of a color.
+		/// - Parameters:
+		///   - luma: Luma value of a color, in 0 ... 1
+		///   - value: Contrast of result, in -1 ... 1
+		/// - Returns: The luma value for the applied contrast.
 		public func lumaApplyContrast(_ luma:Scalar, value:Scalar) -> Scalar {
-			let w = 0.5 + copysign(0.5, luma - 0.5) * value
+			let sign = luma - mediumLuma
+			let one = value * sign < 0 ? 0 : value.magnitude
 			
-			return w
+			return mediumLuma - value.magnitude * mediumLuma + one
 		}
 		
+		/// Compute the luma that should be applied in order to create a contrasting color.
+		///
+		/// - Positive values apply more than the minimum suggested contrast, approaching black or white as value approaches one.
+		/// - Negative values apply less than the minimum suggested contrast, approaching medium luminance as value approaches negative one.
+		/// - Zero applies the minimum suggested contrast.
+		/// - Parameters:
+		///   - luma: Luma value of a color, in 0 ... 1
+		///   - value: Degree of contrast, in -1 ... 1
+		/// - Returns: The luma value for the contrasting color.
 		public func lumaContrasting(_ luma:Scalar, value:Scalar) -> Scalar {
-			let c = luma * 2 - 1
-			let n = (1 - value.magnitude) * (c - copysign(1, c)) - copysign(max(0, value), c)
-			let w = 0.5 - copysign(0.5, luma - 0.5) * n.magnitude
+			let current = lumaContrast(luma)
+			let apply = (1 - value.magnitude) * (current - copysign(1, current)) - copysign(max(0, value), current)
 			
-			return w
+			return lumaApplyContrast(luma, value:apply)
 		}
 		
 		public func lumaMatchContrast(_ v:Scalar, _ u:Scalar, by value:Scalar) -> Scalar {
-			let m = 0.5
+			let m = mediumLuma
 			let n = 1 - value
 			let c = lumaContrast(v) * n + lumaContrast(u) * value
-			let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
+			let s = copysign(1, (v - m) * (u - m))
 			
 			return lumaApplyContrast(v, value:c * s)
 		}
 		
+		/// Compute the contrast ratio between two luminances using the offset equation defined by the G18 and section508 standards.
+		/// - Parameters:
+		///   - u: Luminance computed using the sRGB color space.
+		///   - v: Luminance computed using the sRGB color space.
+		///   - offset: The offset, typically 0.05 for G18.
+		/// - Returns: The contrast ratio.
 		public static func luminanceRatioG18(_ u:Linear, _ v:Linear, offset:Linear = 0.05) -> Linear {
 			let uo = u + offset
 			let vo = v + offset
@@ -692,6 +740,7 @@ extension CHCLT {
 	
 	/// Scale the chroma of the color.
 	/// The color approaches gray as the value approaches zero.
+	/// Negative values generate complementary colors.
 	/// Values greater than one increase vibrancy and may denormalize the color.
 	/// The hue is preserved for positive, inverted for nagative, and lost at zero.
 	/// The luminance is preserved.
@@ -703,6 +752,7 @@ extension CHCLT {
 	
 	/// Adjust the chroma to create a color with the given relative color intensity.
 	/// The color approaches gray as the value approaches zero.
+	/// Negative values generate complementary colors.
 	/// The hue is preserved for positive, inverted for nagative, and lost at zero.
 	/// The luminance is preserved.
 	public func applyChroma(_ linear:Linear.Vector3, luminance v:Linear, apply value:Scalar) -> Linear.Vector3 {
@@ -1306,7 +1356,7 @@ public class CHCLT_Pure: CHCLT {
 public class CHCLT_sRGB: CHCLT {
 	public static let displayP3 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_displayP3_d65)
 	public static let standard = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65)
-	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11))
+	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11, mediumLuma:CHCLT_sRGB.transfer(2 / 11)))
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_sRGB.linear(0.5))
 	
