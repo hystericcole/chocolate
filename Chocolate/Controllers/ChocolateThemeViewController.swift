@@ -343,8 +343,9 @@ class ChocolateThemeLayer: CALayer {
 	
 	override func draw(in ctx: CGContext) {
 		let box = CGRect(origin:.zero, size:bounds.size)
+		let space = view?.screenColorSpace
 		
-		ctx.drawPlaneFromCubeCHCLT(axis:axis, scalar:hue, box:box, chclt:chclt)
+		ctx.drawPlaneFromCubeCHCLT(axis:axis, scalar:hue, box:box, chclt:chclt, drawSpace:space)
 	}
 	
 	override func render(in ctx: CGContext) {

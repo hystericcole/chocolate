@@ -374,8 +374,7 @@ enum ColorModel: Int {
 //	MARK: -
 
 extension CGContext {
-	func drawPlaneFromCubeRGB(axis:Int, scalar:CGFloat.NativeType, box:CGRect) {
-		let drawSpace = colorSpace
+	func drawPlaneFromCubeRGB(axis:Int, scalar:CGFloat.NativeType, box:CGRect, drawSpace:CGColorSpace?) {
 		let overColors:[CGColor]
 		let downColors:[CGColor]
 		let mode:CGBlendMode
@@ -396,6 +395,7 @@ extension CGContext {
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
 		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let drawSpace = drawSpace ?? overColors.first?.colorSpace
 		
 		setRenderingIntent(CGColorRenderingIntent.absoluteColorimetric)
 		
@@ -410,8 +410,7 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeHSB(axis:Int, scalar:CGFloat.NativeType, box:CGRect) {
-		let drawSpace = colorSpace
+	func drawPlaneFromCubeHSB(axis:Int, scalar:CGFloat.NativeType, box:CGRect, drawSpace:CGColorSpace?) {
 		var copyColors:[CGColor]
 		var modeColors:[CGColor]
 		let mode:CGBlendMode
@@ -453,6 +452,7 @@ extension CGContext {
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
 		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let drawSpace = drawSpace ?? copyColors.first?.colorSpace
 		
 		setRenderingIntent(CGColorRenderingIntent.absoluteColorimetric)
 		
@@ -467,8 +467,8 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeXYZ(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
-		let drawSpace = colorSpace
+	func drawPlaneFromCubeXYZ(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
+		let drawSpace = drawSpace ?? chclt.rgbColorSpace()
 		let columns = Int(box.size.width)
 		let rows = min(16, Int(box.size.height))
 		let start = box.origin
@@ -497,8 +497,8 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeLCH(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
-		let drawSpace = colorSpace
+	func drawPlaneFromCubeLCH(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
+		let drawSpace = drawSpace ?? chclt.rgbColorSpace()
 		let columns = Int(box.size.width)
 		let rows = min(32, Int(box.size.height))
 		let start = box.origin
@@ -534,8 +534,8 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
-		let drawSpace = colorSpace
+	func drawPlaneFromCubeCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
+		let drawSpace = drawSpace ?? chclt.rgbColorSpace()
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)
@@ -625,8 +625,8 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeLinearCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT) {
-		let drawSpace = CHCLT.LinearRGB.colorSpace
+	func drawPlaneFromCubeLinearCHCLT(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
+		let drawSpace = drawSpace ?? chclt.rgbColorSpace() ?? CHCLT.LinearRGB.colorSpace
 		let start = box.origin
 		let overEnd = CGPoint(x:box.maxX, y:box.minY)
 		let downEnd = CGPoint(x:box.minX, y:box.maxY)

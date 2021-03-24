@@ -510,6 +510,8 @@ extension PlatformPasteboard {
 
 extension PlatformView {
 	var screenColorSpace:CGColorSpace? {
+		if #available(macOS 10.11.2, iOS 9.3, *), let display = CGColorSpace(name:CGColorSpace.displayP3) { return display }
+		
 		return nil
 	}
 	
@@ -757,6 +759,14 @@ extension PlatformView {
 #else
 		return stableBounds.inset(by:safeAreaInsets)
 #endif
+	}
+}
+
+//	MARK: -
+
+extension CALayer {
+	var view:PlatformView? {
+		return delegate as? PlatformView
 	}
 }
 

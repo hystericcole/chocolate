@@ -283,8 +283,7 @@ extension CHCLT.LinearRGB {
 	public static var colorSpace:CGColorSpace = linearColorSpace()
 	
 	public static func linearColorSpace() -> CGColorSpace! {
-		// extendedLinearDisplayP3 incorrect on iOS
-		//if #available(macOS 10.14.3, iOS 12.3, *), let linear = CGColorSpace(name:CGColorSpace.extendedLinearDisplayP3) { return linear }
+		if #available(macOS 10.14.3, iOS 12.3, *), let linear = CGColorSpace(name:CGColorSpace.extendedLinearDisplayP3) { return linear }
 		if #available(macOS 10.12, iOS 10.0, *), let linear = CGColorSpace(name:CGColorSpace.linearSRGB) { return linear }
 		
 		return CGColorSpace(name:CGColorSpace.genericRGBLinear)!
