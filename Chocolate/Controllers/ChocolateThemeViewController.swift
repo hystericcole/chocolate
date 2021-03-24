@@ -35,19 +35,27 @@ class ChocolateThemeViewController: BaseViewController {
 			}
 		}
 		
+		func sampleText(_ palette:Palette, index:Int, count:Int, formatter:NumberFormatter, reverseContrast:CHCLT.Scalar, reverseLuminance:CHCLT.Linear) -> (String, PlatformColor) {
+			let fraction = Double(index) / Double(count - 1)
+			let linear = palette.foreground(fraction)
+			let name = linear.display(palette.chclt).web()
+			let color = CHCLT.Color(palette.chclt, linear).platformColor
+			let contrast = formatter.string(linear.contrast(palette.chclt) + reverseContrast)
+			let ratio = CHCLT.Contrast.luminanceRatioG18(reverseLuminance, linear.luminance(CHCLT_sRGB.g18))
+			let g18 = formatter.string(ratio)
+			let text = "•\(index)/\(count - 1) \(name) G18 \(g18)◐ \(contrast)◐"
+			
+			return (text, color)
+		}
+		
 		func applyPalette(_ palette:Palette, value:CHCLT.Scalar, count:Int) {
 			let reverse = palette.background(value)
 			let reverseContrast = reverse.contrast(palette.chclt)
+			let reverseLuminance = reverse.luminance(CHCLT_sRGB.g18)
 			let formatter = NumberFormatter(fractionDigits:2 ... 2)
 			
 			for index in 0 ..< count {
-				let fraction = Double(index) / Double(count - 1)
-				let linear = palette.foreground(fraction)
-				let name = linear.display(palette.chclt).web()
-				let color = linear.color().platformColor
-				let contrast = formatter.string(linear.contrast(palette.chclt) + reverseContrast)
-				let g18 = formatter.string(CHCLT_sRGB.ratioG18(reverse.luminance(CHCLT_sRGB.g18), linear.luminance(CHCLT_sRGB.g18)))
-				let text = "•\(index)/\(count - 1) \(name) G18 \(g18)◐ \(contrast)◐"
+				let (text, color) = sampleText(palette, index:index, count:count, formatter:formatter, reverseContrast:reverseContrast, reverseLuminance:reverseLuminance)
 				//let text = "The quick brown fox jumps over a lazy dog."
 				
 				if index < foregrounds.count {
@@ -59,7 +67,7 @@ class ChocolateThemeViewController: BaseViewController {
 			}
 			
 			background.border(.init(width:2, radius:0, color:palette.primary.color()))
-			background.color = reverse.color().platformColor
+			background.color = CHCLT.Color(palette.chclt, reverse).platformColor
 		}
 	}
 	
@@ -107,7 +115,7 @@ class ChocolateThemeViewController: BaseViewController {
 			], to:view)
 		}
 		
-		applyPositions(animated:true)
+		applyPositions(animated:false)
 	}
 	
 	override func viewDidAppear() {
@@ -172,7 +180,7 @@ class ChocolateThemeViewController: BaseViewController {
 		guard !isAccessingColorPanel else { return }
 		
 		isAccessingColorPanel = true
-		PlatformColorPanel.shared.color = palette.primary.color().platformColor
+		PlatformColorPanel.shared.color = CHCLT.Color(palette.chclt, palette.primary).platformColor
 		isAccessingColorPanel = false
 	}
 #else
@@ -193,11 +201,11 @@ class ChocolateThemeViewController: BaseViewController {
 		let chclt = self.chclt
 		let model = colorModel
 		let coordinates = CHCLT.Scalar.vector3(primaryPosition.x.native, 1 - primaryPosition.y.native, sliderHue.value)
-		let primary = model.linearColor(axis:axis, coordinates:coordinates, chclt:chclt)
+		let primary = model.color(axis:axis, coordinates:coordinates, chclt:chclt)
 		let adjust = CHCLT.Adjustment(contrast:sliderDeriveContrast.value, chroma:sliderDeriveChroma.value)
 		let adjustment = CHCLT.Adjustment(contrast:0.5 - 0.6 * (adjust.contrast - 0.5), chroma:adjust.chroma)
 		let contrasting = CHCLT.Adjustment(contrast:sliderContrasting.value + (1.0 - adjust.contrast) * 0.2, chroma:sliderChroma.value)
-		let palette = Palette(chclt:chclt, primary:primary, contrasting:contrasting, primaryAdjustment:adjust, contrastingAdjustment:adjustment)
+		let palette = Palette(chclt:chclt, primary:primary.linearRGB, contrasting:contrasting, primaryAdjustment:adjust, contrastingAdjustment:adjustment)
 		
 		return Input(axis:axis, model:model, chclt:chclt, palette:palette, coordinates:coordinates)
 	}
@@ -329,9 +337,9 @@ class ChocolateThemeViewController: BaseViewController {
 //	MARK: -
 
 class ChocolateThemeLayer: CALayer {
-	var chclt:CHCLT = CHCLT.default
+	var chclt:CHCLT = CHCLT.default { didSet { if chclt != oldValue { setNeedsDisplay() } } }
 	var hue:CHCLT.Scalar = 0.5 { didSet { if hue != oldValue { setNeedsDisplay() } } }
-	var axis:Int = 48
+	var axis:Int = 48 { didSet { if axis != oldValue { setNeedsDisplay() } } }
 	
 	override func draw(in ctx: CGContext) {
 		let box = CGRect(origin:.zero, size:bounds.size)
@@ -386,6 +394,7 @@ class ChocolateThemeViewable: ViewablePositionable {
 	var model:Model
 	var tag:Int { get { return view?.tag ?? model.tag } }
 	var hue:CHCLT.Scalar { get { return view?.hue ?? model.hue } set { model.hue = newValue; view?.hue = newValue } }
+	var themeLayer:ChocolateThemeLayer? { return view?.themeLayer }
 	
 	var intrinsicSize:CGSize {
 		get { return model.intrinsicSize }

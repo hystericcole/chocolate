@@ -197,6 +197,10 @@ extension PlatformView {
 		get { return frame.center }
 	}
 	
+	var screenColorSpace:CGColorSpace? {
+		return window?.screen?.colorSpace?.cgColorSpace
+	}
+	
 	var backgroundColor:PlatformColor? {
 		get { return layer?.backgroundColor?.platformColor }
 		set { layer?.backgroundColor = newValue?.cgColor }
@@ -505,6 +509,10 @@ extension PlatformPasteboard {
 //	MARK: -
 
 extension PlatformView {
+	var screenColorSpace:CGColorSpace? {
+		return nil
+	}
+	
 	func prepareViewableColor(isOpaque:Bool) {
 		self.isUserInteractionEnabled = false
 		self.isOpaque = isOpaque

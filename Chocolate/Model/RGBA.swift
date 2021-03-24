@@ -12,8 +12,8 @@ import simd
 
 extension CHCLT {
 	public struct Color: CustomStringConvertible {
-		public var display:CHCLT.Vector4
-		public var linear:CHCLT.Vector4
+		public let display:CHCLT.Vector4
+		public let linear:CHCLT.Vector4
 		public let chclt:CHCLT
 		
 		public var displayRGB:DisplayRGB { return DisplayRGB(display) }
@@ -27,12 +27,14 @@ extension CHCLT {
 		public var saturation:CHCLT.Scalar { return chclt.saturation(linear.xyz, luminance:linear.w) }
 		public var luma:CHCLT.Scalar { return chclt.transfer(linear.w) }
 		public var luminance:CHCLT.Scalar { return linear.w }
-		public var isDark:Bool { return linear.w < chclt.contrast.mediumLuminance }
+		public var isDark:Bool { return chclt.contrast.luminanceIsDark(linear.w) }
 		public var isNormal:Bool { return linear.min() >= 0.0 && linear.max() <= 1.0 }
 		public var contrast:CHCLT.Scalar { return chclt.contrast(luminance:linear.w) }
 		public var rgb:CHCLT.Vector3 { return display.xyz }
 		public var hcl:CHCLT.Vector3 { return CHCLT.Scalar.vector3(hue, chroma, luma) }
 		public var hsb:CHCLT.Vector3 { return ColorModel.hsb_from_rgb(r:red, g:green, b:blue) }
+		public var lab:CHCLT.Vector3 { return chclt.lab(linearRGB:linear.xyz) }
+		public var lch:CHCLT.Vector3 { return chclt.lch(linearRGB:linear.xyz) }
 		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
 		public var description:String { return rgba() }
 		
@@ -76,6 +78,7 @@ extension CHCLT {
 		
 		public func convert(_ chclt:CHCLT) -> Color { return Color(chclt, self) }
 		public func hueShifted(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.hueShift(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }
+		public func hueTurned(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.hueShift(linear.xyz, luminance:linear.w, by:value, apply:chroma), alpha:display.w) }
 		public func applyHue(_ value:CHCLT.Scalar) -> Self { return hueShifted(value - hue) }
 		public func scaleChroma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.scaleChroma(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }
 		public func applyChroma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyChroma(linear.xyz, luminance:linear.w, apply:value), alpha:display.w) }
@@ -87,9 +90,21 @@ extension CHCLT {
 		public func applyContrast(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyContrast(linear.xyz, luminance:linear.w, apply:value), alpha:display.w) }
 		public func contrasting(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.contrasting(linear.xyz, luminance:linear.w, value:value), alpha:display.w) }
 		public func opposing(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyContrast(linear.xyz, luminance:linear.w, apply:-value), alpha:display.w) }
-		public func normalize() -> Self { return Color(chclt, linear:CHCLT.normalize(linear.xyz, luminance:linear.w, leavePositive:false), alpha:display.w) }
 		public func transform(_ transform:CHCLT.Transform) -> Self { return Color(chclt, linear:chclt.transform(linear.xyz, luminance:linear.w, transform:transform), alpha:display.w) }
-		public func invert()  -> Self { return Color(chclt, linear:1 - linear.xyz, alpha:display.w) }
+		
+		public func normalize() -> Self { return Color(chclt, linear:CHCLT.normalize(linear.xyz, luminance:linear.w, leavePositive:false), alpha:display.w) }
+		public func illuminate() -> Self { return Color(chclt, linear:CHCLT.illuminate(linear.xyz), alpha:display.w) }
+		public func inverse() -> Self { return Color(chclt, linear:1 - linear.xyz, alpha:display.w) }
+		public func liminal() -> Self { return applyLuma(1 - luma) }
+		public func complementary() -> Self { return applyChroma(-chroma) }
+		public func hueGroup(_ turned:CHCLT.Scalar...) -> [Self] { return turned.map { hueTurned($0) } }
+		public func triadic() -> [Self] { return hueGroup(1/3, 2/3) }
+		public func tetradic(clockwise:Bool = false) -> [Self] { return clockwise ? hueGroup(1/6, 3/6, 4/6) : hueGroup(-1/6, -3/6, -4/6) }
+		public func square() -> [Self] { return hueGroup(1/4, 2/4, 3/4) }
+		public func analogous(turns:Scalar = 1/12) -> [Self] { return hueGroup(turns, -turns) }
+		public func complementarySplit(turns:Scalar = 1/12) -> [Self] { return hueGroup(0.5 - turns, turns - 0.5) }
+		
+		public func difference(_ color:Color) -> Scalar { return Lab.difference(lab, color.lab) }
 		
 		public func rgba() -> String { return String(format:"RGBA(%.3g, %.3g, %.3g, %.3g)", red, green, blue, alpha) }
 		public func web(allowFormat:Int = 0) -> String { return displayRGB.web(allowFormat:allowFormat) }

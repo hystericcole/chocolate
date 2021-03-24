@@ -17,12 +17,12 @@ public class CHCLT {
 	public typealias Vector4 = SIMD4<Scalar>
 	
 	public let coefficients:Vector3
-	public let contrast:CHCLT.Contrast
+	public let contrast:Contrast
 	
 	public let toXYZ:Scalar.Matrix3x3
 	public let fromXYZ:Scalar.Matrix3x3
 	
-	public init(_ toXYZ:Scalar.Matrix3x3, contrast:CHCLT.Contrast, coefficients:Vector3? = nil) {
+	public init(_ toXYZ:Scalar.Matrix3x3, contrast:Contrast, coefficients:Vector3? = nil) {
 		self.coefficients = coefficients ?? XYZ.luminanceCoefficients(toXYZ)
 		self.contrast = contrast
 		self.toXYZ = toXYZ
@@ -77,10 +77,6 @@ public class CHCLT {
 		return linear / coefficients
 	}
 	
-	public func luma(_ linear:Vector3) -> Scalar {
-		return transfer(luminance(linear))
-	}
-	
 	public func whitepoint() -> Vector3 {
 		return toXYZ * Vector3.one
 	}
@@ -102,7 +98,7 @@ public class CHCLT {
 	}
 	
 	public func lch(linearRGB:Vector3) -> Vector3 {
-		var lch = Lab.toLCH(lab:lab(linearRGB:linearRGB) / 100.0)
+		var lch = Lab.toLCH(lab:lab(linearRGB:linearRGB) / Lab.range)
 		
 		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
 		
@@ -114,7 +110,7 @@ public class CHCLT {
 		
 		lch.z = lch.z * 2.0 * .pi
 		
-		return linearRGB(lab:Lab.fromLCH(lch:lch) * 100.0)
+		return linearRGB(lab:Lab.fromLCH(lch:lch) * Lab.range)
 	}
 	
 	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
@@ -151,7 +147,7 @@ extension CHCLT {
 	/// Parameters use to compute contrast
 	public struct Contrast: Equatable, Hashable {
 		/// The luminance value separating light and dark colors.
-		/// Contrast in CHCLT is a measure of distance from medium luminance.
+		/// Contrast in CHCLT is a measure of distance from medium luma.  Medium luminance is usually derived from medium luma.
 		/// 
 		/// Colors with luminance below this value are dark and have better contrast against white than black.
 		/// Colors with luminance above this value are light and have better contrast against black than white.
@@ -184,25 +180,6 @@ extension CHCLT {
 		/// For sRGB and a 4.5 ratio this range will be from 0.182 to 0.214.
 		public let mediumLuminance:Scalar
 		
-		/// Controls the shape of the luminance curve.
-		/// Typical values are in the 1 ... 2 range.  1.0 is linear.
-		/// As power increases, the contrast value of most colors will decrease, creating color pairs with higher visual contrast for the same contrast value.
-		///
-		/// ```
-		/// v = luminance
-		/// m = mediumLuminance
-		/// pow(v > m ? (v - m) / (1 - m) : 1 - v / m, power)
-		/// ```
-		/// Colors with luminance equal to the medium luminance have a contrast of zero.
-		/// Colors with luminance equal to zero (black) or one (white) have a contrast of one.
-		///
-		/// CHCLT is designed so that a light and dark color with contrasts adding to at least 1.0 will satisfy the minimum recommended contrast.
-		/// The greatest sum of contrasts of two colors is 2.0 for black and white.
-		/// The power parameter influences the luminance value of colors chosen to have a specific contrast relative to another color.
-		///
-		/// The typical value for power is `13m√m` where m is the medium luminance.  Use 1.0 for linear contrast.
-		public let power:Scalar
-		
 		public var linearOffset:Scalar {
 			return mediumLuminance * mediumLuminance / (1 - 2 * mediumLuminance)
 		}
@@ -211,9 +188,71 @@ extension CHCLT {
 			return 1.0 / mediumLuminance - 1.0
 		}
 		
-		public init(_ mediumLuminance:Scalar, power:Scalar = 0) {
+		public init(_ mediumLuminance:Scalar) {
 			self.mediumLuminance = mediumLuminance
-			self.power = power > 0 ? power : max(1, 13 * pow(mediumLuminance, 1.5))
+		}
+		
+		public func luminanceIsDark(_ luminance:Linear) -> Bool {
+			return luminance < mediumLuminance
+		}
+		
+		public func lumaIsDark(_ luma:Scalar) -> Bool {
+			return luma < 0.5
+		}
+		
+		public func lumaContrast(_ luma:Scalar) -> Scalar {
+			let c = luma * 2 - 1
+			
+			return c.magnitude
+		}
+		
+		public func lumaScaleContrast(_ luma:Scalar, by scalar:Scalar) -> Scalar {
+			let c = luma * 2 - 1
+			let w = 0.5 + copysign(0.5, luma - 0.5) * c.magnitude * scalar
+			
+			return w
+		}
+		
+		public func lumaApplyContrast(_ luma:Scalar, value:Scalar) -> Scalar {
+			let w = 0.5 + copysign(0.5, luma - 0.5) * value
+			
+			return w
+		}
+		
+		public func lumaContrasting(_ luma:Scalar, value:Scalar) -> Scalar {
+			let c = luma * 2 - 1
+			let n = (1 - value.magnitude) * (c - copysign(1, c)) - copysign(max(0, value), c)
+			let w = 0.5 - copysign(0.5, luma - 0.5) * n.magnitude
+			
+			return w
+		}
+		
+		public func lumaMatchContrast(_ v:Scalar, _ u:Scalar, by value:Scalar) -> Scalar {
+			let m = 0.5
+			let n = 1 - value
+			let c = lumaContrast(v) * n + lumaContrast(u) * value
+			let s = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
+			
+			return lumaApplyContrast(v, value:c * s)
+		}
+		
+		public static func luminanceRatioG18(_ u:Linear, _ v:Linear, offset:Linear = 0.05) -> Linear {
+			let uo = u + offset
+			let vo = v + offset
+			
+			return max(uo, vo) / min(uo, vo)
+		}
+		
+		public static func luminanceContrastingG18(_ luminance:Linear, ratio:Linear = 4.5, offset:Linear = 0.05) -> Linear {
+			let m = 1 / (ratio + 1)
+			
+			guard luminance > 0 else { return m }
+			
+			let vo = luminance + offset
+			let uo = luminance > m ? vo / ratio : vo * ratio
+			let u = uo - offset
+			
+			return u
 		}
 	}
 }
@@ -357,39 +396,25 @@ extension CHCLT {
 		return maximum.magnitude > 0 ? linear / maximum : .one
 	}
 	
+	//	MARK: Luma
+	
+	public func luma(_ linear:Vector3) -> Scalar {
+		return transfer(luminance(linear))
+	}
+	
+	public func scaleLuma(_ vector:Linear.Vector3, luminance v:Linear, by scalar:Linear) -> Linear.Vector3 {
+		return applyLuminance(vector, luminance:v, apply:linear(transfer(v) * scalar))
+	}
+	
+	public func applyLuma(_ vector:Linear.Vector3, luminance v:Linear, apply u:Linear) -> Linear.Vector3 {
+		return applyLuminance(vector, luminance:v, apply:linear(u))
+	}
+	
 	//	MARK: Contrast
-	
-	public func luminanceScaleContrast(_ luminance:Linear, by scalar:Scalar) -> Linear {
-		let m = contrast.mediumLuminance
-		let t = scalar < 0 ? luminance < m ? (1 - m) / m : m / (1 - m) : -1
-		let u = m + pow(scalar.magnitude, 1 / contrast.power) * (m - luminance) * t
-		
-		return u
-	}
-	
-	public func luminanceApplyContrast(_ luminance:Linear, value:Scalar) -> Linear {
-		let m = contrast.mediumLuminance
-		let t = pow(value.magnitude, 1 / contrast.power)
-		let u = (luminance < m) == (value < 0) ? (1 - m) * t + m : m * (1 - t)
-		
-		return u
-	}
-	
-	public func luminanceContrasting(_ luminance:Linear, value:Scalar) -> Linear {
-		let m = contrast.mediumLuminance
-		guard value > -1 else { return m }
-		let cc = luminance > m ? (luminance - m) / (1 - m) : 1 - luminance / m
-		let c = pow(cc, contrast.power)
-		let tt = value < 0 ? (1 - c) * (1 + value) : (1 - c) + c * value
-		let t = pow(tt, 1 / contrast.power)
-		let u = luminance > m ? m * (1 - t) : (1 - m) * t + m
-		
-		return u
-	}
 	
 	/// True if luminance is below the medium luminance.
 	public func isDark(_ linear:Linear.Vector3) -> Bool {
-		return luminance(linear) < contrast.mediumLuminance
+		return contrast.luminanceIsDark(luminance(linear))
 	}
 	
 	/// The contrast of a color is a measure of the distance from medium luminance.
@@ -400,10 +425,7 @@ extension CHCLT {
 	///   - v: The luminance of color.
 	/// - Returns: The contrast of color.
 	public func contrast(luminance v:Linear) -> Linear {
-		let m = contrast.mediumLuminance
-		let c = v > m ? (v - m) / (1 - m) : 1 - v / m
-		
-		return pow(c.magnitude, contrast.power)
+		return contrast.lumaContrast(transfer(v))
 	}
 	
 	/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
@@ -416,7 +438,7 @@ extension CHCLT {
 	///   - scalar: The scaling factor.
 	/// - Returns: The adjusted color.
 	public func scaleContrast(_ linear:Linear.Vector3, luminance v:Linear, by scalar:Scalar) -> Linear.Vector3 {
-		return applyLuminance(linear, luminance:v, apply:luminanceScaleContrast(v, by:scalar))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaScaleContrast(transfer(v), by:scalar))
 	}
 	
 	/// Adjust the luminance to create a color that contrasts against the same colors as this color.  Negative values create contrasting colors.
@@ -428,18 +450,14 @@ extension CHCLT {
 	///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
 	/// - Returns: The adjusted color
 	public func applyContrast(_ linear:Linear.Vector3, luminance v:Linear, apply value:Linear) -> Linear.Vector3 {
-		return applyLuminance(linear, luminance:v, apply:luminanceApplyContrast(v, value:value))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaApplyContrast(transfer(v), value:value))
 	}
 	
 	public func matchContrast(_ linear:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
-		let m = contrast.mediumLuminance
 		let v = luminance(linear)
 		let u = luminance(color)
-		let n = 1 - value
-		let c = contrast(luminance:v) * n + contrast(luminance:u) * value
-		let s:Scalar = v < m ? u > m ? -1.0 : 1.0 : u < m ? -1.0 : 1.0
 		
-		return applyContrast(linear, luminance:v, apply:c * s)
+		return applyLuma(linear, luminance:v, apply:contrast.lumaMatchContrast(transfer(v), transfer(u), by:value))
 	}
 	
 	/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
@@ -459,7 +477,7 @@ extension CHCLT {
 	///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
 	/// - Returns: The adjusted color
 	public func contrasting(_ linear:Linear.Vector3, luminance v:Linear, value:Linear) -> Linear.Vector3 {
-		return applyLuminance(linear, luminance:v, apply:luminanceContrasting(v, value:value))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaContrasting(transfer(v), value:value))
 	}
 	
 	//	MARK: Hue
@@ -526,6 +544,10 @@ extension CHCLT {
 		let normalized = CHCLT.normalize(shifted + v, luminance:v, leavePositive:false)
 		
 		return normalized
+	}
+	
+	public func hueShift(_ linear:Linear.Vector3, luminance v:Linear, by shift:Linear, apply chroma:Linear) -> Linear.Vector3 {
+		return applyChroma(hueShift(linear, luminance:v, by:shift), luminance:v, apply:chroma)
 	}
 	
 	public func huePush(_ linear:Linear.Vector3, from color:Linear.Vector3, minimumShift shift:Linear) -> Linear.Vector3 {
@@ -901,13 +923,11 @@ extension CHCLT {
 		}
 		
 		public func scaleLuma(_ chclt:CHCLT, by scalar:Scalar) -> LinearRGB {
-			let v = chclt.luminance(vector)
-			
-			return LinearRGB(chclt.applyLuminance(vector, luminance:v, apply:chclt.linear(chclt.transfer(v) * scalar)))
+			return LinearRGB(chclt.scaleLuma(vector, luminance:chclt.luminance(vector), by:scalar))
 		}
 		
 		public func applyLuma(_ chclt:CHCLT, value u:Scalar) -> LinearRGB {
-			return applyLuminance(chclt, value:chclt.linear(u))
+			return LinearRGB(chclt.applyLuma(vector, luminance:chclt.luminance(vector), apply:u))
 		}
 		
 		//	MARK: Luminance
@@ -1138,6 +1158,7 @@ extension CHCLT {
 
 extension CHCLT {
 	public enum Lab {
+		public static let range = CHCLT.Scalar.vector3(100.0, 128.0, 128.0)
 		public static let genericWhite = XYZ.d50
 		
 		public static func toXYZ(_ t:CHCLT.Linear) -> CHCLT.Linear {
@@ -1194,6 +1215,36 @@ extension CHCLT {
 			
 			return CHCLT.Linear.vector3(lch.x, lch.y * sc.__cosval, lch.y * sc.__sinval)
 		}
+		
+		public static func difference_cie76(_ lab1:CHCLT.Linear.Vector3, _ lab2:CHCLT.Linear.Vector3) -> Scalar {
+			return simd_distance(lab1, lab2)
+		}
+		
+		public static func difference_cie94(_ lab1:CHCLT.Linear.Vector3, _ lab2:CHCLT.Linear.Vector3) -> Scalar {
+			let dl = lab1.x - lab2.x
+			let c1 = hypot(lab1.y, lab1.z)
+			let c2 = hypot(lab2.y, lab2.z)
+			let dc = c1 - c2
+			let da = lab1.y - lab2.y
+			let db = lab1.z - lab2.z
+			let hh = da * da + db * db - dc * dc
+			//let hh = simd_distance_squared(lab1, lab2) - dl * dl - dc * dc
+			let dh = hh.squareRoot()
+			let sl = 1.0
+			let sc = 1.0 + 0.45 * c1
+			let sh = 1.0 + 0.15 * c2
+			let v = Scalar.vector3(dl / sl, dc / sc, dh / sh)
+			
+			return simd_length(v)
+		}
+		
+//		public static func difference_cie2000(_ lab1:CHCLT.Linear.Vector3, _ lab2:CHCLT.Linear.Vector3) -> Scalar {
+//			return 0.000000
+//		}
+		
+		public static func difference(_ lab1:CHCLT.Linear.Vector3, _ lab2:CHCLT.Linear.Vector3) -> Scalar {
+			return difference_cie94(lab1, lab2)
+		}
 	}
 }
 
@@ -1207,7 +1258,7 @@ extension CHCLT {
 
 public class CHCLT_Linear: CHCLT {
 	public static let sRGB = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT_sRGB.contrast)
-	public static let aces = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_acescg, contrast:CHCLT.Contrast(0.5, power:1.0))
+	public static let aces = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_acescg, contrast:CHCLT.Contrast(0.5))
 }
 
 //	MARK: -
@@ -1255,7 +1306,7 @@ public class CHCLT_Pure: CHCLT {
 public class CHCLT_sRGB: CHCLT {
 	public static let displayP3 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_displayP3_d65)
 	public static let standard = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65)
-	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11, power:1.0))
+	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11))
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_sRGB.linear(0.5))
 	
@@ -1277,24 +1328,6 @@ public class CHCLT_sRGB: CHCLT {
 	
 	public override func transfer(_ value:Linear) -> Scalar {
 		return CHCLT_sRGB.transfer(value)
-	}
-	
-	public static func ratioG18(_ u:Linear, _ v:Linear, offset:Linear = 0.05) -> Linear {
-		return max(u + offset, v + offset) / min(u + offset, v + offset)
-	}
-	
-	public static func contrastingG18(_ linear:Linear.Vector3, ratio:Linear = 4.5, offset:Linear = 0.05) -> Linear.Vector3 {
-		let m = 1 / (ratio + 1)
-		let v = CHCLT_sRGB.standard.luminance(linear)
-		
-		guard v > 0 else { return Linear.vector3(m, m, m) }
-		
-		let vo = v + offset
-		let uo = v > m ? vo / ratio : vo * ratio
-		let u = uo - offset
-		let s = u / v
-		
-		return linear * s
 	}
 }
 

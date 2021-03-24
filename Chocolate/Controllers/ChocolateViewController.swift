@@ -505,7 +505,7 @@ extension ChocolateViewController {
 			applyForegrounds(model.foregrounds.enumerated().map { order, color in
 				let fc = formatter.string(color.contrast)
 				let fl = color.convert(sRGB)
-				let g18 = CHCLT_sRGB.ratioG18(bl.luminance, fl.luminance)
+				let g18 = CHCLT.Contrast.luminanceRatioG18(bl.luminance, fl.luminance)
 				let contrast = formatter.string(g18)
 				let text = DisplayStrings.Chocolate.example(foreground:order + 1, fc:fc, background:index + 1, bc:bc, contrast:contrast)
 				

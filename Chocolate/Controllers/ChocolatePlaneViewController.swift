@@ -36,7 +36,7 @@ class ChocolatePlaneViewController: BaseViewController {
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
 	let indicator = Viewable.Color(color:.black)
 	var positionIndicator = Layout.Align(Layout.empty)
-	let colorLabel = Constant.colorStyle.label("")
+	let colorLabel = Constant.colorStyle.label("", maximumLines:1)
 	let group = Viewable.Group()
 	let axis:Axis = .chclt_l
 	
@@ -86,7 +86,7 @@ class ChocolatePlaneViewController: BaseViewController {
 		let formatter = NumberFormatter(fractionDigits:1 ... 1)
 		let hcl = chclt.hcl(linear:linearColor.vector)
 		let contrast = linearColor.contrast(chclt)
-		let symbol = hcl.z < chclt.contrast.mediumLuminance ? "◐" : "◑"
+		let symbol = chclt.contrast.lumaIsDark(hcl.z) ? "◐" : "◑"
 		
 		colorLabel.text = [
 			formatter.string(from:hcl.x * 360.0 as NSNumber)! + "°",
