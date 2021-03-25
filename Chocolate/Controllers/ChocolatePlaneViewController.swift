@@ -116,11 +116,11 @@ class ChocolatePlaneViewController: BaseViewController {
 		if mode.model == .chclt {
 			linearColor = mode.linearColor(chclt:chclt, coordinates:coordinates)
 			platformColor = CHCLT.Color(chclt, linearColor).platformColor
-			borderColor = linearColor.contrasting(chclt, value:borderContrasting).color()
+			borderColor = linearColor.contrasting(chclt, value:borderContrasting).applyChroma(chclt, value:linearColor.chroma(chclt)).color()
 		} else {
 			platformColor = mode.platformColor(chclt:chclt, coordinates:coordinates)
 			linearColor = platformColor.chocolateColor(chclt:chclt)?.linearRGB ?? .white
-			borderColor = linearColor.contrasting(chclt, value:borderContrasting).color()
+			borderColor = linearColor.contrasting(chclt, value:borderContrasting).applyChroma(chclt, value:linearColor.chroma(chclt)).color()
 		}
 		
 		let linearComplement = linearColor.applyChroma(chclt, value:-linearColor.chroma(chclt))
