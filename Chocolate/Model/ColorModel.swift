@@ -262,19 +262,34 @@ enum ColorModel: Int {
 	}
 	
 	static func lumaGradient(chclt:CHCLT, primary:CHCLT.LinearRGB, chroma:Scalar, colorSpace:CGColorSpace?, darkToLight:Bool = false) -> CGGradient? {
-		let count = 17
-		let locations:[CGFloat]? = nil
-		var colors = (0 ..< count).map { primary.applyLuma(chclt, value:1 - Double($0) / Double(count - 1)).applyChroma(chclt, value:chroma).color() }
+		let fractionsAbove = [0.125, 0.75, 0.875, 0.9375]
+		let fractionsBelow = [0.9375, 0.875, 0.125]
+		let color = primary.applyChroma(chclt, value:chroma)
+		let value = color.luma(chclt)
+		let colorsAbove:[CHCLT.LinearRGB] = fractionsAbove.map { color.applyLuma(chclt, value:1.0 - $0 * (1.0 - value)) }
+		let colorsBelow:[CHCLT.LinearRGB] = fractionsBelow.map { color.applyLuma(chclt, value:$0 * value) }
+		let v = CGFloat(value)
+		let locationsAbove:[CGFloat] = fractionsAbove.map { CGFloat($0) * (1.0 - v) }
+		let locationsBelow:[CGFloat] = fractionsBelow.map { 1.0 - CGFloat($0) * v }
+		var colorsOrder:[CHCLT.LinearRGB] = colorsAbove + colorsBelow
+		var locations:[CGFloat] = locationsAbove + locationsBelow
 		
-//		let color = primary.applyChroma(chclt, value:chroma)
-//		let value = color.luma(chclt)
-//		let above = color.applyLuma(chclt, value:value * 0.5 + 0.5)
-//		let below = color.applyLuma(chclt, value:value * 0.5)
-//		let v = CGFloat(value)
-//		let locations:[CGFloat] = darkToLight ? [0, v * 0.5, v, 0.5 + v * 0.5, 1] : [0, 0.5 - v * 0.5, 1 - v, 1 - v * 0.5, 1]
-//		var colors:[CGColor] = [.white, above, color, below, .black].map { $0.color() }
+		locations.insert(1.0 - v, at:fractionsAbove.count)
+		colorsOrder.insert(color, at:fractionsAbove.count)
 		
-		if darkToLight { colors.reverse() }
+		locations.insert(0.0, at:0)
+		colorsOrder.insert(.white, at:0)
+		
+		locations.append(1.0)
+		colorsOrder.append(.black)
+		
+		var colors:[CGColor] = colorsOrder.map { $0.color() }
+		
+		if darkToLight {
+			colors.reverse()
+			locations.reverse()
+			locations = locations.map { 1.0 - $0 }
+		}
 		
 		return CGGradient(colorsSpace:colorSpace, colors:colors as CFArray, locations:locations)
 	}
