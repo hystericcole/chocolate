@@ -86,6 +86,7 @@ class ChocolateThemeViewController: BaseViewController {
 	
 	var indicators:[Viewable.Color] = []
 	var primaryPosition:CGPoint = CGPoint(x:0.875, y:0.875)
+	var isComplement:Bool = false
 	
 	var chclt:CHCLT { return themeView.view?.themeLayer.chclt ?? .default }
 	var colorModel:ColorModel = .chclt
@@ -146,8 +147,9 @@ class ChocolateThemeViewController: BaseViewController {
 		let box = CGRect(origin:.zero, size:view.bounds.size)
 		let location = recognizer.location(in:view)
 		let unbound = location / box.size
-		let unit = CGPoint(x:min(max(0.5, unbound.x), 1), y:min(max(0, unbound.y), 1))
+		let unit = CGPoint(x:min(max(0.0, unbound.x), 1), y:min(max(0, unbound.y), 1))
 		
+		isComplement = unit.x < 0.5
 		primaryPosition = unit
 		applyPositions(animated:recognizer is PlatformTapGestureRecognizer)
 	}
@@ -189,10 +191,13 @@ class ChocolateThemeViewController: BaseViewController {
 	
 	func applyColor(_ color:CHCLT.Color, animated:Bool) {
 		let coordinates = colorModel.coordinates(axis:axis, color:color)
+		let hue = isComplement ? 0.5 + coordinates.z : coordinates.z
+		let chroma = isComplement ? 1.0 - coordinates.x : coordinates.x
+		let luma = 1.0 - coordinates.y
 		
-		themeView.hue = coordinates.z
-		sliderHue.value = coordinates.z
-		primaryPosition = CGPoint(x:coordinates.x, y:1 - coordinates.y)
+		themeView.hue = hue
+		sliderHue.value = hue
+		primaryPosition = CGPoint(x:chroma, y:luma)
 		applyPositions(animated:animated)
 	}
 	
@@ -234,6 +239,7 @@ class ChocolateThemeViewController: BaseViewController {
 		let radius = 12.0
 		let palette = input.palette
 		let deriveLimit = count - 1
+		let r = isComplement ? -1.0 : 1.0
 		
 		var colors:[(color:CHCLT.LinearRGB, border:CHCLT.LinearRGB, neagted:Bool, scale:Layout.Native)] = []
 		var layout:[Layout.Align] = []
@@ -245,17 +251,17 @@ class ChocolateThemeViewController: BaseViewController {
 			let scale:Layout.Native = index == deriveLimit ? 2 : 1
 			let s = 1 - value * (1 - palette.primaryAdjustment.chroma)
 			
-			colors.append((palette.foreground(value), palette.contrasting, s < 0, scale))
+			colors.append((palette.foreground(value), palette.contrasting, r * s < 0, scale))
 		}
 		
-		colors.append((palette.contrasting, palette.primary, palette.contrastingChroma < 0, 3))
+		colors.append((palette.contrasting, palette.primary, palette.contrastingChroma * r < 0, 3))
 		
 		for index in 1 ... deriveLimit {
 			let value = Double(index) / Double(deriveLimit)
 			let scale:Layout.Native = index == deriveLimit ? 2 : 1
 			let s = 1 - value * (1 - palette.contrastingAdjustment.chroma)
 			
-			colors.append((palette.background(value), palette.primary, palette.contrastingChroma * s < 0, scale))
+			colors.append((palette.background(value), palette.primary, palette.contrastingChroma * r * s < 0, scale))
 		}
 		
 		if indicators.count < colors.count {
