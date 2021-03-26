@@ -30,6 +30,14 @@ class ChocolatePlaneViewController: BaseViewController {
 		static let colorStyle = Style(font:.monospaceDigits, size:14, color:nil, alignment:.center)
 	}
 	
+	struct IndicatorColors {
+		let chclt:CHCLT
+		let mode:ChocolatePlaneLayer.Mode
+		let linearColor:CHCLT.LinearRGB
+		let platformColor:PlatformColor
+		let borderColor:CGColor
+	}
+	
 	let indicatorRadius:CGFloat = 33.5
 	let planeView = ChocolatePlaneView()
 	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged))
@@ -67,7 +75,7 @@ class ChocolatePlaneViewController: BaseViewController {
 			Common.Recognizer(.tap(false, 1), target:self, action:#selector(indicatorPanned))
 		], to:planeView)
 		
-		refreshIndicator(CGPoint(x:0.5, y:0.5))
+		applyIndicatorColors(computeIndicatorColors(CGPoint(x:0.5, y:0.5)))
 	}
 	
 	override func loadView() {
@@ -104,7 +112,7 @@ class ChocolatePlaneViewController: BaseViewController {
 		slider.applyModel(model:planeView.mode.model, axis:planeView.mode.axis, chclt:chclt, hue:point.x.native)
 	}
 	
-	func refreshIndicator(_ unit:CGPoint) {
+	func computeIndicatorColors(_ unit:CGPoint) -> IndicatorColors {
 		let chclt = self.chclt
 		let mode = planeView.mode
 		let borderContrasting = 0.0
@@ -124,41 +132,50 @@ class ChocolatePlaneViewController: BaseViewController {
 			borderColor = linearColor.contrasting(chclt, value:borderContrasting).applyChroma(chclt, value:linearColor.chroma(chclt)).color()
 		}
 		
-		let linearComplement = linearColor.applyChroma(chclt, value:-linearColor.chroma(chclt))
+		return IndicatorColors(chclt:chclt, mode:mode, linearColor:linearColor, platformColor:platformColor, borderColor:borderColor)
+	}
+	
+	func applyIndicatorColors(_ colors:IndicatorColors) {
+		let chclt = colors.chclt
+		let mode = colors.mode
+		let linearComplement = colors.linearColor.applyChroma(chclt, value:-colors.linearColor.chroma(chclt))
 		let coordinatesComplement = mode.model.coordinates(axis:mode.axis, color:linearComplement, chclt:chclt)
-		let linearContrast = linearColor.contrasting(chclt, value:0)
+		let linearContrast = colors.linearColor.contrasting(chclt, value:0)
 		
-		indicator.color = platformColor
-		lineContrast.color = platformColor
+		indicator.color = colors.platformColor
+		lineContrast.color = colors.platformColor
 		positionLineContrast.vertical = .fraction(1 - linearContrast.luma(chclt))
 		
 		complement.color = linearComplement.color()?.platformColor
 		positionComplement.horizontal = .fraction(coordinatesComplement.x)
 		positionComplement.vertical = .fraction(1 - coordinatesComplement.y)
 		
-		applyColorToPanel(platformColor)
-		applyColorDescription(chclt:chclt, linearColor:linearColor)
+		applyColorDescription(chclt:chclt, linearColor:colors.linearColor)
 		
 		if let layer = indicator.view?.layer {
-			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:borderColor, clips:true)
+			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:colors.borderColor, clips:true)
 		}
 		
 		if let layer = complement.view?.layer {
-			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:borderColor, clips:true)
+			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:colors.borderColor, clips:true)
 		}
 	}
 	
 	func refreshContent(_ unit:CGPoint, animate:Bool) {
+		let colors = computeIndicatorColors(unit)
+		
+		applyColorToPanel(colors.platformColor)
+		
 		if animate, let view = group.view {
 			Common.animate(duration:0.25, animations:{
-				self.refreshIndicator(unit)
+				self.applyIndicatorColors(colors)
 				self.refreshGradient()
 				
 				view.ordered = self.layout()
 				view.arrangeContents()
 			})
 		} else {
-			refreshIndicator(unit)
+			applyIndicatorColors(colors)
 			refreshGradient()
 			
 			group.view?.ordered = layout()
@@ -213,9 +230,12 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	func applyColorToPanel(_ color:PlatformColor) {
 		guard !isAccessingColorPanel else { return }
+		let panel = PlatformColorPanel.shared
 		
 		isAccessingColorPanel = true
-		PlatformColorPanel.shared.color = color
+		panel.isContinuous = false
+		panel.color = color
+		panel.isContinuous = true
 		isAccessingColorPanel = false
 	}
 #else
@@ -226,9 +246,10 @@ class ChocolatePlaneViewController: BaseViewController {
 		let mode = planeView.mode
 		let coordinates = mode.model.coordinates(axis:mode.axis, color:color)
 		let unit = CGPoint(x:coordinates.x, y:1 - coordinates.y)
+		let z = min(max(0, round(coordinates.z * 0x1p20) * 0x1p-20), 1)
 		
-		slider.value = min(max(0, coordinates.z), 1)
-		planeView.scalar = min(max(0, coordinates.z), 1)
+		slider.value = z
+		planeView.scalar = z
 		positionIndicator.horizontal = .fraction(coordinates.x)
 		positionIndicator.vertical = .fraction(1 - coordinates.y)
 		refreshContent(unit, animate:animated)

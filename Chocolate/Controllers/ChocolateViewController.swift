@@ -233,9 +233,12 @@ class ChocolateViewController: BaseViewController {
 	
 	func applyColorToPanel() {
 		guard !isAccessingColorPanel else { return }
+		let panel = PlatformColorPanel.shared
 		
 		isAccessingColorPanel = true
-		PlatformColorPanel.shared.color = model.primary.platformColor
+		panel.isContinuous = false
+		panel.color = model.primary.platformColor
+		panel.isContinuous = true
 		isAccessingColorPanel = false
 	}
 #else

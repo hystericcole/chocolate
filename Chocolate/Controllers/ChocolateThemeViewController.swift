@@ -180,9 +180,12 @@ class ChocolateThemeViewController: BaseViewController {
 	
 	func applyColorToPanel(_ palette:Palette) {
 		guard !isAccessingColorPanel else { return }
+		let panel = PlatformColorPanel.shared
 		
 		isAccessingColorPanel = true
-		PlatformColorPanel.shared.color = CHCLT.Color(palette.chclt, palette.primary).platformColor
+		panel.isContinuous = false
+		panel.color = CHCLT.Color(palette.chclt, palette.primary).platformColor
+		panel.isContinuous = true
 		isAccessingColorPanel = false
 	}
 #else

@@ -142,9 +142,12 @@ class ChocolateLumaRampViewController: BaseViewController {
 	
 	func applyColorToPanel(_ color:PlatformColor) {
 		guard !isAccessingColorPanel else { return }
+		let panel = PlatformColorPanel.shared
 		
 		isAccessingColorPanel = true
-		PlatformColorPanel.shared.color = color
+		panel.isContinuous = false
+		panel.color = color
+		panel.isContinuous = true
 		isAccessingColorPanel = false
 	}
 #else
