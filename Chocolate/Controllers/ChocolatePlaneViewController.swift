@@ -89,10 +89,11 @@ class ChocolatePlaneViewController: BaseViewController {
 		let symbol = chclt.contrast.lumaIsDark(hcl.z) ? "◐" : "◑"
 		
 		colorLabel.text = [
-			formatter.string(from:hcl.x * 360.0 as NSNumber)! + "°",
-			formatter.string(from:hcl.y * 100 as NSNumber)! + "%",
-			formatter.string(from:hcl.z * 100 as NSNumber)! + "☼",
-			formatter.string(from:contrast * 100 as NSNumber)! + symbol,
+			formatter.string(hcl.x * 360.0) + "°",
+			formatter.string(hcl.y * 100) + "%",
+			formatter.string(hcl.z * 100) + "☼",
+			formatter.string(contrast * 100) + symbol,
+			//formatter.string(linearColor.saturation(chclt) * 100) + "➞",
 			linearColor.display(chclt).web()
 		].joined(separator:" • ")
 	}

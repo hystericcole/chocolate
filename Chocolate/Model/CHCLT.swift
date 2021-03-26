@@ -694,36 +694,22 @@ extension CHCLT {
 	
 	//	MARK: Chroma
 	
-	/// The maximum amount that the chroma can be scaled without denormalizing the color.
-	public static func maximumChroma(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
-		guard v > 0 else { return .infinity }
+	public static func positiveChroma(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
+		let n = 1 - v
+		let hueSaturation = linear - v
+		let a = n.magnitude > 0 ? (hueSaturation / n).max() : 0
+		let b = v.magnitude > 0 ? (hueSaturation / -v).max() : 0
 		
-		let l = linear
-		let w = 1 - v
-		let x = v - l.x
-		let y = v - l.y
-		let z = v - l.z
-		let r = x.magnitude > 0x1p-30 ? x < 0 ? w / -x : v / x : .infinity
-		let g = y.magnitude > 0x1p-30 ? y < 0 ? w / -y : v / y : .infinity
-		let b = z.magnitude > 0x1p-30 ? z < 0 ? w / -z : v / z : .infinity
-		
-		return min(r, g, b)
+		return max(a, b)
 	}
 	
-	/// The maximum amount that the chroma can be scaled in the negative direction without denormalizing the color.
-	public static func minimumChroma(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
-		guard v > 0 else { return -.infinity }
+	public static func negativeChroma(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
+		let n = 1 - v
+		let hueSaturation = linear - v
+		let a = n.magnitude > 0 ? (hueSaturation / n).min() : 0
+		let b = v.magnitude > 0 ? (hueSaturation / -v).min() : 0
 		
-		let l = linear
-		let w = 1 - v
-		let x = v - l.x
-		let y = v - l.y
-		let z = v - l.z
-		let r = x.magnitude > 0x1p-30 ? x > 0 ? w / -x : v / x : -.infinity
-		let g = y.magnitude > 0x1p-30 ? y > 0 ? w / -y : v / y : -.infinity
-		let b = z.magnitude > 0x1p-30 ? z > 0 ? w / -z : v / z : -.infinity
-		
-		return max(r, g, b)
+		return min(a, b)
 	}
 	
 	///	A color with all components equal is desaturated and has a chroma of zero.
@@ -732,10 +718,7 @@ extension CHCLT {
 	/// - Parameter chclt: The color space
 	/// - Returns: The croma
 	public func chroma(_ linear:Linear.Vector3, luminance v:Linear) -> Scalar {
-		let m = CHCLT.maximumChroma(linear, luminance:v)
-		let c = m.isFinite ? 1 / m : 0
-		
-		return c
+		return CHCLT.positiveChroma(linear, luminance:v)
 	}
 	
 	/// Scale the chroma of the color.
@@ -756,8 +739,8 @@ extension CHCLT {
 	/// The hue is preserved for positive, inverted for nagative, and lost at zero.
 	/// The luminance is preserved.
 	public func applyChroma(_ linear:Linear.Vector3, luminance v:Linear, apply value:Scalar) -> Linear.Vector3 {
-		let m = value < 0 ? CHCLT.minimumChroma(linear, luminance:v) : CHCLT.maximumChroma(linear, luminance:v)
-		let s = m.isFinite ? value.magnitude * m : 0
+		let c = value < 0 ? CHCLT.negativeChroma(linear, luminance:v) : CHCLT.positiveChroma(linear, luminance:v)
+		let s = c.magnitude > 0x1p-30 ? value.magnitude / c : 0
 		
 		return scaleChroma(linear, luminance:v, by:s)
 	}
@@ -773,10 +756,11 @@ extension CHCLT {
 	}
 	
 	public func chromaRamp(_ linear:Linear.Vector3, luminance v:Linear, intermediaries:Int = 1, withNegative:Bool = false) -> [Linear.Vector3] {
-		let maximum = CHCLT.maximumChroma(linear, luminance:v)
+		let c = CHCLT.positiveChroma(linear, luminance:v)
 		
-		guard maximum.isFinite else { return [linear, linear] }
+		guard c.magnitude > 0x1p-30 else { return [linear, linear] }
 		
+		let maximum = 1 / c
 		var result = [scaleChroma(linear, luminance:v, by:maximum)]
 		
 		if intermediaries > 0 {
@@ -790,7 +774,7 @@ extension CHCLT {
 		result.append(scaleChroma(linear, luminance:v, by:0))
 		
 		if withNegative {
-			let minimum = CHCLT.minimumChroma(linear, luminance:v)
+			let minimum = 1 / CHCLT.negativeChroma(linear, luminance:v)
 			
 			if intermediaries > 0 {
 				for index in 0 ..< intermediaries {

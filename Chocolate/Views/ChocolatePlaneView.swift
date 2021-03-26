@@ -45,6 +45,8 @@ class ChocolatePlaneLayer: CALayer {
 		
 		switch mode.model {
 		case .chclt: ctx.drawPlaneFromCubeCHCLT(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
+		//case .lch: ctx.drawPlaneFromCubeLCH(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
+		//case .xyz: ctx.drawPlaneFromCubeXYZ(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
 		case .rgb: ctx.drawPlaneFromCubeRGB(axis:mode.axis, scalar:scalar, box:box, drawSpace:space)
 		case .hsb: ctx.drawPlaneFromCubeHSB(axis:mode.axis, scalar:scalar, box:box, drawSpace:space)
 		}

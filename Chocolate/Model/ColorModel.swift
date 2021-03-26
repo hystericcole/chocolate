@@ -153,6 +153,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.colorRGB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		case .hsb: return ColorModel.colorHSB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
+		//case .xyz: return ColorModel.colorXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
+		//case .lch: return ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		case .chclt: return ColorModel.colorCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
 	}
@@ -161,6 +163,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.linearRGB(axis:axis, coordinates:coordinates)
 		case .hsb: return ColorModel.linearHSB(axis:axis, coordinates:coordinates)
+		//case .xyz: return ColorModel.colorXYZ(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
+		//case .lch: return ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
 		case .chclt: return ColorModel.linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
 	}
@@ -169,6 +173,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.platformRGB(axis:axis, coordinates:coordinates, alpha:alpha)
 		case .hsb: return ColorModel.platformHSB(axis:axis, coordinates:coordinates, alpha:alpha)
+		//case .xyz: return ColorModel.colorXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
+		//case .lch: return ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
 		case .chclt: return ColorModel.platformCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
 	}
@@ -177,6 +183,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.hsb, axis:axis)
+		//case .xyz: return ColorModel.coordinates(components:color.chclt.xyz(linearRGB:color.linear.xyz), axis:axis)
+		//case .lch: return ColorModel.coordinates(components:color.lch, axis:axis)
 		case .chclt: return ColorModel.coordinates(components:color.hcl, axis:axis)
 		}
 	}
@@ -185,6 +193,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display(chclt).vector.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.display(chclt).hsb().xyz, axis:axis)
+		//case .xyz: return ColorModel.coordinates(components:chclt.xyz(linearRGB:color.vector), axis:axis)
+		//case .lch: return ColorModel.coordinates(components:chclt.lch(linearRGB:color.vector), axis:axis)
 		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.vector), axis:axis)
 		}
 	}
@@ -497,8 +507,14 @@ extension CGContext {
 			
 			let colors:[CGColor] = (0 ..< rows).map { row in
 				let y = Double(row) / Double(rows - 1)
+				let color = ColorModel.colorXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chclt)
 				
-				return ColorModel.colorXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chclt).color
+				if color.isNormal { return color.color }
+				
+				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
+				//return color.normalize().scaleContrast(0.75).color
+				//return color.normalize().color
+				//return color.color
 			}
 			
 			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
@@ -532,10 +548,10 @@ extension CGContext {
 				
 				if color.isNormal { return color.color }
 				
-				//return (rgb.vector.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
-				return color.normalize().scaleContrast(0.75).color
-				//return rgb.normalize().color
-				//return rgb.color()
+				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
+				//return color.normalize().scaleContrast(0.75).color
+				//return color.normalize().color
+				//return color.color
 			}
 			
 			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
