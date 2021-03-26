@@ -152,6 +152,7 @@ struct Style {
 	
 	func size(_ size:CGFloat) -> Style { return with(size:size) }
 	func color(_ color:PlatformColor) -> Style { return with(color:color) }
+	func align(_ alignment:NSTextAlignment) -> Style { return with(alignment:alignment) }
 	
 	func string(_ text:String) -> NSAttributedString {
 		return NSAttributedString(string:text, attributes:attributes)

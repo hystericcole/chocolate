@@ -84,6 +84,12 @@ class ChocolateThemeViewController: BaseViewController {
 	let sliderContrasting = Viewable.Slider(value:0.5, range:-1 ... 1, action:#selector(deriveChanged))
 	let sliderChroma = Viewable.Slider(value:0.5, range:-2 ... 2, action:#selector(deriveChanged))
 	
+	let stringDeriveContrast = Style.numberRight.label("", maximumLines:1)
+	let stringDeriveChroma = Style.numberRight.label("", maximumLines:1)
+	let stringContrasting = Style.numberRight.label("", maximumLines:1)
+	let stringChroma = Style.numberRight.label("", maximumLines:1)
+	let stringHue = Style.numberRight.label("", maximumLines:1)
+	
 	var indicators:[Viewable.Color] = []
 	var primaryPosition:CGPoint = CGPoint(x:0.875, y:0.875)
 	var isComplement:Bool = false
@@ -211,11 +217,25 @@ class ChocolateThemeViewController: BaseViewController {
 		let coordinates = CHCLT.Scalar.vector3(primaryPosition.x.native, 1 - primaryPosition.y.native, sliderHue.value)
 		let primary = model.color(axis:axis, coordinates:coordinates, chclt:chclt)
 		let adjust = CHCLT.Adjustment(contrast:sliderDeriveContrast.value, chroma:sliderDeriveChroma.value)
-		let adjustment = CHCLT.Adjustment(contrast:0.5 - 0.6 * (adjust.contrast - 0.5), chroma:adjust.chroma)
-		let contrasting = CHCLT.Adjustment(contrast:sliderContrasting.value + (1.0 - adjust.contrast) * 0.2, chroma:sliderChroma.value)
+		let adjustment = CHCLT.Adjustment(contrast:0.5 + 0.6 * (0.5 - adjust.contrast), chroma:adjust.chroma)
+		let increase = (1.0 - adjust.contrast) * 0.2
+		let contrasting = CHCLT.Adjustment(contrast:sliderContrasting.value * (1 - increase) + increase, chroma:sliderChroma.value)
 		let palette = Palette(chclt:chclt, primary:primary.linearRGB, contrasting:contrasting, primaryAdjustment:adjust, contrastingAdjustment:adjustment)
 		
 		return Input(axis:axis, model:model, chclt:chclt, palette:palette, coordinates:coordinates)
+	}
+	
+	func applySliderValues(_ input:Input) {
+		let formatter = NumberFormatter(fractionDigits:1 ... 1)
+		let isDark = input.palette.primary.isDark(input.chclt)
+		let deriveSymbol = isDark != (sliderDeriveContrast.value < 0) ? "◐" : "◑"
+		let contrastingSymbol = isDark ? "◓" : "◒"
+		
+		stringDeriveContrast.text = formatter.string(sliderDeriveContrast.value * 100.0) + deriveSymbol
+		stringDeriveChroma.text = formatter.string(sliderDeriveChroma.value * 100.0) + "%"
+		stringContrasting.text = formatter.string(sliderContrasting.value * 100.0) + contrastingSymbol
+		stringChroma.text = formatter.string(sliderChroma.value * 100.0) + "%"
+		stringHue.text = formatter.string(sliderHue.value * 360.0) + "°"
 	}
 	
 	func sampleLayout(_ input:Input, count:Int) -> Positionable {
@@ -297,22 +317,25 @@ class ChocolateThemeViewController: BaseViewController {
 	func layout() -> Positionable {
 		let input = current()
 		
-		let controls = Layout.Vertical(
+		applySliderValues(input)
+		
+		let controls = Layout.Columns(
+			columnCount:2,
 			spacing:4,
-			alignment:.fill,
+			template:Layout.Horizontal(spacing:4, alignment:.center, position:.stretch),
 			position:.stretch,
-			Layout.EmptySpace(width:1, height:1),
-			sliderDeriveContrast,
-			sliderDeriveChroma,
-			sliderContrasting,
-			sliderChroma,
-			sliderHue
+			sliderDeriveContrast, stringDeriveContrast,
+			sliderDeriveChroma, stringDeriveChroma,
+			sliderContrasting, stringContrasting,
+			sliderChroma, stringChroma,
+			sliderHue, stringHue.minimum(width:50)
 		)
 		
 		let picker = Layout.Vertical(
 			spacing:4,
 			alignment:.fill,
 			position:.stretch,
+			Layout.EmptySpace(width:1, height:1),
 			controls.minimum(width:200).padding(horizontal:20, vertical:0),
 			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0)
 				.minimum(width:120, height:120)
