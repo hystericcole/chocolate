@@ -194,9 +194,13 @@ class ChocolatePlaneViewController: BaseViewController {
 		let axis = Axis(rawValue:picker.select)
 		
 		planeView.mode = axis?.mode ?? .standard
-		refreshContent(positionIndicator.point(), animate:isDisplayed)
-		
 		lineContrast.view?.isHidden = axis != .chclt_c && axis != .chclt_h
+		
+		if let color = indicator.color?.chocolateColor() {
+			applyColor(color, animated:isDisplayed)
+		} else {
+			refreshContent(positionIndicator.point(), animate:isDisplayed)
+		}
 	}
 	
 #if os(macOS)
