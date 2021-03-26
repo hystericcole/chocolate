@@ -39,7 +39,7 @@ class ChocolatePlaneLayer: CALayer {
 	
 	override func draw(in ctx: CGContext) {
 		let box = CGRect(origin:.zero, size:bounds.size)
-		let space = view?.screenColorSpace
+		let space = chclt is CHCLT_Linear ? nil : view?.screenColorSpace
 		
 		ctx.clip(to:box)
 		
@@ -47,8 +47,8 @@ class ChocolatePlaneLayer: CALayer {
 		case .chclt: ctx.drawPlaneFromCubeCHCLT(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
 		//case .lch: ctx.drawPlaneFromCubeLCH(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
 		//case .xyz: ctx.drawPlaneFromCubeXYZ(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
-		case .rgb: ctx.drawPlaneFromCubeRGB(axis:mode.axis, scalar:scalar, box:box, drawSpace:space)
-		case .hsb: ctx.drawPlaneFromCubeHSB(axis:mode.axis, scalar:scalar, box:box, drawSpace:space)
+		case .rgb: ctx.drawPlaneFromCubeRGB(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
+		case .hsb: ctx.drawPlaneFromCubeHSB(axis:mode.axis, scalar:scalar, box:box, chclt:chclt, drawSpace:space)
 		}
 	}
 	

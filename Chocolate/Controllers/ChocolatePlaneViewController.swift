@@ -31,11 +31,9 @@ class ChocolatePlaneViewController: BaseViewController {
 	}
 	
 	struct IndicatorColors {
-		let chclt:CHCLT
 		let mode:ChocolatePlaneLayer.Mode
-		let linearColor:CHCLT.LinearRGB
-		let platformColor:PlatformColor
-		let borderColor:CGColor
+		let color:CHCLT.Color
+		let borderColor:CHCLT.Color
 	}
 	
 	let indicatorRadius:CGFloat = 33.5
@@ -90,10 +88,10 @@ class ChocolatePlaneViewController: BaseViewController {
 		axisChanged()
 	}
 	
-	func applyColorDescription(chclt:CHCLT, linearColor:CHCLT.LinearRGB) {
+	func applyColorDescription(_ color:CHCLT.Color) {
 		let formatter = NumberFormatter(fractionDigits:1 ... 1)
-		let hcl = chclt.hcl(linear:linearColor.vector)
-		let contrast = linearColor.contrast(chclt)
+		let hcl = color.hcl
+		let contrast = color.contrast
 		let symbol = chclt.contrast.lumaIsDark(hcl.z) ? "◐" : "◑"
 		
 		colorLabel.text = [
@@ -101,8 +99,8 @@ class ChocolatePlaneViewController: BaseViewController {
 			formatter.string(hcl.y * 100) + "%",
 			formatter.string(hcl.z * 100) + "☼",
 			formatter.string(contrast * 100) + symbol,
-			//formatter.string(linearColor.saturation(chclt) * 100) + "➞",
-			linearColor.display(chclt).web()
+			//formatter.string(color.saturation * 100) + "➞",
+			color.web()
 		].joined(separator:" • ")
 	}
 	
@@ -113,58 +111,44 @@ class ChocolatePlaneViewController: BaseViewController {
 	}
 	
 	func computeIndicatorColors(_ unit:CGPoint) -> IndicatorColors {
-		let chclt = self.chclt
 		let mode = planeView.mode
-		let borderContrasting = 0.0
 		let coordinates = CHCLT.Scalar.vector3(unit.x.native, 1 - unit.y.native, slider.value)
+		let color = mode.color(chclt:chclt, coordinates:coordinates)
+		let borderColor = color.contrasting(0).applyChroma(color.chroma)
 		
-		let linearColor:CHCLT.LinearRGB
-		let platformColor:PlatformColor
-		let borderColor:CGColor
-		
-		if mode.model == .chclt {
-			linearColor = mode.linearColor(chclt:chclt, coordinates:coordinates)
-			platformColor = CHCLT.Color(chclt, linearColor).platformColor
-			borderColor = linearColor.contrasting(chclt, value:borderContrasting).applyChroma(chclt, value:linearColor.chroma(chclt)).color()
-		} else {
-			platformColor = mode.platformColor(chclt:chclt, coordinates:coordinates)
-			linearColor = platformColor.chocolateColor(chclt:chclt)?.linearRGB ?? .white
-			borderColor = linearColor.contrasting(chclt, value:borderContrasting).applyChroma(chclt, value:linearColor.chroma(chclt)).color()
-		}
-		
-		return IndicatorColors(chclt:chclt, mode:mode, linearColor:linearColor, platformColor:platformColor, borderColor:borderColor)
+		return IndicatorColors(mode:mode, color:color, borderColor:borderColor)
 	}
 	
 	func applyIndicatorColors(_ colors:IndicatorColors) {
-		let chclt = colors.chclt
 		let mode = colors.mode
-		let linearComplement = colors.linearColor.applyChroma(chclt, value:-colors.linearColor.chroma(chclt))
-		let coordinatesComplement = mode.model.coordinates(axis:mode.axis, color:linearComplement, chclt:chclt)
-		let linearContrast = colors.linearColor.contrasting(chclt, value:0)
+		let linearComplement = colors.color.applyChroma(-colors.color.chroma)
+		let coordinatesComplement = mode.model.coordinates(axis:mode.axis, color:linearComplement)
+		let linearContrast = colors.color.contrasting(0)
+		let indicatorColor = colors.color.platformColor
 		
-		indicator.color = colors.platformColor
-		lineContrast.color = colors.platformColor
-		positionLineContrast.vertical = .fraction(1 - linearContrast.luma(chclt))
+		indicator.color = indicatorColor
+		lineContrast.color = indicatorColor
+		positionLineContrast.vertical = .fraction(1 - linearContrast.luma)
 		
-		complement.color = linearComplement.color()?.platformColor
+		complement.color = linearComplement.platformColor
 		positionComplement.horizontal = .fraction(coordinatesComplement.x)
 		positionComplement.vertical = .fraction(1 - coordinatesComplement.y)
 		
-		applyColorDescription(chclt:chclt, linearColor:colors.linearColor)
+		applyColorDescription(colors.color)
 		
 		if let layer = indicator.view?.layer {
-			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:colors.borderColor, clips:true)
+			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:colors.borderColor.color, clips:true)
 		}
 		
 		if let layer = complement.view?.layer {
-			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:colors.borderColor, clips:true)
+			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:colors.borderColor.color, clips:true)
 		}
 	}
 	
 	func refreshContent(_ unit:CGPoint, animate:Bool) {
 		let colors = computeIndicatorColors(unit)
 		
-		applyColorToPanel(colors.platformColor)
+		applyColorToPanel(colors.color.platformColor)
 		
 		if animate, let view = group.view {
 			Common.animate(duration:0.25, animations:{

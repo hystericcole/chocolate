@@ -399,21 +399,22 @@ enum ColorModel: Int {
 //	MARK: -
 
 extension CGContext {
-	func drawPlaneFromCubeRGB(axis:Int, scalar:CGFloat.NativeType, box:CGRect, drawSpace:CGColorSpace?) {
+	func drawPlaneFromCubeRGB(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT?, drawSpace:CGColorSpace?) {
 		let overColors:[CGColor]
 		let downColors:[CGColor]
 		let mode:CGBlendMode
 		let overAxis = ColorModel.AxisOptions.overAxis(axis)
 		let downAxis = ColorModel.AxisOptions.downAxis(axis)
+		let overCoordinates = [CHCLT.Scalar.vector3(0, 0, scalar), CHCLT.Scalar.vector3(1, 0, scalar)]
+		let downCoordinates = [CHCLT.Scalar.vector3(0, 1, scalar), CHCLT.Scalar.vector3(0, 0, scalar)]
 		
-		overColors = [
-			ColorModel.platformRGB(axis:overAxis, coordinates:CHCLT.Scalar.vector3(0, 0, scalar)).cgColor,
-			ColorModel.platformRGB(axis:overAxis, coordinates:CHCLT.Scalar.vector3(1, 0, scalar)).cgColor
-		]
-		downColors = [
-			ColorModel.platformRGB(axis:downAxis, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor,
-			ColorModel.platformRGB(axis:downAxis, coordinates:CHCLT.Scalar.vector3(0, 0, scalar)).cgColor
-		]
+		if let chclt = chclt {
+			overColors = overCoordinates.map { ColorModel.colorRGB(axis:overAxis, coordinates:$0, chclt:chclt).color }
+			downColors = downCoordinates.map { ColorModel.colorRGB(axis:downAxis, coordinates:$0, chclt:chclt).color }
+		} else {
+			overColors = overCoordinates.map { ColorModel.platformRGB(axis:overAxis, coordinates:$0).cgColor }
+			downColors = downCoordinates.map { ColorModel.platformRGB(axis:downAxis, coordinates:$0).cgColor }
+		}
 		mode = .lighten
 		
 		let start = box.origin
@@ -435,7 +436,7 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeHSB(axis:Int, scalar:CGFloat.NativeType, box:CGRect, drawSpace:CGColorSpace?) {
+	func drawPlaneFromCubeHSB(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT?, drawSpace:CGColorSpace?) {
 		var copyColors:[CGColor]
 		var modeColors:[CGColor]
 		let mode:CGBlendMode
@@ -445,28 +446,52 @@ extension CGContext {
 		
 		switch axis % 3 {
 		case 0:
-			copyColors = [
-				ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor,
-				ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar)).cgColor
-			]
-			
-			if options.contains(.negativeY) {
-				copyColors.insert(ColorModel.platformHSB(axis:48, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor, at:0)
+			if let chclt = chclt {
+				copyColors = [
+					ColorModel.colorHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar), chclt:chclt).color,
+					ColorModel.colorHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar), chclt:chclt).color
+				]
+				
+				if options.contains(.negativeY) {
+					copyColors.insert(ColorModel.colorHSB(axis:48, coordinates:CHCLT.Scalar.vector3(0, 1, scalar), chclt:chclt).color, at:0)
+				}
+			} else {
+				copyColors = [
+					ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor,
+					ColorModel.platformHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar)).cgColor
+				]
+				
+				if options.contains(.negativeY) {
+					copyColors.insert(ColorModel.platformHSB(axis:48, coordinates:CHCLT.Scalar.vector3(0, 1, scalar)).cgColor, at:0)
+				}
 			}
 			
 			modeColors = [PlatformColor.white.cgColor, PlatformColor.black.cgColor]
 			mode = .multiply
 		case 1:
 			let scalar = options.contains(.negativeY) ? scalar * 2 - 1 : scalar
-			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
+			if let chclt = chclt {
+				copyColors = (0 ..< count).map { ColorModel.colorHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar), chclt:chclt).color }
+			} else {
+				copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
+			}
+			
 			modeColors = [PlatformColor.white.cgColor, PlatformColor.black.cgColor]
 			mode = .multiply
 		case _:
-			copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
-			modeColors = [
-				ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), alpha:0).cgColor,
-				ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), alpha:1).cgColor
-			]
+			if let chclt = chclt {
+				copyColors = (0 ..< count).map { ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar), chclt:chclt).color }
+				modeColors = [
+					ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), chclt:chclt, alpha:0).color,
+					ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), chclt:chclt, alpha:1).color
+				]
+			} else {
+				copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
+				modeColors = [
+					ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), alpha:0).cgColor,
+					ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), alpha:1).cgColor
+				]
+			}
 			mode = .normal
 		}
 		
