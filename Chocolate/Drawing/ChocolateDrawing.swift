@@ -81,8 +81,8 @@ enum ChocolateDrawing {
 	}
 	
 	static func drawHueGraphs(_ chclt:CHCLT, count:Int, context:CGContext, box:CGRect, polar:Bool) {
-		let hues = chclt.hueRange(start:0.0, shift:1.0 / CHCLT.Scalar(count), count:count)
-		let domain = (0 ..< count).map { CHCLT.Scalar($0) / CHCLT.Scalar(count - 1) }
+		let hues:[CHCLT.Vector3] = chclt.hueRange(start:0.0, shift:1.0 / CHCLT.Scalar(count), count:count)
+		let domain:[CHCLT.Scalar] = (0 ..< count).map { CHCLT.Scalar($0) / CHCLT.Scalar(count - 1) }
 		let mode:CGPathDrawingMode = polar ? .fillStroke : .stroke
 		let opacity:CGFloat = 0.25
 		
@@ -110,7 +110,7 @@ enum ChocolateDrawing {
 		context.addLines(between:blue)
 		context.drawPath(using:mode)
 		
-		let luminances = hues.map { chclt.luminance($0) }
+		let luminances:[CHCLT.Scalar] = hues.map { chclt.luminance($0) }
 		let luminance:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:luminances[$0]) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(luminances[$0])) }
@@ -119,7 +119,7 @@ enum ChocolateDrawing {
 		context.addLines(between:luminance)
 		context.drawPath(using:mode)
 		
-		let chromas = hues.map { chclt.chroma($0, luminance:chclt.luminance($0)) }
+		let chromas:[CHCLT.Scalar] = hues.map { chclt.chroma($0, luminance:chclt.luminance($0)) }
 		let chroma:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:chromas[$0]) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(chromas[$0])) }
@@ -128,7 +128,7 @@ enum ChocolateDrawing {
 		context.addLines(between:chroma)
 		context.drawPath(using:.stroke)
 		
-		let saturations = hues.map { chclt.saturation($0, luminance:chclt.luminance($0)) }
+		let saturations:[CHCLT.Scalar] = hues.map { chclt.saturation($0, luminance:chclt.luminance($0)) }
 		let saturation:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:saturations[$0]) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(saturations[$0])) }
@@ -137,7 +137,7 @@ enum ChocolateDrawing {
 		context.addLines(between:saturation)
 		context.drawPath(using:.stroke)
 		
-		let minimums = hues.map { chclt.applyLuminance($0, luminance:chclt.luminance($0), apply:0.5).min() }
+		let minimums:[CHCLT.Scalar] = hues.map { chclt.applyLuminance($0, luminance:chclt.luminance($0), apply:0.5).min() }
 		let minimum:[CGPoint] = polar
 			? (0 ..< count).map { box.polar(turns:domain[$0], radius:minimums[$0]) }
 			: (0 ..< count).map { box.unit(x:CGFloat(domain[$0]), y:CGFloat(minimums[$0])) }
