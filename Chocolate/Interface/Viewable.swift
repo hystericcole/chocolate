@@ -642,12 +642,12 @@ enum Viewable {
 			var shadow:Shadow?
 			var boundingBox:CGRect?
 			
-			init(tag:Int = 0, path:CGPath? = nil, style:Style, shadow:Shadow? = nil) {
+			init(tag:Int = 0, path:CGPath?, boundingBox:CGRect?, style:Style, shadow:Shadow? = nil) {
 				self.tag = tag
 				self.path = path
 				self.style = style
 				self.shadow = shadow
-				self.boundingBox = nil
+				self.boundingBox = boundingBox
 			}
 			
 			mutating func lazyBoundingBox() -> CGRect {
@@ -683,8 +683,8 @@ enum Viewable {
 			set { model.shadow = newValue; shapeLayer?.shadow = newValue ?? .default }
 		}
 		
-		init(tag:Int = 0, path:CGPath? = nil, style:Style, shadow:Shadow? = nil) {
-			self.model = Model(tag:tag, path:path, style:style, shadow:shadow)
+		init(tag:Int = 0, path:CGPath? = nil, box:CGRect? = nil, style:Style, shadow:Shadow? = nil) {
+			self.model = Model(tag:tag, path:path, boundingBox:box, style:style, shadow:shadow)
 		}
 		
 		func pathForSize(_ size:CGSize) -> CGPath? {

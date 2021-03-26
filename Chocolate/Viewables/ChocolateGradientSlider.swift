@@ -34,8 +34,12 @@ class ChocolateGradientSlider: Viewable.Group {
 	}
 	
 	var layout:Layout.ThumbTrackHorizontal
-	var thumb = Viewable.Color(color:PlatformColor(white:1, alpha:0.0))
 	var track = Viewable.Gradient(colors:[], direction:.right)
+	var thumb = Viewable.Shape(
+		path:ChocolateGradientSlider.thumbIndicatorPath(radius:10.0, thickness:1.0),
+		box:CGRect(origin:.zero, size:CGSize(square:20.0)),
+		style:Viewable.Shape.Style(fill:PlatformColor.black.cgColor)
+	)
 	var action:Selector
 	var radius:CGFloat
 	var isTracking:Bool
@@ -44,6 +48,15 @@ class ChocolateGradientSlider: Viewable.Group {
 	var value:Double {
 		get { return layout.thumbPosition }
 		set { layout.thumbPosition = newValue; view?.ordered = layout }
+	}
+	
+	var thumbColor:CGColor? {
+		get { return thumb.style.fill }
+		set { thumb.style.fill = newValue }
+	}
+	
+	var borderColor:CGColor? = PlatformColor.lightGray.cgColor {
+		didSet { track.gradientLayer?.borderColor = borderColor }
 	}
 	
 	init(value:Double = 0.0, target:AnyObject? = nil, action:Selector, radius:CGFloat = 22) {
@@ -67,14 +80,39 @@ class ChocolateGradientSlider: Viewable.Group {
 		super.init(content:layout)
 	}
 	
+	static func thumbIndicatorPath(radius:CGFloat = 8.0, thickness:CGFloat = 1.0) -> CGPath {
+		let path = CGMutablePath()
+		
+		let two:CGFloat = 2.0
+		let c:CGFloat = radius
+		let r:CGFloat = radius - thickness
+		let d:CGFloat = 1.0 + two.squareRoot()
+		let s:CGFloat = r / d
+		let c0 = CGPoint(x:c, y:c)
+		let c1 = CGPoint(x:c + s, y:c + s)
+		let c2 = CGPoint(x:c + s, y:c - s)
+		let c3 = CGPoint(x:c - s, y:c - s)
+		let c4 = CGPoint(x:c - s, y:c + s)
+		
+		path.addEllipse(in:CGRect(x:0, y:0, width:radius * 2, height:radius * 2))
+		path.move(to:CGPoint(x:c, y:c + s))
+		path.addArc(center:c1, radius:s, startAngle:1.00 * .pi, endAngle:0.25 * .pi, clockwise:true)
+		path.addArc(center:c0, radius:r, startAngle:0.25 * .pi, endAngle:1.75 * .pi, clockwise:true)
+		path.addArc(center:c2, radius:s, startAngle:1.75 * .pi, endAngle:1.00 * .pi, clockwise:true)
+		path.addArc(center:c3, radius:s, startAngle:0.00 * .pi, endAngle:1.25 * .pi, clockwise:true)
+		path.addArc(center:c0, radius:r, startAngle:1.25 * .pi, endAngle:0.75 * .pi, clockwise:true)
+		path.addArc(center:c4, radius:s, startAngle:0.75 * .pi, endAngle:0.00 * .pi, clockwise:true)
+		path.closeSubpath()
+		
+		return path
+	}
+	
 	override func attachToView(_ view: ViewableGroupView) {
 		super.attachToView(view)
 		
-		let thumbBorderColor = PlatformColor.black
-		let trackBorderColor = PlatformColor.lightGray
-		
-		track.border(CALayer.Border(width:Constant.trackBorderWidth, radius:radius, color:trackBorderColor.cgColor))
-		thumb.border(CALayer.Border(width:Constant.thumbBorderWidth, radius:radius, color:thumbBorderColor.cgColor))
+		if let borderColor = borderColor {
+			track.border(CALayer.Border(width:Constant.trackBorderWidth, radius:radius, color:borderColor))
+		}
 		
 		Common.Recognizer.attachRecognizers([
 			Common.Recognizer(.pan(false), target:self, action:#selector(recognizerPanned)),
