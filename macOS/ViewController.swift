@@ -13,7 +13,8 @@ class ViewController: BaseTabController {
 		super.prepare()
 		
 		title = DisplayStrings.Chocolate.title
-		viewControllers = [ChocolateViewController(), ChocolatePlaneViewController(), ChocolateLumaRampViewController()]
+		viewControllers = [ChocolateThemeViewController(), ChocolatePlaneViewController(), ChocolateLumaRampViewController()]
+		title = viewControllers[0].title
 	}
 	
 	override func viewWillAppear() {
@@ -38,12 +39,13 @@ class ViewController: BaseTabController {
 	func applyMinimumSizeToWindow() {
 		guard let window = view.window else { return }
 		
+		let context = window.positionableContext
 		let screen = window.screen ?? NSScreen.main
 		let limit = screen?.visibleFrame.size ?? CGSize(square:640)
 		var minimum = CGSize(width:240, height:360)
 		
 		for controller in viewControllers {
-			let size = controller.view.positionableSize(fitting:Layout.Limit(size:limit))
+			let size = controller.view.positionableSize(fitting:Layout.Limit(size:limit), context:context)
 			let require = size.minimum
 			
 			minimum.width = min(max(minimum.width, ceil(require.width)), limit.width)

@@ -13,6 +13,6 @@ class ViewController: BaseTabController {
 		super.prepare()
 		
 		title = DisplayStrings.Chocolate.title
-		viewControllers = [ChocolateViewController(), ChocolatePlaneViewController(), ChocolateLumaRampViewController()]
+		viewControllers = [ChocolateThemeViewController(), ChocolatePlaneViewController(), ChocolateLumaRampViewController()]
 	}
 }
