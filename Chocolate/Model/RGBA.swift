@@ -53,6 +53,10 @@ extension CHCLT {
 			self.linear = CHCLT.Scalar.vector4(linear, chclt.luminance(linear))
 		}
 		
+		public init(_ chclt:CHCLT, lab:CHCLT.Vector3, alpha:CHCLT.Scalar = 1) {
+			self.init(chclt, linear:chclt.linearRGB(lab:lab), alpha:alpha)
+		}
+		
 		public init(_ chclt:CHCLT, _ color:Color) {
 			self.init(chclt, linear:chclt.convert(linearRGB:color.linear.xyz, from:color.chclt))
 		}
@@ -367,20 +371,20 @@ extension CHCLT.Color {
 		self.init(color?.cgColor)
 	}
 	
-	var platformColor:PlatformColor { return color.platformColor }
+	var platformColor:PlatformColor { return color().platformColor }
 	
-	public var color:CGColor! {
+	public var linearColor:CGColor! {
+		return linearRGB.color(alpha:CGFloat(alpha))
+	}
+	
+	public func color(allowLab:Bool = false) -> CGColor! {
 		if let colorSpace = chclt.rgbColorSpace() {
 			return CGColor.with(colorSpace:colorSpace, componentsVector4:display)
-		} else if let colorSpace = chclt.labColorSpace() {
+		} else if allowLab, let colorSpace = chclt.labColorSpace() {
 			return CGColor.with(colorSpace:colorSpace, componentsVector3:chclt.lab(linearRGB:linear.xyz), alpha:CGFloat(alpha))
 		} else {
 			return CGColor.with(colorSpace:CHCLT.LinearRGB.colorSpace, componentsVector3:linear.xyz, alpha:CGFloat(alpha))
 		}
-	}
-	
-	public var linearColor:CGColor! {
-		return linearRGB.color(alpha:CGFloat(alpha))
 	}
 	
 	public func convert(colorSpace:CGColorSpace?) -> CGColor! {
@@ -392,7 +396,7 @@ extension CHCLT.Color {
 			return color
 		}
 		
-		guard let color = color else { return nil }
+		guard let color = color() else { return nil }
 		
 		if
 			#available(macOS 10.11, iOS 9.0, *),

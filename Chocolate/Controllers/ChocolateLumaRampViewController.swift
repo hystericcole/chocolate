@@ -113,7 +113,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 		let all = colors
 		
 		gradient.colorSpace = CHCLT.LinearRGB.colorSpace
-		gradient.colors = all.compactMap { $0.color }
+		gradient.colors = all.compactMap { $0.color() }
 	}
 	
 	@objc

@@ -293,7 +293,7 @@ enum ColorModel: Int {
 		locations.append(1.0)
 		colorsOrder.append(.black)
 		
-		var colors:[CGColor] = colorsOrder.map { CHCLT.Color(chclt, $0).color }
+		var colors:[CGColor] = colorsOrder.map { CHCLT.Color(chclt, $0).color() }
 		
 		if darkToLight {
 			colors.reverse()
@@ -409,8 +409,8 @@ extension CGContext {
 		let downCoordinates = [CHCLT.Scalar.vector3(0, 1, scalar), CHCLT.Scalar.vector3(0, 0, scalar)]
 		
 		if let chclt = chclt {
-			overColors = overCoordinates.map { ColorModel.colorRGB(axis:overAxis, coordinates:$0, chclt:chclt).color }
-			downColors = downCoordinates.map { ColorModel.colorRGB(axis:downAxis, coordinates:$0, chclt:chclt).color }
+			overColors = overCoordinates.map { ColorModel.colorRGB(axis:overAxis, coordinates:$0, chclt:chclt).color() }
+			downColors = downCoordinates.map { ColorModel.colorRGB(axis:downAxis, coordinates:$0, chclt:chclt).color() }
 		} else {
 			overColors = overCoordinates.map { ColorModel.platformRGB(axis:overAxis, coordinates:$0).cgColor }
 			downColors = downCoordinates.map { ColorModel.platformRGB(axis:downAxis, coordinates:$0).cgColor }
@@ -448,12 +448,12 @@ extension CGContext {
 		case 0:
 			if let chclt = chclt {
 				copyColors = [
-					ColorModel.colorHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar), chclt:chclt).color,
-					ColorModel.colorHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar), chclt:chclt).color
+					ColorModel.colorHSB(axis:0, coordinates:CHCLT.Scalar.vector3(0, 1, scalar), chclt:chclt).color(),
+					ColorModel.colorHSB(axis:0, coordinates:CHCLT.Scalar.vector3(1, 1, scalar), chclt:chclt).color()
 				]
 				
 				if options.contains(.negativeY) {
-					copyColors.insert(ColorModel.colorHSB(axis:48, coordinates:CHCLT.Scalar.vector3(0, 1, scalar), chclt:chclt).color, at:0)
+					copyColors.insert(ColorModel.colorHSB(axis:48, coordinates:CHCLT.Scalar.vector3(0, 1, scalar), chclt:chclt).color(), at:0)
 				}
 			} else {
 				copyColors = [
@@ -471,7 +471,7 @@ extension CGContext {
 		case 1:
 			let scalar = options.contains(.negativeY) ? scalar * 2 - 1 : scalar
 			if let chclt = chclt {
-				copyColors = (0 ..< count).map { ColorModel.colorHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar), chclt:chclt).color }
+				copyColors = (0 ..< count).map { ColorModel.colorHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar), chclt:chclt).color() }
 			} else {
 				copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:1, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
 			}
@@ -480,10 +480,10 @@ extension CGContext {
 			mode = .multiply
 		case _:
 			if let chclt = chclt {
-				copyColors = (0 ..< count).map { ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar), chclt:chclt).color }
+				copyColors = (0 ..< count).map { ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar), chclt:chclt).color() }
 				modeColors = [
-					ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), chclt:chclt, alpha:0).color,
-					ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), chclt:chclt, alpha:1).color
+					ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), chclt:chclt, alpha:0).color(),
+					ColorModel.colorHSB(axis:2, coordinates:CHCLT.Scalar.vector3(0, 0, scalar), chclt:chclt, alpha:1).color()
 				]
 			} else {
 				copyColors = (0 ..< count).map { ColorModel.platformHSB(axis:2, coordinates:CHCLT.Scalar.vector3(Double($0) / Double(count - 1), 1, scalar)).cgColor }
@@ -534,7 +534,7 @@ extension CGContext {
 				let y = Double(row) / Double(rows - 1)
 				let color = ColorModel.colorXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chclt)
 				
-				if color.isNormal { return color.color }
+				if color.isNormal { return color.color() }
 				
 				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
 				//return color.normalize().scaleContrast(0.75).color
@@ -571,7 +571,7 @@ extension CGContext {
 				let coordinates = CHCLT.Scalar.vector3(x, 1 - y, scalar)
 				let color = ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt)
 				
-				if color.isNormal { return color.color }
+				if color.isNormal { return color.color() }
 				
 				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
 				//return color.normalize().scaleContrast(0.75).color

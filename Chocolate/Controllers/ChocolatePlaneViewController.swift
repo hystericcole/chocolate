@@ -137,11 +137,11 @@ class ChocolatePlaneViewController: BaseViewController {
 		applyColorDescription(colors.color)
 		
 		if let layer = indicator.view?.layer {
-			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:colors.borderColor.color, clips:true)
+			layer.border = CALayer.Border(width:3, radius:indicatorRadius, color:colors.borderColor.color(), clips:true)
 		}
 		
 		if let layer = complement.view?.layer {
-			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:colors.borderColor.color, clips:true)
+			layer.border = CALayer.Border(width:2, radius:indicatorRadius * 0.5, color:colors.borderColor.color(), clips:true)
 		}
 	}
 	

@@ -15,7 +15,7 @@ extension CGColor {
 	func chocolateColor(chclt:CHCLT? = nil) -> CHCLT.Color? { return CHCLT.Color(chclt ?? colorSpace?.chclt ?? CGColor.chocolate, self, useSpaceFromColorWhenAvailable:chclt == nil) }
 	
 	func chocolateTransform(_ transform:CHCLT.Transform, chclt:CHCLT? = nil) -> CGColor? {
-		chocolateColor(chclt:chclt)?.transform(transform).color
+		chocolateColor(chclt:chclt)?.transform(transform).color()
 	}
 }
 
