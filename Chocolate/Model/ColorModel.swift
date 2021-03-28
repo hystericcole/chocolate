@@ -191,8 +191,8 @@ enum ColorModel: Int {
 	
 	func coordinates(axis:Int, color:CHCLT.LinearRGB, chclt:CHCLT) -> Scalar.Vector3 {
 		switch self {
-		case .rgb: return ColorModel.coordinates(components:color.display(chclt).vector.xyz, axis:axis)
-		case .hsb: return ColorModel.coordinates(components:color.display(chclt).hsb().xyz, axis:axis)
+		case .rgb: return ColorModel.coordinates(components:color.display(chclt).xyz, axis:axis)
+		case .hsb: return ColorModel.coordinates(components:CHCLT.Color(chclt, color).hsb, axis:axis)
 		//case .xyz: return ColorModel.coordinates(components:chclt.xyz(linearRGB:color.vector), axis:axis)
 		//case .lch: return ColorModel.coordinates(components:chclt.lch(linearRGB:color.vector), axis:axis)
 		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.vector), axis:axis)

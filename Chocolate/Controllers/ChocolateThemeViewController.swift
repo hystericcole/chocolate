@@ -38,7 +38,7 @@ class ChocolateThemeViewController: BaseViewController {
 		func sampleText(_ palette:Palette, index:Int, count:Int, formatter:NumberFormatter, reverseContrast:CHCLT.Scalar, reverseLuminance:CHCLT.Linear) -> (String, PlatformColor) {
 			let fraction = Double(index) / Double(count - 1)
 			let linear = palette.foreground(fraction)
-			let name = linear.display(palette.chclt).web()
+			let name = CHCLT.Color(palette.chclt, linear).web()
 			let color = CHCLT.Color(palette.chclt, linear).platformColor
 			let contrast = formatter.string(linear.contrast(palette.chclt) + reverseContrast)
 			let ratio = CHCLT.Contrast.luminanceRatioG18(reverseLuminance, linear.luminance(CHCLT_sRGB.g18))

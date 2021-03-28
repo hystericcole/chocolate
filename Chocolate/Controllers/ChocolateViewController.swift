@@ -268,11 +268,11 @@ class ChocolateViewController: BaseViewController {
 		case .unknown:
 			color = previousColor
 		case .red:
-			color = DisplayRGB(value, previousColor.display.y, previousColor.display.z).color(chocolate)
+			color = CHCLT.Color(chocolate, red:value, green:previousColor.green, blue:previousColor.blue)
 		case .green:
-			color = DisplayRGB(previousColor.display.x, value, previousColor.display.z).color(chocolate)
+			color = CHCLT.Color(chocolate, red:previousColor.red, green:value, blue:previousColor.blue)
 		case .blue:
-			color = DisplayRGB(previousColor.display.x, previousColor.display.y, value).color(chocolate)
+			color = CHCLT.Color(chocolate, red:previousColor.red, green:previousColor.green, blue:value)
 		case .hue:
 			if stableChroma {
 				color = CHCLT.Color(chocolate, hue:value, chroma:sliderChroma.value, luma:sliderLuma.value)

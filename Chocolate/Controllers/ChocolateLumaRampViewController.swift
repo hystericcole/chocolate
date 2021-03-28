@@ -155,7 +155,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 #endif
 	
 	func copyToPasteboard() {
-		let colors = colorStops.compactMap { $0.color?.chocolateColor()?.displayRGB }
+		let colors = colorStops.compactMap { $0.color?.chocolateColor() }
 		let web = colors.compactMap { $0.web() }.joined(separator:", ")
 		let css = colors.compactMap { $0.css() }.joined(separator:", ")
 		

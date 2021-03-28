@@ -265,7 +265,7 @@ public struct CHCLTShading {
 		public let alpha:CHCLT.Scalar
 		public let location:CHCLT.Scalar
 		
-		func display(_ model:CHCLT) -> DisplayRGB { return color.display(model, alpha:alpha) }
+		func display(_ model:CHCLT) -> CHCLT.Color { CHCLT.Color(model, color, alpha:alpha) }
 		func vector() -> CHCLT.Scalar.Vector4 { return CHCLT.Scalar.vector4(color.vector, alpha) }
 	}
 

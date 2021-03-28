@@ -933,8 +933,8 @@ extension CHCLT {
 		}
 		
 		/// Transfer from linear RGB to display ready, gamma compressed RGB
-		public func display(_ chclt:CHCLT, alpha:Scalar = 1) -> DisplayRGB {
-			return DisplayRGB(Scalar.vector4(chclt.display(vector), alpha))
+		public func display(_ chclt:CHCLT, alpha:Scalar = 1) -> CHCLT.Vector4 {
+			return Scalar.vector4(chclt.display(vector), alpha)
 		}
 		
 		public func color(_ chclt:CHCLT, alpha:Scalar = 1) -> CHCLT.Color {

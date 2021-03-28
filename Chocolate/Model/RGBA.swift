@@ -16,7 +16,6 @@ extension CHCLT {
 		public let linear:CHCLT.Vector4
 		public let chclt:CHCLT
 		
-		public var displayRGB:DisplayRGB { return DisplayRGB(display) }
 		public var linearRGB:CHCLT.LinearRGB { return CHCLT.LinearRGB(linear.xyz) }
 		public var red:CHCLT.Scalar { return display.x }
 		public var green:CHCLT.Scalar { return display.y }
@@ -59,10 +58,6 @@ extension CHCLT {
 		
 		public init(_ chclt:CHCLT, _ color:Color) {
 			self.init(chclt, linear:chclt.convert(linearRGB:color.linear.xyz, from:color.chclt))
-		}
-		
-		public init(_ chclt:CHCLT, _ color:DisplayRGB) {
-			self.init(chclt, display:color.vector)
 		}
 		
 		public init(_ chclt:CHCLT, _ color:CHCLT.LinearRGB, alpha:CHCLT.Scalar = 1) {
@@ -112,8 +107,8 @@ extension CHCLT {
 		public func difference(_ color:Color) -> Scalar { return Lab.difference(lab, color.lab) }
 		
 		public func rgba() -> String { return String(format:"RGBA(%.3g, %.3g, %.3g, %.3g)", red, green, blue, alpha) }
-		public func web(allowFormat:Int = 0) -> String { return displayRGB.web(allowFormat:allowFormat) }
-		public func css(withAlpha:Int = 0) -> String { return displayRGB.css(withAlpha:withAlpha) }
+		public func web(allowFormat:Int = 0) -> String { return Color.web(uint, allowFormat:allowFormat) }
+		public func css(withAlpha:Int = 0) -> String { return Color.css(display, withAlpha:withAlpha) }
 		public func chcl(withAlpha:Int = 0, formatter:NumberFormatter = NumberFormatter(fractionDigits:1 ... 1)) -> [String] {
 			let symbol = isDark ? "◐" : "◑"
 			
@@ -130,155 +125,62 @@ extension CHCLT {
 			
 			return result
 		}
-	}
-}
-
-//	MARK: -
-
-public struct DisplayRGB {
-	public typealias Scalar = CHCLT.Scalar
-	
-	public let vector:CHCLT.Vector4
-	
-	public var red:Scalar { return vector.x }
-	public var green:Scalar { return vector.y }
-	public var blue:Scalar { return vector.z }
-	public var alpha:Scalar { return vector.w }
-	
-	public var integer:(red:UInt, green:UInt, blue:UInt, alpha:UInt) {
-		var scaled = vector * 255
 		
-		scaled.round(.toNearestOrAwayFromZero)
-		
-		let integer = simd_uint(scaled)
-		
-		return (UInt(integer.x), UInt(integer.y), UInt(integer.z), UInt(integer.w))
-	}
-	
-	public var description:String {
-		return String(format:"RGBA(%.3g, %.3g, %.3g, %.3g)", red, green, blue, alpha)
-	}
-	
-	public init(_ rgba:CHCLT.Vector4) {
-		vector = rgba
-	}
-	
-	public init(_ red:Scalar, _ green:Scalar, _ blue:Scalar, _ alpha:Scalar = 1) {
-		vector = Scalar.vector4(red, green, blue, alpha)
-	}
-	
-	public init(gray:Scalar, _ alpha:Scalar = 1) {
-		vector = Scalar.vector4(gray, gray, gray, alpha)
-	}
-	
-	public init(hexagonal hue:Scalar, saturation:Scalar, brightness:Scalar, alpha:Scalar = 1) {
-		vector = Scalar.vector4(ColorModel.rgb_from_hsb(h:hue, s:saturation, b:brightness), alpha)
-	}
-	
-	public func color(_ chclt:CHCLT) -> CHCLT.Color {
-		return CHCLT.Color(chclt, display:vector)
-	}
-	
-	public func web(allowFormat:Int = 0) -> String {
-		let (r, g, b, a) = integer
-		let format:String
-		let scalar:UInt
-		
-		let allowCompact = allowFormat & 0x1A != 0
-		let allowRegular = allowFormat & 0x144 != 0
-		let isCompact = r % 17 == 0 && g % 17 == 0 && b % 17 == 0 && a % 17 == 0
-		let isGray = r == g && r == b
-		let isOpaque = a == 255
-		
-		if allowCompact && (isCompact || !allowRegular) {
-			let allowOpacity = allowFormat & 0x10 != 0
-			let allowGray = allowFormat & 0x02 != 0
-			scalar = 17
+		public func pixel() -> UInt32 {
+			let u = uint
 			
-			if allowGray && isGray && (isOpaque || !allowOpacity) {
-				format = "#%X"
-			} else if isOpaque ? allowFormat & 0x18 == 0x10 : allowOpacity {
-				format = "#%X%X%X%X"
-			} else {
-				format = "#%X%X%X"
-			}
-		} else {
-			let allowOpacity = allowFormat & 0x100 != 0
-			let allowGray = allowFormat & 0x04 != 0
-			scalar = 1
+			return (u.w << 24) | (u.x << 16) | (u.y << 8) | (u.z << 0)
+		}
+		
+		public static func css(_ rgba:CHCLT.Vector4, withAlpha:Int = 0) -> String {
+			let (red, green, blue, alpha) = (rgba.x, rgba.y, rgba.z, rgba.w)
 			
-			if allowGray && isGray && (isOpaque || !allowOpacity) {
-				format = "#%02X"
-			} else if isOpaque ? allowFormat & 0x140 == 0x100 : allowOpacity {
-				format = "#%02X%02X%02X%02X"
+			if withAlpha > 0 || (withAlpha == 0 && alpha < 1) {
+				return String(format:"rgba(%.1f, %.1f, %.1f, %.3g)", red * 255, green * 255, blue * 255, alpha).replacingOccurrences(of:".0,", with:",")
 			} else {
-				format = "#%02X%02X%02X"
+				return String(format:"rgb(%.1f, %.1f, %.1f)", red * 255, green * 255, blue * 255).replacingOccurrences(of:".0", with:"")
 			}
 		}
 		
-		return String(format:format, r / scalar, g / scalar, b / scalar, a / scalar)
-	}
-	
-	public func css(withAlpha:Int = 0) -> String {
-		if withAlpha > 0 || (withAlpha == 0 && alpha < 1) {
-			return String(format:"rgba(%.1f, %.1f, %.1f, %.3g)", red * 255, green * 255, blue * 255, alpha).replacingOccurrences(of:".0,", with:",")
-		} else {
-			return String(format:"rgb(%.1f, %.1f, %.1f)", red * 255, green * 255, blue * 255).replacingOccurrences(of:".0", with:"")
+		public static func web(_ rgba:simd_uint4, allowFormat:Int = 0) -> String {
+			let (r, g, b, a) = (rgba.x, rgba.y, rgba.z, rgba.w)
+			let format:String
+			let scalar:simd_uint4.Scalar
+			
+			let allowCompact = allowFormat & 0x1A != 0
+			let allowRegular = allowFormat & 0x144 != 0
+			let isCompact = r % 17 == 0 && g % 17 == 0 && b % 17 == 0 && a % 17 == 0
+			let isGray = r == g && r == b
+			let isOpaque = a == 255
+			
+			if allowCompact && (isCompact || !allowRegular) {
+				let allowOpacity = allowFormat & 0x10 != 0
+				let allowGray = allowFormat & 0x02 != 0
+				scalar = 17
+				
+				if allowGray && isGray && (isOpaque || !allowOpacity) {
+					format = "#%X"
+				} else if isOpaque ? allowFormat & 0x18 == 0x10 : allowOpacity {
+					format = "#%X%X%X%X"
+				} else {
+					format = "#%X%X%X"
+				}
+			} else {
+				let allowOpacity = allowFormat & 0x100 != 0
+				let allowGray = allowFormat & 0x04 != 0
+				scalar = 1
+				
+				if allowGray && isGray && (isOpaque || !allowOpacity) {
+					format = "#%02X"
+				} else if isOpaque ? allowFormat & 0x140 == 0x100 : allowOpacity {
+					format = "#%02X%02X%02X%02X"
+				} else {
+					format = "#%02X%02X%02X"
+				}
+			}
+			
+			return String(format:format, r / scalar, g / scalar, b / scalar, a / scalar)
 		}
-	}
-	
-	public func pixel() -> UInt32 {
-		var v = vector * 255.0
-
-		v.round(.toNearestOrAwayFromZero)
-
-		let u = simd_uint(v)
-		let a = u.w << 24
-		let r = u.x << 16
-		let g = u.y << 8
-		let b = u.z << 0
-
-		return r | g | b | a
-	}
-	
-	//	MARK: Hexagonal
-	
-	public func hsb() -> Scalar.Vector4 {
-		let hsb = ColorModel.hsb_from_rgb(r:vector.x, g:vector.y, b:vector.z)
-		
-		return Scalar.vector4(hsb, vector.w)
-	}
-}
-
-//	MARK: -
-
-extension DisplayRGB {
-	public static var colorSpace = displayColorSpace()
-	
-	public static func displayColorSpace() -> CGColorSpace {
-		if #available(macOS 11.0, iOS 14.0, *), let extended = CGColorSpace(name:CGColorSpace.extendedDisplayP3) { return extended }
-		if #available(macOS 10.12, iOS 10.0, *), let extended = CGColorSpace(name:CGColorSpace.extendedSRGB) { return extended }
-		if #available(macOS 10.11.2, iOS 9.3, *), let display = CGColorSpace(name:CGColorSpace.displayP3) { return display }
-		
-		return CGColorSpace(name:CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-	}
-	
-	public init?(_ color:CGColor?) {
-		guard let components = color?.componentsVector4 else { return nil }
-		
-		self.init(components)
-	}
-	
-	public func color(colorSpace:CGColorSpace? = nil) -> CGColor! {
-		let space:CGColorSpace
-		
-		if let colorSpace = colorSpace, colorSpace.model == .rgb, colorSpace.numberOfComponents == 3 {
-			space = colorSpace
-		} else {
-			space = DisplayRGB.colorSpace
-		}
-		
-		return CGColor.with(colorSpace:space, componentsVector4:vector)
 	}
 }
 
@@ -479,7 +381,7 @@ extension CHCLT {
 		var result:[CFData:CHCLT] = [:]
 		
 		for (name, chclt) in nameToCHCLT {
-			guard let key = CGColorSpace(name:name)?.commonKey else { continue }
+			guard let key = CGColorSpace(name:name)?.chocolateKey else { continue }
 			
 			//	Extended and truncated variants may have identical keys
 			result[key] = chclt
@@ -524,7 +426,7 @@ extension CHCLT_Pure {
 //	MARK: -
 
 extension CGColorSpace {
-	var commonKey:CFData? {
+	var chocolateKey:CFData? {
 		if #available(OSX 10.12, *) {
 			return copyICCData()
 		} else {
@@ -536,7 +438,7 @@ extension CGColorSpace {
 		guard model == .rgb else { return nil }
 		
 		if let name = name, let chclt = CHCLT.colorSpaceNameToCHCLT[name] { return chclt }
-		if let key = commonKey, let chclt = CHCLT.colorSpaceCommonKeyCHCLT[key] { return chclt }
+		if let key = chocolateKey, let chclt = CHCLT.colorSpaceCommonKeyCHCLT[key] { return chclt }
 		
 		return nil
 	}
