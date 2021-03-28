@@ -25,7 +25,7 @@ extension CHCLT {
 		public var hue:CHCLT.Scalar { return chclt.hue(linear.xyz, luminance:linear.w) }
 		public var chroma:CHCLT.Scalar { return chclt.chroma(linear.xyz, luminance:linear.w) }
 		public var saturation:CHCLT.Scalar { return chclt.saturation(linear.xyz, luminance:linear.w) }
-		public var luma:CHCLT.Scalar { return chclt.transfer(linear.w) }
+		public var luma:CHCLT.Scalar { return chclt.luma(luminance:linear.w) }
 		public var luminance:CHCLT.Scalar { return linear.w }
 		public var isDark:Bool { return chclt.contrast.luminanceIsDark(linear.w) }
 		public var isNormal:Bool { return linear.min() >= 0.0 && linear.max() <= 1.0 }
@@ -35,6 +35,7 @@ extension CHCLT {
 		public var hsb:CHCLT.Vector3 { return ColorModel.hsb_from_rgb(r:red, g:green, b:blue) }
 		public var lab:CHCLT.Vector3 { return chclt.lab(linearRGB:linear.xyz) }
 		public var lch:CHCLT.Vector3 { return chclt.lch(linearRGB:linear.xyz) }
+		public var xyz:CHCLT.Vector3 { return chclt.xyz(linearRGB:linear.xyz) }
 		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
 		public var description:String { return rgba() }
 		
@@ -82,8 +83,8 @@ extension CHCLT {
 		public func applyHue(_ value:CHCLT.Scalar) -> Self { return hueShifted(value - hue) }
 		public func scaleChroma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.scaleChroma(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }
 		public func applyChroma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyChroma(linear.xyz, luminance:linear.w, apply:value), alpha:display.w) }
-		public func scaleLuma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyLuminance(linear.xyz, luminance:linear.w, apply:chclt.linear(chclt.transfer(linear.w) * value)), alpha:display.w) }
-		public func applyLuma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyLuminance(linear.xyz, luminance:linear.w, apply:chclt.linear(value)), alpha:display.w) }
+		public func scaleLuma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyLuminance(linear.xyz, luminance:linear.w, apply:chclt.luminance(luma:chclt.luma(luminance:linear.w) * value)), alpha:display.w) }
+		public func applyLuma(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyLuminance(linear.xyz, luminance:linear.w, apply:chclt.luminance(luma:value)), alpha:display.w) }
 		public func scaleLuminance(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:linear.xyz * value, alpha:display.w) }
 		public func applyLuminance(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.applyLuminance(linear.xyz, luminance:linear.w, apply:value), alpha:display.w) }
 		public func scaleContrast(_ value:CHCLT.Scalar) -> Self { return Color(chclt, linear:chclt.scaleContrast(linear.xyz, luminance:linear.w, by:value), alpha:display.w) }

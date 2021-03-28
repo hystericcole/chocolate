@@ -77,6 +77,14 @@ public class CHCLT {
 		return linear / coefficients
 	}
 	
+	public func luma(luminance:Linear) -> Scalar {
+		return transfer(luminance)
+	}
+	
+	public func luminance(luma:Scalar) -> Linear {
+		return linear(luma)
+	}
+	
 	public func whitepoint() -> Vector3 {
 		return toXYZ * Vector3.one
 	}
@@ -180,9 +188,9 @@ extension CHCLT {
 	/// When using a medium luma other than 0.5 there will be a range of colors that satisfy the chosen ratio but would have better perceptual contrast against opposite colors.
 	/// For sRGB and a 4.5 ratio this will be colors with luminance in the range 0.182 to 0.214.
 	public struct Contrast: Equatable, Hashable {
-		/// The luminance value separating light and dark colors.  Must equal `linear(mediumLuma)`
+		/// The luminance value separating light and dark colors.  Must equal `luminance(luma:mediumLuma)`
 		public let mediumLuminance:Linear
-		/// The luma value separating light and dark colors.  Must equal `transfer(mediumLuminance)`
+		/// The luma value separating light and dark colors.  Must equal `luma(luminance:mediumLuminance)`
 		public let mediumLuma:Scalar
 		
 		public var linearOffset:Scalar {
@@ -197,16 +205,16 @@ extension CHCLT {
 		/// # Luma
 		/// To create a luma based contrast, choose the value for medium luma (typically 0.5) then compute the medium luminance.
 		/// ```
-		/// mediumLuminance:linear(mediumLuma)
+		/// mediumLuminance:luminance(luma:mediumLuma)
 		/// ```
 		/// # Luminance
 		/// To create a luminance based contrast, choose the value for medium luminance (e.g. 2/11) then compute the medium luma.
 		/// ```
-		/// mediumLuma:transfer(mediumLuminance)
+		/// mediumLuma:luma(luminance:mediumLuminance)
 		/// ```
 		///
 		/// - Parameters:
-		///   - mediumLuminance: The medium luminance, typically computed as `linear(0.5)`
+		///   - mediumLuminance: The medium luminance, typically computed as `luminance(luma:0.5)`
 		///   - mediumLuma: The medium luma, typically 0.5
 		public init(_ mediumLuminance:Linear, mediumLuma:Scalar = 0.5) {
 			self.mediumLuminance = mediumLuminance
@@ -447,15 +455,15 @@ extension CHCLT {
 	//	MARK: Luma
 	
 	public func luma(_ linear:Vector3) -> Scalar {
-		return transfer(luminance(linear))
+		return luma(luminance:luminance(linear))
 	}
 	
 	public func scaleLuma(_ vector:Linear.Vector3, luminance v:Linear, by scalar:Linear) -> Linear.Vector3 {
-		return applyLuminance(vector, luminance:v, apply:linear(transfer(v) * scalar))
+		return applyLuminance(vector, luminance:v, apply:luminance(luma:luma(luminance:v) * scalar))
 	}
 	
 	public func applyLuma(_ vector:Linear.Vector3, luminance v:Linear, apply u:Linear) -> Linear.Vector3 {
-		return applyLuminance(vector, luminance:v, apply:linear(u))
+		return applyLuminance(vector, luminance:v, apply:luminance(luma:u))
 	}
 	
 	//	MARK: Contrast
@@ -473,7 +481,7 @@ extension CHCLT {
 	///   - v: The luminance of color.
 	/// - Returns: The contrast of color.
 	public func contrast(luminance v:Linear) -> Linear {
-		return contrast.lumaContrast(transfer(v))
+		return contrast.lumaContrast(luma(luminance:v))
 	}
 	
 	/// Scale the luminance of the color so that the resulting contrast will be scaled by the given amount.
@@ -486,7 +494,7 @@ extension CHCLT {
 	///   - scalar: The scaling factor.
 	/// - Returns: The adjusted color.
 	public func scaleContrast(_ linear:Linear.Vector3, luminance v:Linear, by scalar:Scalar) -> Linear.Vector3 {
-		return applyLuma(linear, luminance:v, apply:contrast.lumaScaleContrast(transfer(v), by:scalar))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaScaleContrast(luma(luminance:v), by:scalar))
 	}
 	
 	/// Adjust the luminance to create a color that contrasts against the same colors as this color.  Negative values create contrasting colors.
@@ -498,14 +506,14 @@ extension CHCLT {
 	///   - value: The contrast of the adjusted color.  Negative values create contrasting colors.  Values near zero contrast poorly.  Values near one contrast well.
 	/// - Returns: The adjusted color
 	public func applyContrast(_ linear:Linear.Vector3, luminance v:Linear, apply value:Linear) -> Linear.Vector3 {
-		return applyLuma(linear, luminance:v, apply:contrast.lumaApplyContrast(transfer(v), value:value))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaApplyContrast(luma(luminance:v), value:value))
 	}
 	
 	public func matchContrast(_ linear:Linear.Vector3, to color:Linear.Vector3, by value:Scalar) -> Linear.Vector3 {
 		let v = luminance(linear)
 		let u = luminance(color)
 		
-		return applyLuma(linear, luminance:v, apply:contrast.lumaMatchContrast(transfer(v), transfer(u), by:value))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaMatchContrast(luma(luminance:v), luma(luminance:u), by:value))
 	}
 	
 	/// Adjust the luminance to create a color that contrasts well against this color, relative to the minimum suggested contrast.
@@ -525,7 +533,7 @@ extension CHCLT {
 	///   - value: The contrast adjustment in the range -1 (medium luminance) to 0 (minimum contrast) to 1 (maximum contrast).
 	/// - Returns: The adjusted color
 	public func contrasting(_ linear:Linear.Vector3, luminance v:Linear, value:Linear) -> Linear.Vector3 {
-		return applyLuma(linear, luminance:v, apply:contrast.lumaContrasting(transfer(v), value:value))
+		return applyLuma(linear, luminance:v, apply:contrast.lumaContrasting(luma(luminance:v), value:value))
 	}
 	
 	//	MARK: Hue
@@ -797,7 +805,7 @@ extension CHCLT {
 		let h = hue(linear, luminance:l)
 		let c = chroma(linear, luminance:l)
 		
-		return Linear.vector3(h, c, transfer(l))
+		return Linear.vector3(h, c, luma(luminance:l))
 	}
 	
 	public func transformContrast(_ linear:Linear.Vector3, luminance v:Linear, transform:Transform.Effect) -> Linear.Vector3 {
@@ -908,7 +916,7 @@ extension CHCLT {
 		}
 		
 		public init(_ chclt:CHCLT, hue:Scalar, chroma:Scalar, luma:Linear) {
-			self.init(chclt, hue:hue, chroma:chroma, luminance:chclt.linear(luma))
+			self.init(chclt, hue:hue, chroma:chroma, luminance:chclt.luminance(luma:luma))
 		}
 		
 		public func pixel() -> UInt32 {
