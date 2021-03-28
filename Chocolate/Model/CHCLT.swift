@@ -19,15 +19,17 @@ public class CHCLT {
 	public let coefficients:Vector3
 	public let contrast:Contrast
 	
-	public let toXYZ:Scalar.Matrix3x3
-	public let fromXYZ:Scalar.Matrix3x3
+	public let toCIEXYZ:Scalar.Matrix3x3
+	public let fromCIEXYZ:Scalar.Matrix3x3
 	
-	public init(_ toXYZ:Scalar.Matrix3x3, contrast:Contrast, coefficients:Vector3? = nil) {
-		self.coefficients = coefficients ?? XYZ.luminanceCoefficients(toXYZ)
+	public init(_ toCIEXYZ:Scalar.Matrix3x3, contrast:Contrast, coefficients:Vector3? = nil) {
+		self.coefficients = coefficients ?? CIEXYZ.luminanceCoefficients(toCIEXYZ)
 		self.contrast = contrast
-		self.toXYZ = toXYZ
-		self.fromXYZ = toXYZ.inverse
+		self.toCIEXYZ = toCIEXYZ
+		self.fromCIEXYZ = toCIEXYZ.inverse
 	}
+	
+	//	MARK: Transfer
 	
 	public func linear(_ value:Scalar) -> Linear {
 		return value
@@ -59,6 +61,8 @@ public class CHCLT {
 		return copysign(transfer(value.magnitude), value)
 	}
 	
+	//	MARK: Luminance
+	
 	/// Compute the perceptual luminance of the linear components.
 	///
 	/// Usually `rgb⋅c` where c is the weighting coefficients.
@@ -77,6 +81,8 @@ public class CHCLT {
 		return linear / coefficients
 	}
 	
+	//	MARK: Luma
+	
 	public func luma(luminance:Linear) -> Scalar {
 		return transfer(luminance)
 	}
@@ -85,53 +91,7 @@ public class CHCLT {
 		return linear(luma)
 	}
 	
-	public func whitepoint() -> Vector3 {
-		return toXYZ * Vector3.one
-	}
-	
-	public func xyz(linearRGB:Vector3) -> Vector3 {
-		return toXYZ * linearRGB
-	}
-	
-	public func linearRGB(xyz:Vector3) -> Vector3 {
-		return fromXYZ * xyz
-	}
-	
-	public func lab(linearRGB:Vector3) -> Vector3 {
-		return Lab.fromXYZ(xyz:xyz(linearRGB:linearRGB), white:whitepoint())
-	}
-	
-	public func linearRGB(lab:Vector3) -> Vector3 {
-		return linearRGB(xyz:Lab.toXYZ(lab:lab, white:whitepoint()))
-	}
-	
-	public func lch(linearRGB:Vector3) -> Vector3 {
-		var lch = Lab.toLCH(lab:lab(linearRGB:linearRGB) / Lab.range)
-		
-		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
-		
-		return lch
-	}
-	
-	public func linearRGB(lch:Vector3) -> Vector3 {
-		var lch = lch
-		
-		lch.z = lch.z * 2.0 * .pi
-		
-		return linearRGB(lab:Lab.fromLCH(lch:lch) * Lab.range)
-	}
-	
-	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
-		if toXYZ == chclt.toXYZ {
-			return linearRGB
-		} else {
-			return self.linearRGB(xyz:chclt.xyz(linearRGB:linearRGB))
-		}
-	}
-	
-	public func convert(rgb:Vector3, from chclt:CHCLT) -> Vector3 {
-		return display(convert(linearRGB:chclt.linear(rgb), from:chclt))
-	}
+	//	MARK: Comparison
 	
 	public func isEqual(to chclt:CHCLT) -> Bool {
 		return coefficients == chclt.coefficients && contrast == chclt.contrast && type(of:self) == type(of:chclt)
@@ -142,6 +102,60 @@ public class CHCLT {
 		hasher.combine(contrast)
 	}
 }
+
+//	MARK: - Conversion
+
+extension CHCLT {
+	public func whitepoint() -> Vector3 {
+		return toCIEXYZ * Vector3.one
+	}
+	
+	public func ciexyz(linearRGB:Vector3) -> Vector3 {
+		return toCIEXYZ * linearRGB
+	}
+	
+	public func linearRGB(ciexyz:Vector3) -> Vector3 {
+		return fromCIEXYZ * ciexyz
+	}
+	
+	public func cielab(linearRGB:Vector3) -> Vector3 {
+		return CIELAB.fromXYZ(xyz:ciexyz(linearRGB:linearRGB), white:whitepoint())
+	}
+	
+	public func linearRGB(cielab:Vector3) -> Vector3 {
+		return linearRGB(ciexyz:CIELAB.toXYZ(lab:cielab, white:whitepoint()))
+	}
+	
+	public func lchab(linearRGB:Vector3) -> Vector3 {
+		var lch = CIELAB.toLCH(lab:cielab(linearRGB:linearRGB) / CIELAB.range)
+		
+		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
+		
+		return lch
+	}
+	
+	public func linearRGB(lchab:Vector3) -> Vector3 {
+		var lch = lchab
+		
+		lch.z = lch.z * 2.0 * .pi
+		
+		return linearRGB(cielab:CIELAB.fromLCH(lch:lch) * CIELAB.range)
+	}
+	
+	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
+		if toCIEXYZ == chclt.toCIEXYZ {
+			return linearRGB
+		} else {
+			return self.linearRGB(ciexyz:chclt.ciexyz(linearRGB:linearRGB))
+		}
+	}
+	
+	public func convert(rgb:Vector3, from chclt:CHCLT) -> Vector3 {
+		return display(convert(linearRGB:chclt.linear(rgb), from:chclt))
+	}
+}
+
+//	MARK: - Equatable
 
 extension CHCLT: Equatable, Hashable {
 	public static func == (lhs: CHCLT, rhs: CHCLT) -> Bool {
@@ -1101,7 +1115,7 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
-	public enum XYZ {
+	public enum CIEXYZ {
 		public static let d50:CHCLT.Vector3 = tristimulus(x:0.34567, y:0.35850)
 		public static let d55:CHCLT.Vector3 = tristimulus(x:0.33242, y:0.34743)
 		public static let d65:CHCLT.Vector3 = tristimulus(x:0.31271, y:0.32902)
@@ -1199,9 +1213,9 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
-	public enum Lab {
+	public enum CIELAB {
 		public static let range = CHCLT.Scalar.vector3(100.0, 128.0, 128.0)
-		public static let genericWhite = XYZ.d50
+		public static let genericWhite = CIEXYZ.d50
 		
 		public static func toXYZ(_ t:CHCLT.Linear) -> CHCLT.Linear {
 			let o:Linear = 6.0 / 29.0
@@ -1216,7 +1230,7 @@ extension CHCLT {
 			}
 		}
 		
-		public static func toXYZ(lab:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = XYZ.d65) -> CHCLT.Linear.Vector3 {
+		public static func toXYZ(lab:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = CIEXYZ.d65) -> CHCLT.Linear.Vector3 {
 			let l = (lab.x + 16.0) / 116.0
 			let x = l + lab.y / 500.0
 			let z = l - lab.z / 200.0
@@ -1239,7 +1253,7 @@ extension CHCLT {
 			}
 		}
 		
-		public static func fromXYZ(xyz:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = XYZ.d65) -> CHCLT.Linear.Vector3 {
+		public static func fromXYZ(xyz:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = CIEXYZ.d65) -> CHCLT.Linear.Vector3 {
 			let xyz = xyz / white
 			let x = fromXYZ(xyz.x)
 			let y = fromXYZ(xyz.y)
@@ -1299,20 +1313,20 @@ extension CHCLT {
 //	MARK: -
 
 public class CHCLT_Linear: CHCLT {
-	public static let sRGB = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT_sRGB.contrast)
-	public static let aces = CHCLT_Linear(CHCLT.XYZ.rgb_to_xyz_acescg, contrast:CHCLT.Contrast(0.5))
+	public static let sRGB = CHCLT_Linear(CHCLT.CIEXYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT_sRGB.contrast)
+	public static let aces = CHCLT_Linear(CHCLT.CIEXYZ.rgb_to_xyz_acescg, contrast:CHCLT.Contrast(0.5))
 }
 
 //	MARK: -
 
 public class CHCLT_Pure: CHCLT {
-	public static let y240 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_smpte240m_d65, exponent:2)
-	public static let y601 = CHCLT_Pure(CHCLT_BT.y601.toXYZ, exponent:19 / 10, coefficients:CHCLT_BT.y601.coefficients)
-	public static let y709 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_bt709_d65, exponent:19 / 10)
-	public static let y2020 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_bt2020_d65, exponent:19 / 10)
-	public static let sRGB = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, exponent:11 / 5)
-	public static let dciP3 = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_theaterP3_dci, exponent:13 / 5)
-	public static let adobeRGB = CHCLT_Pure(CHCLT.XYZ.rgb_to_xyz_adobeRGB_d65, exponent:563 / 256)
+	public static let y240 = CHCLT_Pure(CHCLT.CIEXYZ.rgb_to_xyz_smpte240m_d65, exponent:2)
+	public static let y601 = CHCLT_Pure(CHCLT_BT.y601.toCIEXYZ, exponent:19 / 10, coefficients:CHCLT_BT.y601.coefficients)
+	public static let y709 = CHCLT_Pure(CHCLT.CIEXYZ.rgb_to_xyz_bt709_d65, exponent:19 / 10)
+	public static let y2020 = CHCLT_Pure(CHCLT.CIEXYZ.rgb_to_xyz_bt2020_d65, exponent:19 / 10)
+	public static let sRGB = CHCLT_Pure(CHCLT.CIEXYZ.rgb_to_xyz_sRGB_d65, exponent:11 / 5)
+	public static let dciP3 = CHCLT_Pure(CHCLT.CIEXYZ.rgb_to_xyz_theaterP3_dci, exponent:13 / 5)
+	public static let adobeRGB = CHCLT_Pure(CHCLT.CIEXYZ.rgb_to_xyz_adobeRGB_d65, exponent:563 / 256)
 	
 	public let exponent:Linear
 	
@@ -1346,9 +1360,9 @@ public class CHCLT_Pure: CHCLT {
 //	MARK: -
 
 public class CHCLT_sRGB: CHCLT {
-	public static let displayP3 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_displayP3_d65)
-	public static let standard = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65)
-	public static let g18 = CHCLT_sRGB(CHCLT.XYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11, mediumLuma:CHCLT_sRGB.transfer(2 / 11)))
+	public static let displayP3 = CHCLT_sRGB(CHCLT.CIEXYZ.rgb_to_xyz_displayP3_d65)
+	public static let standard = CHCLT_sRGB(CHCLT.CIEXYZ.rgb_to_xyz_sRGB_d65)
+	public static let g18 = CHCLT_sRGB(CHCLT.CIEXYZ.rgb_to_xyz_sRGB_d65, contrast:CHCLT.Contrast(2 / 11, mediumLuma:CHCLT_sRGB.transfer(2 / 11)))
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_sRGB.linear(0.5))
 	
@@ -1376,9 +1390,9 @@ public class CHCLT_sRGB: CHCLT {
 //	MARK: -
 
 public class CHCLT_BT: CHCLT {
-	public static let y601 = CHCLT_BT(CHCLT.XYZ.rgb_to_xyz_bt601_525_d65, coefficients:CHCLT.Linear.vector3(0.299, 0.587, 0.114))
-	public static let y709 = CHCLT_BT(CHCLT.XYZ.rgb_to_xyz_bt709_d65)
-	public static let y2020 = CHCLT_BT(CHCLT.XYZ.rgb_to_xyz_bt2020_d65)
+	public static let y601 = CHCLT_BT(CHCLT.CIEXYZ.rgb_to_xyz_bt601_525_d65, coefficients:CHCLT.Linear.vector3(0.299, 0.587, 0.114))
+	public static let y709 = CHCLT_BT(CHCLT.CIEXYZ.rgb_to_xyz_bt709_d65)
+	public static let y2020 = CHCLT_BT(CHCLT.CIEXYZ.rgb_to_xyz_bt2020_d65)
 	public static let y2100 = y2020
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_BT.linear(0.5))
@@ -1407,7 +1421,7 @@ public class CHCLT_BT: CHCLT {
 //	MARK: -
 
 public class CHCLT_ROMM: CHCLT {
-	public static let standard = CHCLT_ROMM(CHCLT.XYZ.rgb_to_xyz_romm_d50)
+	public static let standard = CHCLT_ROMM(CHCLT.CIEXYZ.rgb_to_xyz_romm_d50)
 	
 	public static let contrast = CHCLT.Contrast(CHCLT_ROMM.linear(0.5))
 	

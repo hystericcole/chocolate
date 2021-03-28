@@ -103,16 +103,16 @@ enum ColorModel: Int {
 		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
 	}
 	
-	static func colorXYZ(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
-		let xyz = components(coordinates:coordinates, axis:axis)
-		let rgb = chclt.linearRGB(xyz:xyz)
+	static func colorCIEXYZ(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
+		let ciexyz = components(coordinates:coordinates, axis:axis)
+		let rgb = chclt.linearRGB(ciexyz:ciexyz)
 		
 		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
 	}
 	
-	static func colorLCH(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
-		let lch = components(coordinates:coordinates, axis:axis)
-		let rgb = chclt.linearRGB(lch:lch)
+	static func colorLCHAB(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
+		let lchab = components(coordinates:coordinates, axis:axis)
+		let rgb = chclt.linearRGB(lchab:lchab)
 		
 		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
 	}
@@ -153,8 +153,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.colorRGB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		case .hsb: return ColorModel.colorHSB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
-		//case .xyz: return ColorModel.colorXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
-		//case .lch: return ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
+		//case .xyz: return ColorModel.colorCIEXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
+		//case .lch: return ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		case .chclt: return ColorModel.colorCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
 	}
@@ -163,8 +163,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.linearRGB(axis:axis, coordinates:coordinates)
 		case .hsb: return ColorModel.linearHSB(axis:axis, coordinates:coordinates)
-		//case .xyz: return ColorModel.colorXYZ(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
-		//case .lch: return ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
+		//case .xyz: return ColorModel.colorCIEXYZ(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
+		//case .lch: return ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
 		case .chclt: return ColorModel.linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
 	}
@@ -173,8 +173,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.platformRGB(axis:axis, coordinates:coordinates, alpha:alpha)
 		case .hsb: return ColorModel.platformHSB(axis:axis, coordinates:coordinates, alpha:alpha)
-		//case .xyz: return ColorModel.colorXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
-		//case .lch: return ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
+		//case .xyz: return ColorModel.colorCIEXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
+		//case .lch: return ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
 		case .chclt: return ColorModel.platformCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
 	}
@@ -183,8 +183,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display.xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:color.hsb, axis:axis)
-		//case .xyz: return ColorModel.coordinates(components:color.chclt.xyz(linearRGB:color.linear.xyz), axis:axis)
-		//case .lch: return ColorModel.coordinates(components:color.lch, axis:axis)
+		//case .xyz: return ColorModel.coordinates(components:color.chclt.ciexyz(linearRGB:color.linear.xyz), axis:axis)
+		//case .lch: return ColorModel.coordinates(components:color.lchab, axis:axis)
 		case .chclt: return ColorModel.coordinates(components:color.hcl, axis:axis)
 		}
 	}
@@ -193,8 +193,8 @@ enum ColorModel: Int {
 		switch self {
 		case .rgb: return ColorModel.coordinates(components:color.display(chclt).xyz, axis:axis)
 		case .hsb: return ColorModel.coordinates(components:CHCLT.Color(chclt, color).hsb, axis:axis)
-		//case .xyz: return ColorModel.coordinates(components:chclt.xyz(linearRGB:color.vector), axis:axis)
-		//case .lch: return ColorModel.coordinates(components:chclt.lch(linearRGB:color.vector), axis:axis)
+		//case .xyz: return ColorModel.coordinates(components:chclt.ciexyz(linearRGB:color.vector), axis:axis)
+		//case .lch: return ColorModel.coordinates(components:chclt.lchab(linearRGB:color.vector), axis:axis)
 		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.vector), axis:axis)
 		}
 	}
@@ -532,7 +532,7 @@ extension CGContext {
 			
 			let colors:[CGColor] = (0 ..< rows).map { row in
 				let y = Double(row) / Double(rows - 1)
-				let color = ColorModel.colorXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chclt)
+				let color = ColorModel.colorCIEXYZ(axis:axis, coordinates:CHCLT.Scalar.vector3(x, 1 - y, scalar), chclt:chclt)
 				
 				if color.isNormal { return color.color() }
 				
@@ -569,7 +569,7 @@ extension CGContext {
 			let colors:[CGColor] = (0 ..< rows).map { row in
 				let y = Double(row) / Double(rows - 1)
 				let coordinates = CHCLT.Scalar.vector3(x, 1 - y, scalar)
-				let color = ColorModel.colorLCH(axis:axis, coordinates:coordinates, chclt:chclt)
+				let color = ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt)
 				
 				if color.isNormal { return color.color() }
 				

@@ -484,7 +484,7 @@ extension ChocolateThemeViewController {
 		}
 		
 		init(tag:Int = 0, value:Double = 0, range:ClosedRange<Double> = 0 ... 1, target:AnyObject? = nil, action:Selector?, interiorRange:Layout.NativeRange) {
-			let highlight = PlatformColor.systemGreen.withAlphaComponent(0.75)
+			let highlight = PlatformColor.systemGreen.withAlphaComponent(0.5)
 			
 			slider = Viewable.Slider(tag:tag, value:value, range:range, target:target, action:action)
 			color = Viewable.Color(highlight)

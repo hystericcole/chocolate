@@ -32,9 +32,9 @@ extension CHCLT {
 		public var rgb:CHCLT.Vector3 { return display.xyz }
 		public var hcl:CHCLT.Vector3 { return CHCLT.Scalar.vector3(hue, chroma, luma) }
 		public var hsb:CHCLT.Vector3 { return ColorModel.hsb_from_rgb(r:red, g:green, b:blue) }
-		public var lab:CHCLT.Vector3 { return chclt.lab(linearRGB:linear.xyz) }
-		public var lch:CHCLT.Vector3 { return chclt.lch(linearRGB:linear.xyz) }
-		public var xyz:CHCLT.Vector3 { return chclt.xyz(linearRGB:linear.xyz) }
+		public var cielab:CHCLT.Vector3 { return chclt.cielab(linearRGB:linear.xyz) }
+		public var lchab:CHCLT.Vector3 { return chclt.lchab(linearRGB:linear.xyz) }
+		public var ciexyz:CHCLT.Vector3 { return chclt.ciexyz(linearRGB:linear.xyz) }
 		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
 		public var description:String { return rgba() }
 		
@@ -53,7 +53,7 @@ extension CHCLT {
 		}
 		
 		public init(_ chclt:CHCLT, lab:CHCLT.Vector3, alpha:CHCLT.Scalar = 1) {
-			self.init(chclt, linear:chclt.linearRGB(lab:lab), alpha:alpha)
+			self.init(chclt, linear:chclt.linearRGB(cielab:lab), alpha:alpha)
 		}
 		
 		public init(_ chclt:CHCLT, _ color:Color) {
@@ -104,7 +104,7 @@ extension CHCLT {
 		public func analogous(turns:Scalar = 1/12) -> [Self] { return hueGroup(turns, -turns) }
 		public func complementarySplit(turns:Scalar = 1/12) -> [Self] { return hueGroup(0.5 - turns, turns - 0.5) }
 		
-		public func difference(_ color:Color) -> Scalar { return Lab.difference(lab, color.lab) }
+		public func difference(_ color:Color) -> Scalar { return CIELAB.difference(cielab, color.cielab) }
 		
 		public func rgba() -> String { return String(format:"RGBA(%.3g, %.3g, %.3g, %.3g)", red, green, blue, alpha) }
 		public func web(allowFormat:Int = 0) -> String { return Color.web(uint, allowFormat:allowFormat) }
@@ -246,12 +246,12 @@ extension CHCLT.Color {
 			let converted = color.converted(to:labColorSpace, intent:CGColorRenderingIntent.absoluteColorimetric, options:nil),
 			let components = converted.componentsVector4
 		{
-			self.init(chclt, linear:chclt.linearRGB(lab:components.xyz), alpha:components.w)
+			self.init(chclt, linear:chclt.linearRGB(cielab:components.xyz), alpha:components.w)
 		} else if let components = color.componentsVector4, let model = color.colorSpace?.model {
 			switch model {
 			case .rgb: self.init(chclt, display:components)
-			case .lab: self.init(chclt, linear:chclt.linearRGB(xyz:CHCLT.Lab.toXYZ(lab:components.xyz, white:CHCLT.Lab.genericWhite)), alpha:components.w)
-			case .XYZ: self.init(chclt, linear:chclt.linearRGB(xyz:components.xyz), alpha:components.w)
+			case .lab: self.init(chclt, linear:chclt.linearRGB(ciexyz:CHCLT.CIELAB.toXYZ(lab:components.xyz, white:CHCLT.CIELAB.genericWhite)), alpha:components.w)
+			case .XYZ: self.init(chclt, linear:chclt.linearRGB(ciexyz:components.xyz), alpha:components.w)
 			default: return nil
 			}
 		} else {
@@ -283,7 +283,7 @@ extension CHCLT.Color {
 		if let colorSpace = chclt.rgbColorSpace() {
 			return CGColor.with(colorSpace:colorSpace, componentsVector4:display)
 		} else if allowLab, let colorSpace = chclt.labColorSpace() {
-			return CGColor.with(colorSpace:colorSpace, componentsVector3:chclt.lab(linearRGB:linear.xyz), alpha:CGFloat(alpha))
+			return CGColor.with(colorSpace:colorSpace, componentsVector3:chclt.cielab(linearRGB:linear.xyz), alpha:CGFloat(alpha))
 		} else {
 			return CGColor.with(colorSpace:CHCLT.LinearRGB.colorSpace, componentsVector3:linear.xyz, alpha:CGFloat(alpha))
 		}
@@ -406,9 +406,9 @@ extension CHCLT {
 		let a:[CGFloat] = [CGFloat(w.x), CGFloat(w.y), CGFloat(w.z)]
 		let gamma:[CGFloat] = [g, g, g]
 		let matrix:[CGFloat] = [
-			CGFloat(toXYZ.columns.0.x), CGFloat(toXYZ.columns.0.y), CGFloat(toXYZ.columns.0.z),
-			CGFloat(toXYZ.columns.1.x), CGFloat(toXYZ.columns.1.y), CGFloat(toXYZ.columns.1.z),
-			CGFloat(toXYZ.columns.2.x), CGFloat(toXYZ.columns.2.y), CGFloat(toXYZ.columns.2.z)
+			CGFloat(toCIEXYZ.columns.0.x), CGFloat(toCIEXYZ.columns.0.y), CGFloat(toCIEXYZ.columns.0.z),
+			CGFloat(toCIEXYZ.columns.1.x), CGFloat(toCIEXYZ.columns.1.y), CGFloat(toCIEXYZ.columns.1.z),
+			CGFloat(toCIEXYZ.columns.2.x), CGFloat(toCIEXYZ.columns.2.y), CGFloat(toCIEXYZ.columns.2.z)
 		]
 		
 		return CGColorSpace(calibratedRGBWhitePoint:a, blackPoint:nil, gamma:gamma, matrix:matrix)
