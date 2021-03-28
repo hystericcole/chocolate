@@ -142,6 +142,22 @@ extension CHCLT {
 		return linearRGB(cielab:CIELAB.fromLCH(lch:lch) * CIELAB.range)
 	}
 	
+	public func lchok(linearRGB:Vector3) -> Vector3 {
+		var lch = OKLAB.toLCH(lab:OKLAB.fromXYZ(xyz:ciexyz(linearRGB:linearRGB)))
+		
+		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
+		
+		return lch
+	}
+	
+	public func linearRGB(lchok:Vector3) -> Vector3 {
+		var lch = lchok
+		
+		lch.z = lch.z * 2.0 * .pi
+		
+		return linearRGB(ciexyz:OKLAB.toXYZ(lab:OKLAB.fromLCH(lch:lch)))
+	}
+	
 	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
 		if toCIEXYZ == chclt.toCIEXYZ {
 			return linearRGB
@@ -1213,6 +1229,47 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
+	public enum OKLAB {
+		public static let m1 = CHCLT.Linear.Matrix3x3([0.8189330101, 0.0329845436, 0.0482003018], [0.3618667424, 0.9293118715, 0.2643662691], [-0.1288597137, 0.0361456387, 0.6338517070])
+		public static let m1i = m1.inverse
+		public static let m2 = CHCLT.Linear.Matrix3x3([0.2104542553, 1.9779984951, 0.0259040371], [0.7936177850, -2.4285922050, 0.7827717662], [-0.0040720468, 0.4505937099, -0.8086757660])
+		public static let m2i = m2.inverse
+		
+		public static func toXYZ(lab:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = CIEXYZ.d65) -> CHCLT.Linear.Vector3 {
+			let linear = OKLAB.m2i * lab
+			let lms = linear * linear * linear
+			let xyz = OKLAB.m1i * lms
+			
+			return xyz
+		}
+		
+		public static func fromXYZ(xyz:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = CIEXYZ.d65) -> CHCLT.Linear.Vector3 {
+			var lms = OKLAB.m1 * xyz
+			
+			lms.x = cbrt(lms.x)
+			lms.y = cbrt(lms.y)
+			lms.z = cbrt(lms.z)
+			
+			let lab = OKLAB.m2 * lms
+			
+			return lab
+		}
+		
+		public static func toLCH(lab:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
+			return CHCLT.Linear.vector3(lab.x, hypot(lab.z, lab.y), atan2(lab.z, lab.y))
+		}
+		
+		public static func fromLCH(lch:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
+			let sc = lch.z.sincos()
+			
+			return CHCLT.Linear.vector3(lch.x, lch.y * sc.__cosval, lch.y * sc.__sinval)
+		}
+	}
+}
+
+//	MARK: -
+
+extension CHCLT {
 	public enum CIELAB {
 		public static let range = CHCLT.Scalar.vector3(100.0, 128.0, 128.0)
 		public static let genericWhite = CIEXYZ.d50
@@ -1263,7 +1320,7 @@ extension CHCLT {
 		}
 		
 		public static func toLCH(lab:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
-			return CHCLT.Linear.vector3(lab.x, hypot(lab.z, lab.x), atan2(lab.z, lab.y))
+			return CHCLT.Linear.vector3(lab.x, hypot(lab.z, lab.y), atan2(lab.z, lab.y))
 		}
 		
 		public static func fromLCH(lch:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {

@@ -43,11 +43,11 @@ class TestablePositionable: Positionable, CustomStringConvertible {
 		self.compressionResistance = .zero
 	}
 	
-	func positionableSize(fitting limit: Layout.Limit) -> Layout.Size {
+	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 		return Layout.Size(intrinsic:intrinsicContentSize)
 	}
 	
-	func applyPositionableFrame(_ frame: CGRect, context: Layout.Context) {
+	func applyPositionableFrame(_ frame:CGRect, context:Layout.Context) {
 		self.frame = frame
 	}
 	
@@ -65,7 +65,7 @@ class LayoutTestCase: XCTestCase {
 		let container = TestablePositionable(frame:CGRect(x:10, y:10, width:1000, height:1000))
 		let context = container.positionableContext
 		let box = CGRect(x:100, y:100, width:800, height:800)
-		let positionableSize = columns.positionableSize(fitting:Layout.Limit(size:box.size))
+		let positionableSize = columns.positionableSize(fitting:Layout.Limit(size:box.size), context:context)
 		
 		columns.applyPositionableFrame(box, context:context)
 		

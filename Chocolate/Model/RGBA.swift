@@ -34,6 +34,7 @@ extension CHCLT {
 		public var hsb:CHCLT.Vector3 { return ColorModel.hsb_from_rgb(r:red, g:green, b:blue) }
 		public var cielab:CHCLT.Vector3 { return chclt.cielab(linearRGB:linear.xyz) }
 		public var lchab:CHCLT.Vector3 { return chclt.lchab(linearRGB:linear.xyz) }
+		public var lchok:CHCLT.Vector3 { return chclt.lchok(linearRGB:linear.xyz) }
 		public var ciexyz:CHCLT.Vector3 { return chclt.ciexyz(linearRGB:linear.xyz) }
 		public var uint:simd_uint4 { var v = display * 255.0; v.round(.toNearestOrAwayFromZero); return simd_uint(v) }
 		public var description:String { return rgba() }

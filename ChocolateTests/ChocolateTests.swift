@@ -64,4 +64,28 @@ class ChocolateTests: XCTestCase {
 			XCTAssertEqual(v, d, "axis \(axis)")
 		}
 	}
+	
+	func testOKLAB() {
+		let xyz_lab:[(CHCLT.Vector3, CHCLT.Vector3)] = [
+			(CHCLT.Scalar.vector3(0.95, 1.0, 1.09), CHCLT.Scalar.vector3(1, 0, 0)),
+			(CHCLT.Scalar.vector3(1.0, 0.0, 0.0), CHCLT.Scalar.vector3(0.450, 1.236, -0.019)),
+			(CHCLT.Scalar.vector3(0.0, 1.0, 0.0), CHCLT.Scalar.vector3(0.922, -0.671, 0.263)),
+			(CHCLT.Scalar.vector3(0.0, 0.0, 1.0), CHCLT.Scalar.vector3(0.153, -1.415, -0.449))
+		]
+		
+		for (xyz, lab) in xyz_lab {
+			var converted_xyz = CHCLT.OKLAB.toXYZ(lab:lab)
+			var converted_lab = CHCLT.OKLAB.fromXYZ(xyz:xyz)
+			
+			converted_xyz *= 100.0
+			converted_lab *= 1000.0
+			converted_xyz.round(.toNearestOrAwayFromZero)
+			converted_lab.round(.toNearestOrAwayFromZero)
+			converted_xyz /= 100.0
+			converted_lab /= 1000.0
+			
+			XCTAssertEqual(xyz, converted_xyz)
+			XCTAssertEqual(lab, converted_lab)
+		}
+	}
 }
