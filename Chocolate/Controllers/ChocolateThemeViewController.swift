@@ -79,10 +79,10 @@ class ChocolateThemeViewController: BaseViewController {
 	
 	let themeView = ChocolateThemeViewable()
 	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged), trackInset:3)
-	let sliderDeriveContrast = Viewable.Slider(value:0.5, range:-2 ... 2, action:#selector(deriveChanged))
-	let sliderDeriveChroma = Viewable.Slider(value:0.0, range:-2 ... 2, action:#selector(deriveChanged))
-	let sliderContrasting = Viewable.Slider(value:0.5, range:-1 ... 1, action:#selector(deriveChanged))
-	let sliderChroma = Viewable.Slider(value:0.5, range:-2 ... 2, action:#selector(deriveChanged))
+	let sliderDeriveContrast = SliderWithInteriorRange(value:0.5, range:-2 ... 2, action:#selector(deriveChanged), interiorRange:9/16 ... 11/16)
+	let sliderDeriveChroma = SliderWithInteriorRange(value:0.0, range:-2 ... 2, action:#selector(deriveChanged), interiorRange:0.25 ... 0.75)
+	let sliderContrasting = SliderWithInteriorRange(value:0.5, range:-1 ... 1, action:#selector(deriveChanged), interiorRange:9/16 ... 63/64)
+	let sliderChroma = SliderWithInteriorRange(value:0.5, range:-2 ... 2, action:#selector(deriveChanged), interiorRange:0.25 ... 0.75)
 	
 	let iconDerive = (0 ..< 3).map { _ in Viewable.Color(nil, intrinsicSize:CGSize(square:20)) }
 	let iconContrasting = Viewable.Color(.orange, intrinsicSize:CGSize(square:10))
@@ -466,5 +466,57 @@ class ChocolateThemeViewable: ViewablePositionable {
 	
 	func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
 		return Layout.Size(prefer:model.intrinsicSize)
+	}
+}
+
+//	MARK: -
+
+extension ChocolateThemeViewController {
+	struct SliderWithInteriorRange: PositionableWithTarget {
+		let slider:Viewable.Slider
+		let color:Viewable.Color
+		var colorRange:Layout.NativeRange
+		var target:Positionable { return slider }
+		
+		var value:Double {
+			get { return slider.value }
+			set { slider.value = newValue }
+		}
+		
+		init(tag:Int = 0, value:Double = 0, range:ClosedRange<Double> = 0 ... 1, target:AnyObject? = nil, action:Selector?, interiorRange:Layout.NativeRange) {
+			let highlight = PlatformColor.systemGreen.withAlphaComponent(0.75)
+			
+			slider = Viewable.Slider(tag:tag, value:value, range:range, target:target, action:action)
+			color = Viewable.Color(highlight)
+			colorRange = interiorRange
+		}
+		
+		func applyPositionableFrame(_ frame: CGRect, context: Layout.Context) {
+			layout().applyPositionableFrame(frame, context:context)
+		}
+		
+		func orderablePositionables(environment: Layout.Environment, order: Layout.Order) -> [Positionable] {
+			let targets:[Positionable] = [color, slider]
+			
+			return targets.flatMap { $0.orderablePositionables(environment:environment, order:order) }
+		}
+		
+		func layout() -> Positionable {
+#if os(macOS)
+			let trackInset:Layout.Native = 1
+			let height:Layout.Native = 0.4
+			let y:Layout.Native = 0.3
+#else
+			let trackInset:Layout.Native = 3
+			let height:Layout.Native = 0.275
+			let y:Layout.Native = 0.375
+#endif
+			
+			let interiorRange = color
+				.fraction(origin:colorRange.lowerBound, y, size:colorRange.length, height)
+				.padding(horizontal:trackInset, vertical:0)
+			
+			return Layout.Overlay(primary:1, interiorRange, slider)
+		}
 	}
 }

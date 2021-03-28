@@ -2916,6 +2916,10 @@ extension Positionable {
 		)
 	}
 	
+	func fraction(origin x:Layout.Native, _ y:Layout.Native, size width:Layout.Native, _ height:Layout.Native) -> Positionable {
+		return fraction(width:width, height:height).align(horizontal:.fraction(width != 1.0 ? x / (1.0 - width) : 0.0), vertical:.fraction(height != 1.0 ? y / (1.0 - height) : 0.0))
+	}
+	
 	/// Increase the minimum width and height.
 	/// - Parameters:
 	///   - width: The minimum width.
