@@ -79,10 +79,10 @@ class ChocolateViewController: BaseViewController {
 	let stringPrimary = Style.caption.label(Strings.primary)
 	let stringForeground = Style.caption.label(Strings.foreground)
 	let stringWeb = Style.webColor.label("")
-	let colorBox = Viewable.Color(color:nil)
-	let colorCircleBackground = Viewable.Color(color:nil)
-	let colorCircleCenter = Viewable.Color(color:nil)
-	let colorCircles:[Viewable.Color] = (0 ..< 12).map { _ in Viewable.Color(color:nil) }
+	let colorBox = Viewable.Color(nil)
+	let colorCircleBackground = Viewable.Color(nil)
+	let colorCircleCenter = Viewable.Color(nil)
+	let colorCircles:[Viewable.Color] = (0 ..< 12).map { _ in Viewable.Color(nil) }
 	var samples:[Sample] = []
 	
 	override func prepare() {
@@ -193,7 +193,7 @@ class ChocolateViewController: BaseViewController {
 		foregrounds.content = Layout.Overlay(
 			Viewable.Gradient(colors:[.black, .white]),
 			Layout.Horizontal(
-				targets:model.foregrounds.map { Viewable.Color(color:$0.platformColor).aspect(ratio:2) },
+				targets:model.foregrounds.map { Viewable.Color($0.platformColor).aspect(ratio:2) },
 				spacing:4,
 				alignment:.fill,
 				position:.uniform,
@@ -334,8 +334,8 @@ class ChocolateViewController: BaseViewController {
 				spacePicker.fixed(width:colorBoxSize).limiting(height:30 ... colorBoxSize),
 				Layout.Overlay(
 					Layout.Horizontal(alignment:.fill, position:.uniform,
-						Viewable.Color(color:.white),
-						Viewable.Color(color:.black)
+						Viewable.Color(.white),
+						Viewable.Color(.black)
 					),
 					colorBox.padding(4)
 				).fixed(width:colorBoxSize, height:colorBoxSize),
@@ -441,7 +441,7 @@ extension ChocolateViewController {
 		var index:Int = 0
 		
 		var foregrounds:[Style.Label] = []
-		let background = Viewable.Color(color: nil)
+		let background = Viewable.Color(nil)
 		let sliderContrast = Viewable.Slider(range:-1 ... 1, action:#selector(applyColor))
 		let sliderChroma = Viewable.Slider(range:-1 ... 1, action:#selector(applyColor))
 		let stringContrast = Style.small.label("")

@@ -71,9 +71,12 @@ protocol PositionableWithTargets: PositionableNode {
 struct Layout {
 	typealias Native = CGFloat.NativeType
 	typealias NativeRange = ClosedRange<Native>
+	typealias Timestamp = UInt64
 	
 	enum Order {
-		case existing, create, attach
+		case create
+		case attach
+		case existing
 	}
 	
 	enum Axis: CustomStringConvertible {
@@ -173,6 +176,7 @@ struct Layout {
 		/// Fill available bounds by making elements a uniform size, ignoring the measured size of the element.
 		/// Equivalent to fillEqually in a stackView.
 		case uniform
+		/// As `uniform` except end elements are weighted differently than interior elements.
 		case uniformWithEnds(Native)
 		/// Fill available bounds by aligning each element within a uniform space.
 		/// Equivalent to equalCentering in a stack view, when value is 0.5.
@@ -263,7 +267,7 @@ struct Layout {
 	}
 	
 	/// Environment for applying layout
-	struct Environment: CustomStringConvertible {
+	struct Environment: Equatable, CustomStringConvertible {
 		static var current:Environment { return Environment(isRTL:false) }
 		
 		/// Is the natural layout direction right to left.
@@ -275,22 +279,24 @@ struct Layout {
 	}
 	
 	/// Context for a layout pass within a container
-	struct Context: CustomStringConvertible {
+	struct Context: Equatable, CustomStringConvertible {
+		let timestamp:Timestamp
 		/// The bounds of the container
 		var bounds:CGRect
 		/// The unobstructed bounds of the container
 		var safeBounds:CGRect
-		/// Is the positive direction of the y axis down
-		var isDownPositive:Bool
 		/// The number of device pixels per logical pixel
 		var scale:CGFloat
 		/// The layout environment
 		var environment:Environment
+		/// Is the positive direction of the y axis down
+		var isDownPositive:Bool
 		
 		var description:String { return "\(bounds) @\(scale)x \(isDownPositive ? "↓+" : "↑+") \(environment)" }
 		var data:Data { return withUnsafeBytes(of:self) { Data($0) } }
 		
-		init(bounds:CGRect, safeBounds:CGRect, isDownPositive:Bool, scale:CGFloat = 1, environment:Layout.Environment) {
+		init(bounds:CGRect, safeBounds:CGRect, isDownPositive:Bool, scale:CGFloat = 1, environment:Layout.Environment, timestamp:Timestamp? = nil) {
+			self.timestamp = timestamp ?? DispatchTime.now().uptimeNanoseconds
 			self.bounds = bounds
 			self.safeBounds = safeBounds
 			self.isDownPositive = isDownPositive
@@ -374,6 +380,26 @@ struct Layout {
 			
 			return Limit(width:width < Limit.unlimited ? width : nil, height:height < Limit.unlimited ? height : nil)
 		}
+		
+		func isEqual(to limit:Limit, on axis:Axis? = nil) -> Bool {
+			if axis != .vertical {
+				if let value = width, value < Limit.unlimited {
+					if value != limit.width { return false }
+				} else if let value = limit.width, value < Limit.unlimited {
+					return false
+				}
+			}
+			
+			if axis != .horizontal {
+				if let value = height, value < Limit.unlimited {
+					if value != limit.height { return false }
+				} else if let value = limit.height, value < Limit.unlimited {
+					return false
+				}
+			}
+			
+			return true
+		}
 	}
 	
 	/// The space requested during layout, in one direction.
@@ -382,7 +408,7 @@ struct Layout {
 	/// - To require a size, set minimum and maximum equal to that size.  Constant and fraction will be ignored.
 	/// - To request a range of sizes, set minimum and maximum, with constant set to the preferred value within that range.
 	/// - To request a fraction of available space, set fraction, and optionally minimum and maximum.
-	struct Dimension: CustomStringConvertible {
+	struct Dimension: Equatable, CustomStringConvertible {
 		static let unbound = Limit.unlimited * 0x1p10
 		static let unlimited = 0 ... unbound
 		static let zero = Dimension(value:0)
@@ -484,8 +510,8 @@ struct Layout {
 		
 		mutating func multiply(_ scalar:Native) {
 			constant *= scalar
-			minimum *= scalar
-			maximum = min(maximum * scalar, Dimension.unbound)
+			minimum = max(minimum * scalar, 0)
+			maximum = maximum < Dimension.unbound ? min(maximum * scalar, Dimension.unbound) : Dimension.unbound
 			fraction *= scalar
 		}
 		
@@ -508,7 +534,7 @@ struct Layout {
 	}
 	
 	/// The size requested during layout
-	struct Size: CustomStringConvertible {
+	struct Size: Equatable, CustomStringConvertible {
 		static let unbound = CGSize(width:Dimension.unbound, height:Dimension.unbound)
 		static let zero = Size(width:.zero, height:.zero)
 		
@@ -664,7 +690,7 @@ struct Layout {
 	}
 	
 	/// Set of amounts to inset or pad the edges of a rectangle
-	struct EdgeInsets: CustomStringConvertible {
+	struct EdgeInsets: Equatable, CustomStringConvertible {
 		static let zero = EdgeInsets(uniform:0)
 		
 		var minX, maxX, minY, maxY:Native
@@ -742,7 +768,7 @@ struct Layout {
 	}
 	
 	/// Uses space but has no content.
-	struct EmptySpace: Positionable {
+	struct EmptySpace: Equatable, Positionable {
 		var size:CGSize
 		
 		var frame:CGRect { return .zero }
@@ -1331,20 +1357,15 @@ struct Layout {
 			self.columnMajor = major
 			self.direction = direction
 			
-			rowTemplate.targets.removeAll()
+			self.rowTemplate.targets.removeAll()
+		}
+		
+		init(spans:[Positionable], columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default) {
+			self.init(targets:Span.resolve(spans, axis:.vertical, axisCount:columnCount), columnCount:columnCount, spacing:spacing, template:template, position:position, primary:-1, direction:.positive, major:false)
 		}
 		
 		init(columnCount:Int, spacing:Native = 0, template:Horizontal, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false, _ targets:Positionable...) {
-			self.targets = targets
-			self.columnCount = columnCount
-			self.spacing = spacing
-			self.position = position
-			self.rowTemplate = template
-			self.primaryIndex = primary
-			self.columnMajor = major
-			self.direction = direction
-			
-			rowTemplate.targets.removeAll()
+			self.init(targets:targets, columnCount:columnCount, spacing:spacing, template:template, position:position, primary:primary, direction:direction, major:major)
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
@@ -1532,17 +1553,16 @@ struct Layout {
 			self.primaryIndex = primary
 			self.rowMajor = major
 			self.direction = direction
+			
+			self.columnTemplate.targets.removeAll()
+		}
+		
+		init(spans:[Positionable], rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default) {
+			self.init(targets:Span.resolve(spans, axis:.horizontal, axisCount:rowCount), rowCount:rowCount, spacing:spacing, template:template, position:position, primary:-1, direction:.positive, major:false)
 		}
 		
 		init(rowCount:Int, spacing:Native = 0, template:Vertical, position:Position = .default, primary:Int = -1, direction:Direction = .natural, major:Bool = false, _ targets:Positionable...) {
-			self.targets = targets
-			self.rowCount = rowCount
-			self.spacing = spacing
-			self.position = position
-			self.columnTemplate = template
-			self.primaryIndex = primary
-			self.rowMajor = major
-			self.direction = direction
+			self.init(targets:targets, rowCount:rowCount, spacing:spacing, template:template, position:position, primary:primary, direction:direction, major:major)
 		}
 		
 		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
@@ -2623,29 +2643,268 @@ struct Layout {
 		}
 	}
 	
+	class Span: PositionableWithTarget {
+		struct Maker: PositionableWithTarget {
+			let target:Positionable
+			let columns:Int
+			let rows:Int
+			
+			init(_ target:Positionable, columns:Int = 1, rows:Int = 1) {
+				self.target = target
+				self.columns = columns
+				self.rows = rows
+			}
+		}
+		
+		let target:Positionable
+		var scaleWidth:Native
+		var scaleHeight:Native
+		var positions:Int
+		var cacheSize:Layout.Size
+		var cacheLimit:Layout.Limit
+		var cacheTimestamp:Timestamp
+		var applyFrame:CGRect
+		var applyCount:Int
+		var applyTimestamp:Timestamp
+		
+		init(_ target:Positionable, positions:Int, scaleWidth:Native = 1, scaleHeight:Native = 1) {
+			self.target = target
+			self.scaleWidth = 1
+			self.scaleHeight = 1
+			self.positions = positions
+			self.applyFrame = .zero
+			self.applyCount = 0
+			self.applyTimestamp = 0
+			self.cacheSize = .zero
+			self.cacheLimit = Limit()
+			self.cacheTimestamp = 0
+		}
+		
+		convenience init(_ target:Positionable, columns:Int = 1, rows:Int = 1) {
+			self.init(target, positions:columns * rows, scaleWidth:1.0 / Native(columns), scaleHeight:1.0 / Native(rows))
+		}
+		
+		func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			if cacheTimestamp != context.timestamp || !cacheLimit.isEqual(to:limit) {
+				var size = target.positionableSize(fitting:limit, context:context)
+				
+				size.width.multiply(scaleWidth)
+				size.height.multiply(scaleHeight)
+				
+				cacheTimestamp = context.timestamp
+				cacheLimit = limit
+				cacheSize = size
+			}
+			
+			return cacheSize
+		}
+		
+		func applyPositionableFrame(_ frame:CGRect, context:Layout.Context) {
+			if applyTimestamp == context.timestamp {
+				applyFrame = applyFrame.union(frame)
+				applyCount += 1
+			} else {
+				applyTimestamp = context.timestamp
+				applyFrame = frame
+				applyCount = 1
+			}
+			
+			if applyCount == positions {
+				target.applyPositionableFrame(applyFrame, context:context)
+			}
+		}
+		
+		static func resolve(_ targets:[Positionable], axis:Axis, axisCount:Int) -> [Positionable] {
+			var result:[Positionable] = []
+			var spans:[Int:[Span]] = [:]
+			var index:Int = 0
+			let count:Int = targets.count
+			var position:Int = 0
+			
+			while index < count || !spans.isEmpty {
+				if let spanned = spans[position] {
+					spans[position] = nil
+					
+					if spanned.count == 1 {
+						result.append(spanned[0])
+					} else {
+						result.append(Layout.Overlay(targets:spanned))
+					}
+				} else if index >= count {
+					result.append(Layout.empty)
+				} else if let maker = targets[index] as? Span.Maker {
+					index += 1
+					
+					if maker.rows < 1 || maker.columns < 1 {
+						continue
+					}
+					
+					let rowStart, rowLimit, columnStart, columnLimit:Int
+					
+					switch axis {
+					case .horizontal:
+						rowStart = position % axisCount
+						rowLimit = min(rowStart + maker.rows, axisCount)
+						columnStart = position / axisCount
+						columnLimit = columnStart + maker.columns
+					case .vertical:
+						rowStart = position / axisCount
+						rowLimit = rowStart + maker.rows
+						columnStart = position % axisCount
+						columnLimit = min(columnStart + maker.columns, axisCount)
+					}
+					
+					let span = Span(maker.target, columns:columnLimit - columnStart, rows:rowLimit - rowStart)
+					
+					for columnIndex in columnStart ..< columnLimit {
+						for rowIndex in rowStart ..< rowLimit {
+							let order:Int
+							
+							switch axis {
+							case .horizontal: order = columnIndex * axisCount + rowIndex
+							case .vertical: order = rowIndex * axisCount + columnIndex
+							}
+							
+							if spans[order]?.append(span) == nil {
+								spans[order] = [span]
+							}
+						}
+					}
+					
+					spans[position] = nil
+					result.append(span)
+				} else {
+					result.append(targets[index])
+					index += 1
+				}
+				
+				position += 1
+			}
+			
+			return result
+		}
+	}
+	
+	/// Measure all targets as the largest target, optionally limited to one axis.
+	class Largest {
+		struct Item: PositionableWithTarget {
+			let largest:Largest
+			let index:Int
+			
+			var target: Positionable { return largest.targets[index] }
+			
+			func positionableSize(fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+				return largest.positionableSize(index:index, fitting:limit, context:context)
+			}
+		}
+		
+		var targets:[Positionable]
+		var axis:Axis?
+		var cacheLargest:Size
+		var cacheSizes:[Size]
+		var previousLimit:Limit
+		var previousTimestamp:Timestamp
+		
+		init(axis:Axis? = nil, _ targets: Positionable...) {
+			self.targets = targets
+			self.axis = axis
+			self.cacheSizes = []
+			self.cacheLargest = .zero
+			self.previousLimit = Limit()
+			self.previousTimestamp = 0
+		}
+		
+		subscript(_ index:Int) -> Positionable {
+			return Item(largest:self, index:index)
+		}
+		
+		func append(_ target:Positionable) -> Positionable {
+			let index = targets.count
+			
+			targets.append(target)
+			
+			return Item(largest:self, index:index)
+		}
+		
+		func positionableSize(index:Int, fitting limit:Layout.Limit, context:Layout.Context) -> Layout.Size {
+			guard targets.indices.contains(index) else { return .zero }
+			
+			if !previousLimit.isEqual(to:limit, on:axis) || previousTimestamp != context.timestamp {
+				cacheSizes.removeAll()
+				previousLimit = limit
+				previousTimestamp = context.timestamp
+			}
+			
+			if cacheSizes.count <= index {
+				for index in cacheSizes.count ..< targets.count {
+					cacheSizes.append(targets[index].positionableSize(fitting: limit, context: context))
+				}
+				
+				var maximum = Size()
+				
+				for size in cacheSizes {
+					maximum.width.increase(size.width)
+					maximum.height.increase(size.height)
+				}
+				
+				cacheLargest = maximum
+			}
+			
+			switch axis {
+			case .none: return cacheLargest
+			case .horizontal: return Size(width:cacheLargest.width, height:cacheSizes[index].height)
+			case .vertical: return Size(width:cacheSizes[index].width, height:cacheLargest.height)
+			}
+		}
+	}
+	
 	static let empty = EmptySpace()
 }
 
 //	MARK: -
 
 extension Positionable {
+	/// Any edge that reaches safe bounds will extend to bounds.
+	/// - Parameters:
+	///   - axis: Optionally limit to a single axis.
+	/// - Returns: Positionable.
 	func ignoringSafeBounds(_ axis:Layout.Axis? = nil) -> Positionable {
 		return Layout.IgnoreSafeBounds(self, axis:axis)
 	}
 	
+	/// Add empty space around edges.  Negative values may cause adjacent elements to overlap.
+	/// - Parameters:
+	///   - uniform: The padding.
+	/// - Returns: Positionable.
 	func padding(_ insets:Layout.EdgeInsets) -> Positionable {
 		return Layout.Padding(self, insets:insets)
 	}
 	
+	/// Add empty space around edges.  Negative values may cause adjacent elements to overlap.
+	/// - Parameters:
+	///   - uniform: The padding for each edge.
+	/// - Returns: Positionable.
 	func padding(_ uniform:Layout.Native = 8) -> Positionable {
 		return Layout.Padding(self, uniform:uniform)
 	}
 	
+	/// Add empty space around edges.  Negative values may cause adjacent elements to overlap.
+	/// - Parameters:
+	///   - horizontal: The left and right padding.
+	///   - vertical: The left and right padding.
+	/// - Returns: Positionable.
 	func padding(horizontal:Layout.Native, vertical:Layout.Native) -> Positionable {
 		return Layout.Padding(self, insets:Layout.EdgeInsets(horizontal:horizontal, vertical:vertical))
 	}
 	
+	/// Use a fixed width and height.
+	/// - Parameters:
+	///   - width: The fixed width.  Use nil to measure the width normally.
+	///   - height: The fixed height.  Use nil to measure the height normally.
+	/// - Returns: Positionable.
 	func fixed(width:Layout.Native? = nil, height:Layout.Native? = nil) -> Positionable {
+		guard width != nil || height != nil else { return self }
+		
 		return Layout.Sizing(self, width:width, height:height)
 	}
 	
@@ -2657,22 +2916,60 @@ extension Positionable {
 		)
 	}
 	
+	/// Increase the minimum width and height.
+	/// - Parameters:
+	///   - width: The minimum width.
+	///   - height: The minimum height.
+	/// - Returns: Positionable.
 	func minimum(width:Layout.Native = 0, height:Layout.Native = 0) -> Positionable {
+		guard width > 0 || height > 0 else { return self }
+		
 		return Layout.Limiting(self, minimumWidth:width, minimumHeight:height)
 	}
 	
+	/// Increase the minimum width and height, and decrease the maximum width and height.
+	/// - Parameters:
+	///   - width: The minimum and maximum width.
+	///   - height: The minimum and maximum height.
+	/// - Returns: Positionable.
 	func limiting(width:Layout.NativeRange = Layout.Dimension.unlimited, height:Layout.NativeRange = Layout.Dimension.unlimited) -> Positionable {
 		return Layout.Limiting(self, width:width, height:height)
 	}
 	
+	/// Span rows and columns in a `Layout.Rows` or `Layout.Columns` initialized with `init(spans:[...])`.
+	/// Mutating a `Layout.Rows` or `Layout.Columns` with spans is undefined.
+	/// - Parameters:
+	///   - columns: Columns to span.
+	///   - rows: Rows to span.
+	/// - Returns: Positionable
+	func span(columns:Int = 1, rows:Int = 1) -> Positionable {
+		guard columns > 1 || rows > 1 else { return self }
+		
+		return Layout.Span.Maker(self, columns:columns, rows:rows)
+	}
+	
+	/// Set the minimum and maximum to unbounded.
+	/// - Returns: Positionable.
 	func useAvailableSpace() -> Positionable {
 		return Layout.Sizing(self, width:Layout.Dimension(minimum:0), height:Layout.Dimension(minimum:0))
 	}
 	
+	/// Align the element within available bounds instead of filling available space.
+	/// - Parameters:
+	///   - horizontal: The horizontal alignment.  Default is center.
+	///   - vertical: The vertical alignment.  Default is center.
+	/// - Returns: Positionable.
 	func align(horizontal:Layout.Alignment = .center, vertical:Layout.Alignment = .center) -> Positionable {
+		guard !horizontal.isFill || !vertical.isFill else { return self }
+		
 		return Layout.Align(self, horizontal:horizontal, vertical:vertical)
 	}
 	
+	/// Preserve the given aspect ratio when positioning element within available bounds.
+	/// - Parameters:
+	///   - ratio: The aspect ratio width/height.  Values greater than 1 are wide.  Values less than 1 are tall.
+	///   - position: The position of the element within available bounds.  Defaults to center.
+	/// - Returns: Positionable.
 	func aspect(ratio:Layout.Native, position:Layout.Native = 0.5) -> Positionable {
 		return Layout.Aspect(self, ratio:ratio, position:position)
 	}
@@ -2947,7 +3244,36 @@ extension PlatformView: PositionableContainer {
 	}
 	
 	func orderPositionables(_ unorderable:[Positionable], environment:Layout.Environment, options:Layout.OrderOptions = .add) {
-		PlatformView.orderPositionables(unorderable, environment:environment, options:options, hierarchyRoot:self)
+		let views = unorderable.flatMap { $0.orderablePositionables(environment:environment, order:.create).compactMap { $0 as? PlatformView } }
+		var siblings:[PlatformView] = []
+		var added:Set<PlatformView> = []
+		let isAdding = options.contains(.add)
+		let current = subviews
+		let index:Int
+		
+		for view in views {
+			if let owner = view.superview {
+				guard owner === self else { continue }
+			} else {
+				guard isAdding else { continue }
+			}
+			
+			if added.insert(view).inserted {
+				siblings.append(view)
+			}
+		}
+		
+		if options.contains(.remove) {
+			for view in current where !added.contains(view) { view.removeFromSuperview() }
+			
+			index = subviews.count
+		} else {
+			index = current.lastIndex { siblings.contains($0) } ?? current.count
+		}
+		
+		insertSubviews(siblings, at:index)
+		
+		//PlatformView.orderPositionables(unorderable, environment:environment, options:options, hierarchyRoot:self)
 	}
 }
 

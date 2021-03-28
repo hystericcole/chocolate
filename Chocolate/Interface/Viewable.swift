@@ -213,7 +213,7 @@ enum Viewable {
 			set { model.intrinsicSize = newValue; view?.invalidateIntrinsicContentSize() }
 		}
 		
-		init(tag:Int = 0, color:PlatformColor?, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
+		init(tag:Int = 0, _ color:PlatformColor?, intrinsicSize:CGSize = Viewable.noIntrinsicSize) {
 			self.model = Model(tag:tag, color:color, intrinsicSize:intrinsicSize)
 		}
 		

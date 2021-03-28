@@ -78,7 +78,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 		}
 		
 		if count > current {
-			colorStops += (current ..< count).map { _ in Viewable.Color(color:nil) }
+			colorStops += (current ..< count).map { _ in Viewable.Color(nil) }
 		}
 		
 		if count != current {

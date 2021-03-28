@@ -59,9 +59,10 @@ class ChocolateGradientSlider: Viewable.Group {
 		didSet { track.gradientLayer?.borderColor = borderColor }
 	}
 	
-	init(value:Double = 0.0, target:AnyObject? = nil, action:Selector, radius:CGFloat = 22) {
+	init(value:Double = 0.0, target:AnyObject? = nil, action:Selector, radius:CGFloat = 22, trackInset:CGFloat = 0) {
+		let inset = Constant.trackInset + trackInset
 		let diameter = radius.native * 2
-		let gradient = InsetGradient(target:track, inset:radius - Constant.trackInset)
+		let gradient = InsetGradient(target:track, inset:radius - inset)
 		
 		self.radius = radius
 		self.action = action
@@ -74,7 +75,7 @@ class ChocolateGradientSlider: Viewable.Group {
 			trackAbove:Layout.empty,
 			trackWhole:gradient.rounded(),
 			thumbPosition:value,
-			trackInset:Layout.EdgeInsets(uniform:Constant.trackInset.native)
+			trackInset:Layout.EdgeInsets(uniform:inset.native)
 		)
 		
 		super.init(content:layout)

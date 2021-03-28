@@ -19,7 +19,7 @@ class ChocolateThemeViewController: BaseViewController {
 	}
 	
 	class Sample {
-		let background = Viewable.Color(color:nil)
+		let background = Viewable.Color(nil)
 		var foregrounds:[Style.Label] = []
 		
 		func layout() -> Positionable {
@@ -78,12 +78,14 @@ class ChocolateThemeViewController: BaseViewController {
 	var samples:[Sample] = []
 	
 	let themeView = ChocolateThemeViewable()
-	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged))
+	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged), trackInset:3)
 	let sliderDeriveContrast = Viewable.Slider(value:0.5, range:-2 ... 2, action:#selector(deriveChanged))
 	let sliderDeriveChroma = Viewable.Slider(value:0.0, range:-2 ... 2, action:#selector(deriveChanged))
 	let sliderContrasting = Viewable.Slider(value:0.5, range:-1 ... 1, action:#selector(deriveChanged))
 	let sliderChroma = Viewable.Slider(value:0.5, range:-2 ... 2, action:#selector(deriveChanged))
 	
+	let iconDerive = (0 ..< 3).map { _ in Viewable.Color(nil, intrinsicSize:CGSize(square:20)) }
+	let iconContrasting = Viewable.Color(.orange, intrinsicSize:CGSize(square:10))
 	let stringDeriveContrast = Style.numberRight.label("", maximumLines:1)
 	let stringDeriveChroma = Style.numberRight.label("", maximumLines:1)
 	let stringContrasting = Style.numberRight.label("", maximumLines:1)
@@ -228,14 +230,23 @@ class ChocolateThemeViewController: BaseViewController {
 	func applySliderValues(_ input:Input) {
 		let formatter = NumberFormatter(fractionDigits:1 ... 1)
 		let isDark = input.palette.primary.isDark(input.chclt)
-		let deriveSymbol = isDark != (sliderDeriveContrast.value < 0) ? "◐" : "◑"
+		let deriveSymbol = isDark != (input.palette.primaryAdjustment.contrast < 0) ? "◐" : "◑"
 		let contrastingSymbol = isDark ? "◓" : "◒"
+		let increase = (1.0 - input.palette.primaryAdjustment.contrast) * 0.2
+		let contrast = sliderContrasting.value * (1 - increase) + increase
 		
-		stringDeriveContrast.text = formatter.string(sliderDeriveContrast.value * 100.0) + deriveSymbol
-		stringDeriveChroma.text = formatter.string(sliderDeriveChroma.value * 100.0) + "%"
-		stringContrasting.text = formatter.string(sliderContrasting.value * 100.0) + contrastingSymbol
+		stringDeriveContrast.text = formatter.string(input.palette.primaryAdjustment.contrast * 100.0) + deriveSymbol
+		stringDeriveChroma.text = formatter.string(input.palette.primaryAdjustment.chroma * 100.0) + "%"
+		stringContrasting.text = formatter.string(contrast * 100.0) + contrastingSymbol
 		stringChroma.text = formatter.string(sliderChroma.value * 100.0) + "%"
-		stringHue.text = formatter.string(sliderHue.value * 360.0) + "°"
+		stringHue.text = formatter.string(input.coordinates.z * 360.0) + "°"
+		
+		iconContrasting.color = input.palette.primaryBackground.platformColor
+		iconContrasting.border(.init(width:1, color:input.palette.primaryForeground))
+		for (index, color) in iconDerive.enumerated() {
+			color.color = input.palette.foreground(Double(index + 1) / Double(iconDerive.count)).color()?.platformColor
+			color.border(.init(width:1, radius:color.intrinsicSize.width / 2, color:input.palette.primaryBackground))
+		}
 	}
 	
 	func sampleLayout(_ input:Input, count:Int) -> Positionable {
@@ -289,7 +300,7 @@ class ChocolateThemeViewController: BaseViewController {
 		
 		if indicators.count < colors.count {
 			for _ in indicators.count ..< colors.count {
-				indicators.append(Viewable.Color(color:nil))
+				indicators.append(Viewable.Color(nil))
 			}
 		}
 		
@@ -316,19 +327,29 @@ class ChocolateThemeViewController: BaseViewController {
 	
 	func layout() -> Positionable {
 		let input = current()
+		let gap = Layout.EmptySpace(width:1, height:4)
 		
 		applySliderValues(input)
 		
+		let deriveScalar = Double(iconDerive.count - 1)
+		let derive = Layout.Overlay(targets:iconDerive.enumerated().map { (offset, element) in
+			return element.align(horizontal:.fraction(1 - Double(offset) / deriveScalar), vertical:.fraction(Double(offset) / deriveScalar))
+		})
+		
 		let controls = Layout.Columns(
-			columnCount:2,
+			spans:[
+				derive.span(rows:2), sliderDeriveContrast, stringDeriveContrast,
+				sliderDeriveChroma, stringDeriveChroma,
+				gap, gap, gap,
+				iconContrasting.aspect(ratio:1).rounded().span(rows:2), sliderContrasting, stringContrasting,
+				sliderChroma, stringChroma,
+				gap, gap, gap,
+				sliderHue.span(columns:2), stringHue.minimum(width:50)
+			],
+			columnCount:3,
 			spacing:4,
 			template:Layout.Horizontal(spacing:4, alignment:.center, position:.stretch),
-			position:.stretch,
-			sliderDeriveContrast, stringDeriveContrast,
-			sliderDeriveChroma, stringDeriveChroma,
-			sliderContrasting, stringContrasting,
-			sliderChroma, stringChroma,
-			sliderHue, stringHue.minimum(width:50)
+			position:.stretch
 		)
 		
 		let picker = Layout.Vertical(
@@ -336,10 +357,10 @@ class ChocolateThemeViewController: BaseViewController {
 			alignment:.fill,
 			position:.stretch,
 			Layout.EmptySpace(width:1, height:1),
-			controls.minimum(width:200).padding(horizontal:20, vertical:0),
+			controls.minimum(width:200),
 			Layout.Overlay(targets:[themeView] + indicatorLayout(input, count:deriveCount), primary:0)
 				.minimum(width:120, height:120)
-				.padding(36)
+				.padding(Layout.EdgeInsets(minX:16, maxX:16, minY:32, maxY:16))
 		)
 		
 		sampleScroll.content = sampleLayout(input, count:4)
@@ -349,7 +370,7 @@ class ChocolateThemeViewController: BaseViewController {
 			columnTemplate:Layout.Vertical(alignment:.fill, position:.stretch),
 			axis:.vertical,
 			mode:.ratio(0.75),
-			picker.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200),
+			picker.fraction(width:0.5, minimumWidth:200, height:0.5, minimumHeight:200).padding(20),
 			sampleScroll.ignoringSafeBounds()
 		)
 	}

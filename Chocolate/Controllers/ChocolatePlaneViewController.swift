@@ -38,16 +38,16 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	let indicatorRadius:CGFloat = 33.5
 	let planeView = ChocolatePlaneView()
-	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged))
+	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged), trackInset:3)
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
-	let indicator = Viewable.Color(color:.black)
+	let indicator = Viewable.Color(.black)
 	var positionIndicator = Layout.Align(Layout.empty)
 	let colorLabel = Constant.colorStyle.label("", maximumLines:1)
 	let group = Viewable.Group()
 	let axis:Axis = .chclt_l
 	
-	let lineContrast = Viewable.Color(color:.black, intrinsicSize:CGSize(width:1, height:1))
-	let complement = Viewable.Color(color:.black)
+	let lineContrast = Viewable.Color(.black, intrinsicSize:CGSize(width:1, height:1))
+	let complement = Viewable.Color(.black)
 	var positionLineContrast = Layout.Align(Layout.empty, horizontal:.fill)
 	var positionComplement = Layout.Align(Layout.empty)
 	
