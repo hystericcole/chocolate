@@ -553,9 +553,9 @@ extension CGContext {
 				if color.isNormal { return color.color() }
 				
 				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
-				//return color.normalize().scaleContrast(0.75).color
-				//return color.normalize().color
-				//return color.color
+				//return color.normalize().scaleContrast(0.75).color()
+				//return color.normalize().color()
+				//return color.color()
 			}
 			
 			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
@@ -590,9 +590,9 @@ extension CGContext {
 				if color.isNormal { return color.color() }
 				
 				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
-				//return color.normalize().scaleContrast(0.75).color
-				//return color.normalize().color
-				//return color.color
+				//return color.normalize().scaleContrast(0.75).color()
+				//return color.normalize().color()
+				//return color.color()
 			}
 			
 			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
@@ -627,9 +627,9 @@ extension CGContext {
 				if color.isNormal { return color.color() }
 				
 				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
-				//return color.normalize().scaleContrast(0.75).color
-				//return color.normalize().color
-				//return color.color
+				//return color.normalize().scaleContrast(0.75).color()
+				//return color.normalize().color()
+				//return color.color()
 			}
 			
 			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }

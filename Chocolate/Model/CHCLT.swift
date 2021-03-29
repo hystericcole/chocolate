@@ -145,6 +145,7 @@ extension CHCLT {
 	public func lchok(linearRGB:Vector3) -> Vector3 {
 		var lch = OKLAB.toLCH(lab:OKLAB.fromXYZ(xyz:ciexyz(linearRGB:linearRGB)))
 		
+		lch.y *= 3.0
 		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
 		
 		return lch
@@ -153,6 +154,7 @@ extension CHCLT {
 	public func linearRGB(lchok:Vector3) -> Vector3 {
 		var lch = lchok
 		
+		lch.y /= 3.0
 		lch.z = lch.z * 2.0 * .pi
 		
 		return linearRGB(ciexyz:OKLAB.toXYZ(lab:OKLAB.fromLCH(lch:lch)))
@@ -676,7 +678,7 @@ extension CHCLT {
 	}
 	
 	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance from:Scalar, _ to:Scalar, count:Int) -> [Linear.Vector3] {
-		let v:Scalar = 0.25
+		let v:Scalar = 1.0
 		let reference = hueReference(luminance:v)
 		let hueSaturation = reference - v
 		let axis = hueAxis()
