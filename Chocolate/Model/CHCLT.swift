@@ -18,6 +18,7 @@ public class CHCLT {
 	
 	public let coefficients:Vector3
 	public let contrast:Contrast
+	public let hueGeometry:HueGeometry
 	
 	public let toCIEXYZ:Scalar.Matrix3x3
 	public let fromCIEXYZ:Scalar.Matrix3x3
@@ -27,6 +28,7 @@ public class CHCLT {
 		self.contrast = contrast
 		self.toCIEXYZ = toCIEXYZ
 		self.fromCIEXYZ = toCIEXYZ.inverse
+		self.hueGeometry = HueGeometry(coefficients:self.coefficients)
 	}
 	
 	//	MARK: Transfer
@@ -73,22 +75,34 @@ public class CHCLT {
 		return simd_dot(linear, coefficients)
 	}
 	
-	/// Compute the values that would produce the given luminance.
-	///
-	/// luminance(inverseLuminance(rgb)) = ∑ rgb
-	/// - Parameter linear: The linear results.
-	public func inverseLuminance(_ linear:Vector3) -> Vector3 {
-		return linear / coefficients
+	public func luminance(luma:Scalar) -> Linear {
+		return linear(luma)
 	}
-	
-	//	MARK: Luma
 	
 	public func luma(luminance:Linear) -> Scalar {
 		return transfer(luminance)
 	}
 	
-	public func luminance(luma:Scalar) -> Linear {
-		return linear(luma)
+	//	MARK: Hue
+	
+	public func hue(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
+		return hueGeometry.hue(linear, luminance:v)
+	}
+	
+	public func hueShift(_ linear:Linear.Vector3, luminance v:Linear, by shift:Linear) -> Linear.Vector3 {
+		return hueGeometry.hueShift(linear, luminance:v, by:shift)
+	}
+	
+	public func hueRange(start:Scalar = 0, shift:Scalar, count:Int) -> [Linear.Vector3] {
+		return hueGeometry.hueRange(start:start, shift:shift, count:count)
+	}
+	
+	public func pure(hue:Scalar) -> Linear.Vector3 {
+		return hueGeometry.pure(hue:hue)
+	}
+	
+	public func pure(hue:Scalar, luminance u:Linear) -> Linear.Vector3 {
+		return hueGeometry.pure(hue:hue, luminance:u)
 	}
 	
 	//	MARK: Comparison
@@ -127,37 +141,37 @@ extension CHCLT {
 	}
 	
 	public func lchab(linearRGB:Vector3) -> Vector3 {
-		var lch = CIELAB.toLCH(lab:cielab(linearRGB:linearRGB) / CIELAB.range)
+		let lab = cielab(linearRGB:linearRGB)
+		var lch = CIELAB.toLCH(lab:lab) / CIELAB.normalizeLCH
 		
-		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
+		lch.z = modf(lch.z + 1.0).1
 		
 		return lch
 	}
 	
 	public func linearRGB(lchab:Vector3) -> Vector3 {
-		var lch = lchab
+		let lch = lchab * CIELAB.normalizeLCH
+		let lab = CIELAB.fromLCH(lch:lch)
 		
-		lch.z = lch.z * 2.0 * .pi
-		
-		return linearRGB(cielab:CIELAB.fromLCH(lch:lch) * CIELAB.range)
+		return linearRGB(cielab:lab)
 	}
 	
 	public func lchok(linearRGB:Vector3) -> Vector3 {
-		var lch = OKLAB.toLCH(lab:OKLAB.fromXYZ(xyz:ciexyz(linearRGB:linearRGB)))
+		let xyz = ciexyz(linearRGB:linearRGB)
+		let lab = OKLAB.fromXYZ(xyz:xyz)
+		var lch = OKLAB.toLCH(lab:lab) / OKLAB.normalizeLCH
 		
-		lch.y *= 3.0
-		lch.z = modf(lch.z * 0.5 / .pi + 1.0).1
+		lch.z = modf(lch.z + 1.0).1
 		
 		return lch
 	}
 	
 	public func linearRGB(lchok:Vector3) -> Vector3 {
-		var lch = lchok
+		let lch = lchok * OKLAB.normalizeLCH
+		let lab = OKLAB.fromLCH(lch:lch)
+		let xyz = OKLAB.toXYZ(lab:lab)
 		
-		lch.y /= 3.0
-		lch.z = lch.z * 2.0 * .pi
-		
-		return linearRGB(ciexyz:OKLAB.toXYZ(lab:OKLAB.fromLCH(lch:lch)))
+		return linearRGB(ciexyz:xyz)
 	}
 	
 	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
@@ -178,6 +192,110 @@ extension CHCLT {
 extension CHCLT: Equatable, Hashable {
 	public static func == (lhs: CHCLT, rhs: CHCLT) -> Bool {
 		return lhs.isEqual(to:rhs)
+	}
+}
+
+//	MARK: -
+
+extension CHCLT {
+	public struct HueGeometry {
+		public var reference:Linear.Vector3
+		public var axis:Linear.Vector3
+		
+		public init(reference:Linear.Vector3, axis:Linear.Vector3) {
+			self.reference = reference
+			self.axis = axis
+		}
+		
+		public init(coefficients:CHCLT.Vector3) {
+			let inverse = .one / coefficients
+			let reference = Linear.vector3(inverse.x, 0, 0) - 1.0
+			let red_cross_green = Linear.vector3(inverse.y, inverse.x, inverse.x * inverse.y - inverse.x - inverse.y)
+			
+			self.init(reference:reference, axis:simd_normalize(red_cross_green))
+		}
+		
+		public static func rotate(_ linear:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
+			//	use rodrigues rotation to rotate vector around normalized axis
+			let sc = turns.sincosturns()
+			let v1 = linear * sc.__cosval
+			let v2 = simd_cross(axis, linear) * sc.__sinval
+			let v3 = axis * simd_dot(axis, linear) * (1 - sc.__cosval)
+			let sum = v1 + v2 + v3
+			
+			return sum
+		}
+		
+		/// Hue is the angle between the color and red, normalized to the 0 ... 1 range.
+		/// Reds are near 0 or 1, greens are near ⅓, and blues are near ⅔ but the actual angles vary.
+		/// - Parameters:
+		///   - linear: The color.
+		///   - v: The luminance of color.
+		/// - Returns: The hue
+		public func hue(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
+			let v = max(v, linear.min())
+			let hueSaturation = linear - v
+			let hueSaturationLengthSquared = simd_length_squared(hueSaturation)
+			
+			guard hueSaturationLengthSquared > 0.0 else { return 0.0 }
+			
+			let hueSaturationUnit = hueSaturation / hueSaturationLengthSquared.squareRoot()
+			let referenceUnit = simd_normalize(reference)
+			
+			let dot = min(max(-1.0, simd_dot(hueSaturationUnit, referenceUnit)), 1.0)
+			let turns = acos(dot) * 0.5 / .pi
+			
+			return linear.y < linear.z ? 1.0 - turns : turns
+		}
+		
+		/// Rotate the color around the normal axis, changing the ratio of the components.
+		/// Shifting the hue preserves the luminance, and changes the chroma value.
+		/// The saturation is preserved unless the color needs to be normalized after rotation.
+		/// - Parameters:
+		///   - linear: The color.
+		///   - v: The luminance of color.
+		///   - shift: The amount to shift.  Shifting by zero or one has no effect.  Shifting by half gives the same hue as negating chroma.
+		/// - Returns: The adjusted color.
+		public func hueShift(_ linear:Linear.Vector3, luminance v:Linear, by shift:Linear) -> Linear.Vector3 {
+			let hueSaturation = linear - v
+			
+			guard simd_length_squared(hueSaturation) > 0 else { return linear }
+			
+			let shifted = CHCLT.HueGeometry.rotate(hueSaturation, axis:axis, turns:shift)
+			let normalized = CHCLT.normalize(shifted + v, luminance:v, leavePositive:false)
+			
+			return normalized
+		}
+		
+		public func hueRange(start:Scalar = 0, shift:Scalar, count:Int) -> [Linear.Vector3] {
+			return Array<Linear.Vector3>(unsafeUninitializedCapacity:count) { buffer, initialized in
+				var hue = start
+				
+				for index in 0 ..< count {
+					buffer[index] = pure(hue:hue)
+					hue += shift
+				}
+				
+				initialized = count
+			}
+		}
+		
+		public func pure(hue:Scalar) -> Linear.Vector3 {
+			let rotated = CHCLT.HueGeometry.rotate(reference, axis:axis, turns:hue)
+			let normalized = CHCLT.saturate(rotated)
+			
+			return normalized
+		}
+		
+		public func pure(hue:Scalar, luminance u:Linear) -> Linear.Vector3 {
+			guard u > 0 else { return .zero }
+			guard u < 1 else { return .one }
+			
+			let rotated = CHCLT.HueGeometry.rotate(reference * u, axis:axis, turns:hue)
+			let normalized = CHCLT.normalize(rotated + u, luminance:u, leavePositive:false)
+			
+			return normalized
+		}
 	}
 }
 
@@ -570,70 +688,6 @@ extension CHCLT {
 	
 	//	MARK: Hue
 	
-	public static func rotate(_ linear:Linear.Vector3, axis:Linear.Vector3, turns:Linear) -> Linear.Vector3 {
-		//	use rodrigues rotation to rotate vector around normalized axis
-		let sc = turns.sincosturns()
-		let v1 = linear * sc.__cosval
-		let v2 = simd_cross(axis, linear) * sc.__sinval
-		let v3 = axis * simd_dot(axis, linear) * (1 - sc.__cosval)
-		let sum = v1 + v2 + v3
-		
-		return sum
-	}
-	
-	public func hueReference(luminance v:Linear) -> Linear.Vector3 {
-		return inverseLuminance(Linear.vector3(v, 0, 0))
-	}
-	
-	public func hueAxis() -> Linear.Vector3 {
-		let inverse = inverseLuminance(.one)
-		let red_cross_green = Linear.vector3(inverse.y, inverse.x, inverse.x * inverse.y - inverse.x - inverse.y)
-		
-		return simd_normalize(red_cross_green)
-	}
-	
-	/// Hue is the angle between the color and red, normalized to the 0 ... 1 range.
-	/// Reds are near 0 or 1, greens are near ⅓, and blues are near ⅔ but the actual angles vary.
-	/// - Parameters:
-	///   - linear: The color.
-	///   - v: The luminance of color.
-	/// - Returns: The hue
-	public func hue(_ linear:Linear.Vector3, luminance v:Linear) -> Linear {
-		let v = max(v, linear.min())
-		let hueSaturation = linear - v
-		let hueSaturationLengthSquared = simd_length_squared(hueSaturation)
-		
-		guard hueSaturationLengthSquared > 0.0 else { return 0.0 }
-		
-		let hueSaturationUnit = hueSaturation / hueSaturationLengthSquared.squareRoot()
-		let reference = hueReference(luminance:1)
-		let referenceUnit = simd_normalize(reference - 1)
-		
-		let dot = min(max(-1.0, simd_dot(hueSaturationUnit, referenceUnit)), 1.0)
-		let turns = acos(dot) * 0.5 / .pi
-		
-		return linear.y < linear.z ? 1.0 - turns : turns
-	}
-	
-	/// Rotate the color around the normal axis, changing the ratio of the components.
-	/// Shifting the hue preserves the luminance, and changes the chroma value.
-	/// The saturation is preserved unless the color needs to be normalized after rotation.
-	/// - Parameters:
-	///   - linear: The color.
-	///   - v: The luminance of color.
-	///   - shift: The amount to shift.  Shifting by zero or one has no effect.  Shifting by half gives the same hue as negating chroma.
-	/// - Returns: The adjusted color.
-	public func hueShift(_ linear:Linear.Vector3, luminance v:Linear, by shift:Linear) -> Linear.Vector3 {
-		let hueSaturation = linear - v
-		
-		guard simd_length_squared(hueSaturation) > 0 else { return linear }
-		
-		let shifted = CHCLT.rotate(hueSaturation, axis:hueAxis(), turns:shift)
-		let normalized = CHCLT.normalize(shifted + v, luminance:v, leavePositive:false)
-		
-		return normalized
-	}
-	
 	public func hueShift(_ linear:Linear.Vector3, luminance v:Linear, by shift:Linear, apply chroma:Linear) -> Linear.Vector3 {
 		return applyChroma(hueShift(linear, luminance:v, by:shift), luminance:v, apply:chroma)
 	}
@@ -642,7 +696,7 @@ extension CHCLT {
 		let v = luminance(linear)
 		let w = luminance(color)
 		
-		guard chroma(color, luminance:w) > 1/32 else { return linear }
+		guard chroma(color, luminance:w) > 0x1p-6 else { return linear }
 		
 		let h = hue(linear, luminance:v)
 		let g = hue(color, luminance:w)
@@ -656,40 +710,13 @@ extension CHCLT {
 		return hueShift(linear, luminance:v, by:e < 0 ? -e - t : t - e)
 	}
 	
-	public func hueRange(start:Scalar = 0, shift:Scalar, count:Int) -> [Linear.Vector3] {
-		let v:Scalar = 1.0
-		let reference = hueReference(luminance:v)
-		let hueSaturation = reference - v
-		let axis = hueAxis()
-		
-		return Array<Linear.Vector3>(unsafeUninitializedCapacity:count) { buffer, initialized in
-			var hue = start
-			
-			for index in 0 ..< count {
-				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
-				let normalized = CHCLT.saturate(rotated)
-				
-				buffer[index] = normalized
-				hue += shift
-			}
-			
-			initialized = count
-		}
-	}
-	
 	public func luminanceRamp(hueStart:Scalar = 0, hueShift:Scalar, chroma:Scalar, luminance from:Scalar, _ to:Scalar, count:Int) -> [Linear.Vector3] {
-		let v:Scalar = 1.0
-		let reference = hueReference(luminance:v)
-		let hueSaturation = reference - v
-		let axis = hueAxis()
-		
 		return Array<Linear.Vector3>(unsafeUninitializedCapacity:count) { buffer, initialized in
 			var hue = hueStart
 			
 			for index in 0 ..< count {
 				let u = from + (to - from) * Scalar(index) / Scalar(count - 1)
-				let rotated = CHCLT.rotate(hueSaturation, axis:axis, turns:hue)
-				let normalized = CHCLT.saturate(rotated)
+				let normalized = pure(hue:hue)
 				let luminated = applyLuminance(normalized, luminance:luminance(normalized), apply:u)
 				let vector = applyChroma(luminated, luminance:u, apply:chroma)
 				
@@ -699,28 +726,6 @@ extension CHCLT {
 			
 			initialized = count
 		}
-	}
-	
-	public func pure(hue:Scalar) -> Linear.Vector3 {
-		let u:Scalar = 1.0
-		let axis = hueAxis()
-		let reference = hueReference(luminance:u)
-		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
-		let normalized = CHCLT.saturate(rotated)
-		
-		return normalized
-	}
-	
-	public func pure(hue:Scalar, luminance u:Linear) -> Linear.Vector3 {
-		guard u > 0 else { return .zero }
-		guard u < 1 else { return .one }
-		
-		let axis = hueAxis()
-		let reference = hueReference(luminance:u)
-		let rotated = CHCLT.rotate(reference - u, axis:axis, turns:hue)
-		let normalized = CHCLT.normalize(rotated + u, luminance:u, leavePositive:false)
-		
-		return normalized
 	}
 	
 	public func saturation(_ vector:Linear.Vector3, luminance v:Linear) -> Scalar {
@@ -1232,6 +1237,7 @@ extension CHCLT {
 
 extension CHCLT {
 	public enum OKLAB {
+		public static let normalizeLCH = CHCLT.Scalar.vector3(1.0, 0.5, 2.0 * .pi)
 		public static let m1 = CHCLT.Linear.Matrix3x3([0.8189330101, 0.0329845436, 0.0482003018], [0.3618667424, 0.9293118715, 0.2643662691], [-0.1288597137, 0.0361456387, 0.6338517070])
 		public static let m1i = m1.inverse
 		public static let m2 = CHCLT.Linear.Matrix3x3([0.2104542553, 1.9779984951, 0.0259040371], [0.7936177850, -2.4285922050, 0.7827717662], [-0.0040720468, 0.4505937099, -0.8086757660])
@@ -1273,7 +1279,7 @@ extension CHCLT {
 
 extension CHCLT {
 	public enum CIELAB {
-		public static let range = CHCLT.Scalar.vector3(100.0, 128.0, 128.0)
+		public static let normalizeLCH = CHCLT.Scalar.vector3(100.0, 200.0, 2.0 * .pi)
 		public static let genericWhite = CIEXYZ.d50
 		
 		public static func toXYZ(_ t:CHCLT.Linear) -> CHCLT.Linear {

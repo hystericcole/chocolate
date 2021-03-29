@@ -57,7 +57,7 @@ class ChocolateLumaRampViewController: BaseViewController {
 			spacing:2,
 			alignment:.fill,
 			Layout.Sizing(gradient, width:Layout.Dimension(constant:0, fraction:0.5), height:nil),
-			Layout.Vertical(targets:colorStops, spacing:2, alignment:.fill, position:.uniformWithEnds(0.5))
+			Layout.Vertical(targets:colorStops, spacing:colorStops.count > 32 ? 0 : 2, alignment:.fill, position:.uniformWithEnds(0.5))
 		)
 		
 		group.content = Layout.Flow(
