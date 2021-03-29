@@ -305,7 +305,11 @@ enum ColorModel: Int {
 		locations.append(1.0)
 		colorsOrder.append(.black)
 		
+#if os(macOS)
+		var colors:[CGColor] = colorsOrder.map { $0.color() }
+#else
 		var colors:[CGColor] = colorsOrder.map { CHCLT.Color(chclt, $0).color() }
+#endif
 		
 		if darkToLight {
 			colors.reverse()
@@ -332,7 +336,7 @@ enum ColorModel: Int {
 		
 		if reverse { colors.reverse() }
 		
-		return CGGradient(colorsSpace:colorSpace, colors:colors.map { CHCLT.Color(chclt, linear:$0).color } as CFArray, locations:nil)
+		return CGGradient(colorsSpace:colorSpace, colors:colors.map { CHCLT.Color(chclt, linear:$0).color() } as CFArray, locations:nil)
 	}
 	
 	static func rgb_from_hsb(h:Scalar, s:Scalar, b:Scalar) -> Scalar.Vector3 {
