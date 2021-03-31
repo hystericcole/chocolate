@@ -19,7 +19,7 @@ class ChocolatePlaneViewController: BaseViewController {
 			
 			return ChocolatePlaneLayer.Mode(
 				model:model,
-				axis:axis
+				axis:model.isLCH ? 5 - axis : axis
 			)
 		}
 		

@@ -132,48 +132,6 @@ extension CHCLT {
 		return fromCIEXYZ * ciexyz
 	}
 	
-	public func cielab(linearRGB:Vector3) -> Vector3 {
-		return CIELAB.fromXYZ(xyz:ciexyz(linearRGB:linearRGB), white:whitepoint())
-	}
-	
-	public func linearRGB(cielab:Vector3) -> Vector3 {
-		return linearRGB(ciexyz:CIELAB.toXYZ(lab:cielab, white:whitepoint()))
-	}
-	
-	public func lchab(linearRGB:Vector3) -> Vector3 {
-		let lab = cielab(linearRGB:linearRGB)
-		var lch = CIELAB.toLCH(lab:lab) / CIELAB.normalizeLCH
-		
-		lch.z = modf(lch.z + 1.0).1
-		
-		return lch
-	}
-	
-	public func linearRGB(lchab:Vector3) -> Vector3 {
-		let lch = lchab * CIELAB.normalizeLCH
-		let lab = CIELAB.fromLCH(lch:lch)
-		
-		return linearRGB(cielab:lab)
-	}
-	
-	public func lchok(linearRGB:Vector3) -> Vector3 {
-		let xyz = ciexyz(linearRGB:linearRGB)
-		let lab = OKLAB.fromXYZ(xyz:xyz)
-		var lch = OKLAB.toLCH(lab:lab) / OKLAB.normalizeLCH
-		
-		lch.z = modf(lch.z + 1.0).1
-		
-		return lch
-	}
-	
-	public func linearRGB(lchok:Vector3) -> Vector3 {
-		let lch = lchok * OKLAB.normalizeLCH
-		let lab = OKLAB.fromLCH(lch:lch)
-		let xyz = OKLAB.toXYZ(lab:lab)
-		
-		return linearRGB(ciexyz:xyz)
-	}
-	
 	public func convert(linearRGB:Vector3, from chclt:CHCLT) -> Vector3 {
 		if toCIEXYZ == chclt.toCIEXYZ {
 			return linearRGB
@@ -1236,12 +1194,158 @@ extension CHCLT {
 //	MARK: -
 
 extension CHCLT {
+	public struct CLSH {
+		public static let sRGB = CLSH(rgb_to_lms:OKLAB.m1_x_sRGB, lms_to_lab:OKLAB.m2)
+		
+		public let rgb2lms, lms2rgb, lms2lab, lab2lms:CHCLT.Linear.Matrix3x3
+		public let zeroAlignRed:CHCLT.Scalar
+		
+		public init(rgb_to_lms:CHCLT.Linear.Matrix3x3, lms_to_lab:CHCLT.Linear.Matrix3x3) {
+			rgb2lms = rgb_to_lms
+			lms2rgb = rgb_to_lms.inverse
+			lms2lab = lms_to_lab
+			lab2lms = lms_to_lab.inverse
+			
+			let red = CHCLT.Linear.vector3(1, 0, 0)
+			var lms = rgb_to_lms * red
+			
+			lms.x = cbrt(lms.x)
+			lms.y = cbrt(lms.y)
+			lms.z = cbrt(lms.z)
+			
+			let lab = lms_to_lab * lms
+			let hue = atan2(lab.z, lab.y)
+			
+			zeroAlignRed = hue * 0.5 / .pi
+		}
+		
+		public init(rgb_to_xyz_d65:CHCLT.Linear.Matrix3x3) {
+			self.init(rgb_to_lms:OKLAB.m1 * rgb_to_xyz_d65, lms_to_lab:OKLAB.m2)
+		}
+		
+		public func lab(rgb:CHCLT.Linear.Vector3) -> CHCLT.Scalar.Vector3 {
+			var lms = rgb2lms * rgb
+			
+			lms.x = cbrt(lms.x)
+			lms.y = cbrt(lms.y)
+			lms.z = cbrt(lms.z)
+			
+			return lms2lab * lms
+		}
+		
+		public func rgb(lab:CHCLT.Scalar.Vector3) -> CHCLT.Linear.Vector3 {
+			let l = lab2lms * lab
+			let lms = l * l * l
+			
+			return lms2rgb * lms
+		}
+		
+		public func lch(lab:CHCLT.Scalar.Vector3) -> CHCLT.Scalar.Vector3 {
+			return CHCLT.Linear.vector3(lab.x, hypot(lab.z, lab.y), atan2(lab.z, lab.y))
+		}
+		
+		public func lab(lch:CHCLT.Scalar.Vector3) -> CHCLT.Scalar.Vector3 {
+			let sc = lch.z.sincos()
+			
+			return CHCLT.Linear.vector3(lch.x, lch.y * sc.__cosval, lch.y * sc.__sinval)
+		}
+		
+		///	k = a(l+xd)³ + b(l+xe)³ + c(l+xf)³
+		private static func maximumChromaRoot(a:Linear, b:Linear, c:Linear, d:Linear, e:Linear, f:Linear, l:Linear, k:Linear) -> Linear {
+			//	k = a(l+xd)³ + b(l+xe)³ + c(l+xf)³
+			//	k = al³ + 3al²xd + 3alx²d² + ax³d³ + bl³ + 3bl²xe + 3blx²e² + bx³e³ + cl³ + 3cl²xf + 3clx²f² + cx³f³
+			//	k = (a+b+c)l³ + 3l²(ad + be + cf)x + 3l(ad² + be² + cf²)x² + (ad³ + be³ + cf³)x³
+			
+			let p0 = (a + b + c) * l * l * l - k
+			let p1 = 3 * (a * d + b * e + c * f) * l * l
+			let p2 = 3 * (a * d * d + b * e * e + c * f * f) * l
+			let p3 = (a * d * d * d + b * e * e * e + c * f * f * f)
+			
+			guard p0.magnitude > 0 else { return 0 }
+			guard p3.magnitude > 0 else { return Polynomial.quadraticRoots(a:p2, b:p1, c:p0).filter { $0 >= 0 }.min() ?? 1 }
+			
+			let roots = Polynomial.cubicRoots(a:p3, b:p2, c:p1, d:p0)
+			
+			return roots.filter { $0 >= 0 }.min() ?? 1
+		}
+		
+		public func maximumChroma(l:Scalar, sine:Scalar, cosine:Scalar) -> CHCLT.Scalar {
+			let h4 = lab2lms.columns.1.x * cosine + lab2lms.columns.2.x * sine
+			let h5 = lab2lms.columns.1.y * cosine + lab2lms.columns.2.y * sine
+			let h6 = lab2lms.columns.1.z * cosine + lab2lms.columns.2.z * sine
+			
+			let r0 = CLSH.maximumChromaRoot(a:lms2rgb.columns.0.x, b:lms2rgb.columns.1.x, c:lms2rgb.columns.2.x, d:h4, e:h5, f:h6, l:l, k:0)
+			let r1 = CLSH.maximumChromaRoot(a:lms2rgb.columns.0.x, b:lms2rgb.columns.1.x, c:lms2rgb.columns.2.x, d:h4, e:h5, f:h6, l:l, k:1)
+			let g0 = CLSH.maximumChromaRoot(a:lms2rgb.columns.0.y, b:lms2rgb.columns.1.y, c:lms2rgb.columns.2.y, d:h4, e:h5, f:h6, l:l, k:0)
+			let g1 = CLSH.maximumChromaRoot(a:lms2rgb.columns.0.y, b:lms2rgb.columns.1.y, c:lms2rgb.columns.2.y, d:h4, e:h5, f:h6, l:l, k:1)
+			let b0 = CLSH.maximumChromaRoot(a:lms2rgb.columns.0.z, b:lms2rgb.columns.1.z, c:lms2rgb.columns.2.z, d:h4, e:h5, f:h6, l:l, k:0)
+			let b1 = CLSH.maximumChromaRoot(a:lms2rgb.columns.0.z, b:lms2rgb.columns.1.z, c:lms2rgb.columns.2.z, d:h4, e:h5, f:h6, l:l, k:1)
+			
+			return min(r0, r1, g0, g1, b0, b1)
+		}
+		
+		public func clsh(rgb:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
+			var clsh = lch(lab:lab(rgb:rgb))
+			
+			if clsh.y > 0 {
+				let sc = clsh.z.sincos()
+				let mc = maximumChroma(l:clsh.x, sine:sc.__sinval, cosine:sc.__cosval)
+				
+				if mc > 0 {
+					clsh.y /= mc
+					clsh.z = modf(clsh.z * 0.5 / .pi + 1.0 - zeroAlignRed).1
+				} else {
+					clsh.y = 0
+					clsh.z = 0
+				}
+			} else {
+				clsh.z = 0
+			}
+			
+			return clsh
+		}
+		
+		public func rgb(clsh:CHCLT.Linear.Vector3) -> CHCLT.Linear.Vector3 {
+			guard clsh.x > 0 else { return CHCLT.Linear.Vector3.zero }
+			guard clsh.x < 1 else { return CHCLT.Linear.Vector3.one }
+			
+			var lab = CHCLT.Linear.vector3(clsh.x, 0, 0)
+			
+			if clsh.y.magnitude > 0 {
+				let turns = clsh.z + zeroAlignRed
+				let sc = turns.sincosturns()
+				let mc = maximumChroma(l:clsh.x, sine:sc.__sinval, cosine:sc.__cosval)
+				let c = mc * clsh.y
+				
+				lab.y = c * sc.__cosval
+				lab.z = c * sc.__sinval
+			}
+			
+			return rgb(lab:lab)
+		}
+	}
+	
+	public func clsh(linearRGB:Vector3) -> Vector3 {
+		return CLSH.sRGB.clsh(rgb:linearRGB)
+	}
+	
+	public func linearRGB(clsh:Vector3) -> Vector3 {
+		let rgb = CLSH.sRGB.rgb(clsh:clsh)
+		
+		return rgb.clamped(lowerBound:Linear.Vector3.zero, upperBound:Linear.Vector3.one)
+	}
+}
+
+//	MARK: -
+
+extension CHCLT {
 	public enum OKLAB {
 		public static let normalizeLCH = CHCLT.Scalar.vector3(1.0, 0.5, 2.0 * .pi)
 		public static let m1 = CHCLT.Linear.Matrix3x3([0.8189330101, 0.0329845436, 0.0482003018], [0.3618667424, 0.9293118715, 0.2643662691], [-0.1288597137, 0.0361456387, 0.6338517070])
 		public static let m1i = m1.inverse
 		public static let m2 = CHCLT.Linear.Matrix3x3([0.2104542553, 1.9779984951, 0.0259040371], [0.7936177850, -2.4285922050, 0.7827717662], [-0.0040720468, 0.4505937099, -0.8086757660])
 		public static let m2i = m2.inverse
+		public static let m1_x_sRGB = CHCLT.Linear.Matrix3x3([0.4122214708, 0.2119034982, 0.0883024619], [0.5363325363, 0.6806995451, 0.2817188376], [0.0514459929, 0.1073969566, 0.6299787005])
 		
 		public static func toXYZ(lab:CHCLT.Linear.Vector3, white:CHCLT.Linear.Vector3 = CIEXYZ.d65) -> CHCLT.Linear.Vector3 {
 			let linear = OKLAB.m2i * lab
@@ -1272,6 +1376,24 @@ extension CHCLT {
 			
 			return CHCLT.Linear.vector3(lch.x, lch.y * sc.__cosval, lch.y * sc.__sinval)
 		}
+	}
+	
+	public func oklch(linearRGB:Vector3) -> Vector3 {
+		let xyz = ciexyz(linearRGB:linearRGB)
+		let lab = OKLAB.fromXYZ(xyz:xyz)
+		var lch = OKLAB.toLCH(lab:lab) / OKLAB.normalizeLCH
+		
+		lch.z = modf(lch.z + 1.0).1
+		
+		return lch
+	}
+	
+	public func linearRGB(oklch:Vector3) -> Vector3 {
+		let lch = oklch * OKLAB.normalizeLCH
+		let lab = OKLAB.fromLCH(lch:lch)
+		let xyz = OKLAB.toXYZ(lab:lab)
+		
+		return linearRGB(ciexyz:xyz)
 	}
 }
 
@@ -1366,6 +1488,30 @@ extension CHCLT {
 		public static func difference(_ lab1:CHCLT.Linear.Vector3, _ lab2:CHCLT.Linear.Vector3) -> Scalar {
 			return difference_cie94(lab1, lab2)
 		}
+	}
+	
+	public func cielab(linearRGB:Vector3) -> Vector3 {
+		return CIELAB.fromXYZ(xyz:ciexyz(linearRGB:linearRGB), white:whitepoint())
+	}
+	
+	public func linearRGB(cielab:Vector3) -> Vector3 {
+		return linearRGB(ciexyz:CIELAB.toXYZ(lab:cielab, white:whitepoint()))
+	}
+	
+	public func lchab(linearRGB:Vector3) -> Vector3 {
+		let lab = cielab(linearRGB:linearRGB)
+		var lch = CIELAB.toLCH(lab:lab) / CIELAB.normalizeLCH
+		
+		lch.z = modf(lch.z + 1.0).1
+		
+		return lch
+	}
+	
+	public func linearRGB(lchab:Vector3) -> Vector3 {
+		let lch = lchab * CIELAB.normalizeLCH
+		let lab = CIELAB.fromLCH(lch:lch)
+		
+		return linearRGB(cielab:lab)
 	}
 }
 

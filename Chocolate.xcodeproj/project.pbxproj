@@ -48,6 +48,8 @@
 		07D28D3125C3B928008347A4 /* Style.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D2F25C3B927008347A4 /* Style.swift */; };
 		07D28D4625C3BB1D008347A4 /* Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D4525C3BB1D008347A4 /* Styles.swift */; };
 		07D28D4725C3BB1D008347A4 /* Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D28D4525C3BB1D008347A4 /* Styles.swift */; };
+		07ED3D6A2613FAE40053F39F /* Polynomial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED3D692613FAE40053F39F /* Polynomial.swift */; };
+		07ED3D6B2613FAE40053F39F /* Polynomial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07ED3D692613FAE40053F39F /* Polynomial.swift */; };
 		07F7852E25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */; };
 		07F7852F25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */; };
 		07FA9EE425C20785005C439B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07FA9EE325C20785005C439B /* AppDelegate.swift */; };
@@ -133,6 +135,7 @@
 		07D28D2025C2A80C008347A4 /* BaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseView.swift; sourceTree = "<group>"; };
 		07D28D2F25C3B927008347A4 /* Style.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Style.swift; sourceTree = "<group>"; };
 		07D28D4525C3BB1D008347A4 /* Styles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Styles.swift; sourceTree = "<group>"; };
+		07ED3D692613FAE40053F39F /* Polynomial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polynomial.swift; sourceTree = "<group>"; };
 		07F7852D25EB0886008C8F9A /* ChocolateLumaRampViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChocolateLumaRampViewController.swift; sourceTree = "<group>"; };
 		07FA9EE025C20785005C439B /* Chocolate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Chocolate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		07FA9EE325C20785005C439B /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -383,6 +386,7 @@
 				07FA9F7225C20A90005C439B /* RGBA.swift */,
 				07AFCAF025DED1E40004382B /* MutableImage.swift */,
 				071FD44425E85A31002A69DF /* Palette.swift */,
+				07ED3D692613FAE40053F39F /* Polynomial.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -658,6 +662,7 @@
 				07D28D2125C2A80C008347A4 /* BaseView.swift in Sources */,
 				07B1D21725FC3B5E00BB5954 /* ChocolateGradientSlider.swift in Sources */,
 				07C42CBF25FAA39F0011466F /* ColorModel.swift in Sources */,
+				07ED3D6A2613FAE40053F39F /* Polynomial.swift in Sources */,
 				07F7852E25EB0886008C8F9A /* ChocolateLumaRampViewController.swift in Sources */,
 				07FA9F8F25C2129C005C439B /* ChocolateViewController.swift in Sources */,
 				079FDCAE25C81685008A2DF1 /* Viewable.swift in Sources */,
@@ -703,6 +708,7 @@
 				07FA9F2625C208B0005C439B /* AppDelegate.swift in Sources */,
 				07D28D3125C3B928008347A4 /* Style.swift in Sources */,
 				07C42CC025FAA39F0011466F /* ColorModel.swift in Sources */,
+				07ED3D6B2613FAE40053F39F /* Polynomial.swift in Sources */,
 				07FA9F2825C208B0005C439B /* SceneDelegate.swift in Sources */,
 				07CF4DB725D63AB0009BADDD /* Atomic.swift in Sources */,
 				07FA9F8125C20A90005C439B /* CHCLT.swift in Sources */,

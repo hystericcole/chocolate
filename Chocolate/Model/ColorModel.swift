@@ -13,7 +13,9 @@ import simd
 enum ColorModel: Int {
 	typealias Scalar = CHCLT.Scalar
 	
-	case chclt, rgb, hsb
+	case chclt, rgb, hsb, clsh
+	
+	var isLCH:Bool { return self == .clsh }
 	
 	struct AxisOptions: OptionSet {
 		static let axisCount = 3
@@ -103,6 +105,13 @@ enum ColorModel: Int {
 		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
 	}
 	
+	static func colorCLSH(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
+		let clsh = components(coordinates:coordinates, axis:axis)
+		let rgb = chclt.linearRGB(clsh:clsh)
+		
+		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
+	}
+	
 	static func colorCIEXYZ(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
 		let ciexyz = components(coordinates:coordinates, axis:axis)
 		let rgb = chclt.linearRGB(ciexyz:ciexyz)
@@ -117,9 +126,9 @@ enum ColorModel: Int {
 		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
 	}
 	
-	static func colorLCHOK(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
-		let lchok = components(coordinates:coordinates, axis:axis)
-		let rgb = chclt.linearRGB(lchok:lchok)
+	static func colorOKLCH(axis:Int, coordinates:Scalar.Vector3, chclt:CHCLT, alpha:Scalar = 1.0) -> CHCLT.Color {
+		let oklch = components(coordinates:coordinates, axis:axis)
+		let rgb = chclt.linearRGB(oklch:oklch)
 		
 		return CHCLT.Color(chclt, linear:rgb, alpha:alpha)
 	}
@@ -162,7 +171,8 @@ enum ColorModel: Int {
 		case .hsb: return ColorModel.colorHSB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		//case .xyz: return ColorModel.colorCIEXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		//case .lchab: return ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
-		//case .lchok: return ColorModel.colorLCHOK(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
+		//case .oklch: return ColorModel.colorOKLCH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
+		case .clsh: return ColorModel.colorCLSH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		case .chclt: return ColorModel.colorCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
 	}
@@ -173,7 +183,8 @@ enum ColorModel: Int {
 		case .hsb: return ColorModel.linearHSB(axis:axis, coordinates:coordinates)
 		//case .xyz: return ColorModel.colorCIEXYZ(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
 		//case .lchab: return ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
-		//case .lchok: return ColorModel.colorLCHOK(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
+		//case .oklch: return ColorModel.colorOKLCH(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
+		case .clsh: return ColorModel.colorCLSH(axis:axis, coordinates:coordinates, chclt:chclt).linearRGB
 		case .chclt: return ColorModel.linearCHCLT(axis:axis, coordinates:coordinates, chclt:chclt)
 		}
 	}
@@ -184,7 +195,8 @@ enum ColorModel: Int {
 		case .hsb: return ColorModel.platformHSB(axis:axis, coordinates:coordinates, alpha:alpha)
 		//case .xyz: return ColorModel.colorCIEXYZ(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
 		//case .lchab: return ColorModel.colorLCHAB(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
-		//case .lchok: return ColorModel.colorLCHOK(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
+		//case .oklch: return ColorModel.colorOKLCH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
+		case .clsh: return ColorModel.colorCLSH(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha.native).platformColor
 		case .chclt: return ColorModel.platformCHCLT(axis:axis, coordinates:coordinates, chclt:chclt, alpha:alpha)
 		}
 	}
@@ -195,7 +207,8 @@ enum ColorModel: Int {
 		case .hsb: return ColorModel.coordinates(components:color.hsb, axis:axis)
 		//case .xyz: return ColorModel.coordinates(components:color.chclt.ciexyz(linearRGB:color.linear.xyz), axis:axis)
 		//case .lchab: return ColorModel.coordinates(components:color.lchab, axis:axis)
-		//case .lchok: return ColorModel.coordinates(components:color.lchok, axis:axis)
+		//case .oklch: return ColorModel.coordinates(components:color.oklch, axis:axis)
+		case .clsh: return ColorModel.coordinates(components:color.clsh, axis:axis)
 		case .chclt: return ColorModel.coordinates(components:color.hcl, axis:axis)
 		}
 	}
@@ -206,7 +219,8 @@ enum ColorModel: Int {
 		case .hsb: return ColorModel.coordinates(components:CHCLT.Color(chclt, color).hsb, axis:axis)
 		//case .xyz: return ColorModel.coordinates(components:chclt.ciexyz(linearRGB:color.vector), axis:axis)
 		//case .lchab: return ColorModel.coordinates(components:chclt.lchab(linearRGB:color.vector), axis:axis)
-		//case .lchok: return ColorModel.coordinates(components:chclt.lchok(linearRGB:color.vector), axis:axis)
+		//case .oklch: return ColorModel.coordinates(components:chclt.oklch(linearRGB:color.vector), axis:axis)
+		case .clsh: return ColorModel.coordinates(components:chclt.clsh(linearRGB:color.vector), axis:axis)
 		case .chclt: return ColorModel.coordinates(components:chclt.hcl(linear:color.vector), axis:axis)
 		}
 	}
@@ -243,6 +257,14 @@ enum ColorModel: Int {
 			result = chclt.chromaRamp(color.vector, luminance:color.luminance(chclt), intermediaries:0, withNegative:options.contains(.negativeY)).reversed().map { CHCLT.LinearRGB($0) }
 		case (.chclt, _):
 			result = [.black, .white]
+		case (.clsh, 2):
+			let clsh = CHCLT.CLSH.sRGB
+			result = (0 ..< count).map { CHCLT.LinearRGB(clsh.rgb(clsh:CHCLT.Linear.vector3(0.75, 1.0, Double($0) / Double(count - 1)))) }
+		case (.clsh, 1):
+			let clsh = CHCLT.CLSH.sRGB
+			result = (0 ..< count).map { CHCLT.LinearRGB(clsh.rgb(clsh:CHCLT.Linear.vector3(0.75, Double($0) / Double(count - 1), hue))) }
+		case (.clsh, _):
+			result = [.black, .white]
 		}
 		
 		if options.contains(.flipZ) { result.reverse() }
@@ -275,6 +297,10 @@ enum ColorModel: Int {
 			let color = CHCLT.LinearRGB(chclt, hue:hue)
 			result = chclt.chromaRamp(color.vector, luminance:color.luminance(chclt), intermediaries:0, withNegative:options.contains(.negativeY)).reversed().map { CHCLT.LinearRGB($0).color().platformColor }
 		case (.chclt, _):
+			result = [.black, .white]
+		case (.clsh, 2):
+			result = (0 ..< count).map { ColorModel.colorCLSH(axis:2, coordinates:Scalar.vector3(1, 1, Double($0) / Double(count - 1)), chclt:chclt).platformColor }
+		case (.clsh, _):
 			result = [.black, .white]
 		}
 		
@@ -606,7 +632,7 @@ extension CGContext {
 		}
 	}
 	
-	func drawPlaneFromCubeLCHOK(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
+	func drawPlaneFromCubeOKLCH(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
 		let drawSpace = drawSpace ?? chclt.rgbColorSpace()
 		let columns = Int(box.size.width)
 		let rows = min(32, Int(box.size.height))
@@ -622,7 +648,44 @@ extension CGContext {
 			let colors:[CGColor] = (0 ..< rows).map { row in
 				let y = Double(row) / Double(rows - 1)
 				let coordinates = CHCLT.Scalar.vector3(x, 1 - y, scalar)
-				let color = ColorModel.colorLCHOK(axis:axis, coordinates:coordinates, chclt:chclt)
+				let color = ColorModel.colorOKLCH(axis:axis, coordinates:coordinates, chclt:chclt)
+				
+				if color.isNormal { return color.color() }
+				
+				return (color.linear.max() > 1 ? CHCLT.LinearRGB.white : CHCLT.LinearRGB.black).color()
+				//return color.normalize().scaleContrast(0.75).color()
+				//return color.normalize().color()
+				//return color.color()
+			}
+			
+			guard let gradient = CGGradient(colorsSpace:drawSpace, colors:colors as CFArray, locations:nil) else { continue }
+			
+			let origin = step * CGFloat(column) + box.origin
+			let stripe = CGRect(origin:origin, size:size)
+			
+			clip(to:stripe)
+			drawLinearGradient(gradient, start:start, end:downEnd, options:drawingOptions)
+			resetClip()
+		}
+	}
+	
+	func drawPlaneFromCubeCLSH(axis:Int, scalar:CGFloat.NativeType, box:CGRect, chclt:CHCLT, drawSpace:CGColorSpace?) {
+		let drawSpace = drawSpace ?? chclt.rgbColorSpace()
+		let columns = Int(box.size.width)
+		let rows = min(32, Int(box.size.height))
+		let start = box.origin
+		let downEnd = CGPoint(x:box.minX, y:box.maxY)
+		let drawingOptions:CGGradientDrawingOptions = [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+		let size = CGSize(width:1, height:box.size.height)
+		let step = CGPoint(x:1, y:0)
+		
+		for column in 0 ..< columns {
+			let x = Double(column) / Double(columns - 1)
+			
+			let colors:[CGColor] = (0 ..< rows).map { row in
+				let y = Double(row) / Double(rows - 1)
+				let coordinates = CHCLT.Scalar.vector3(x, 1 - y, scalar)
+				let color = ColorModel.colorCLSH(axis:axis, coordinates:coordinates, chclt:chclt)
 				
 				if color.isNormal { return color.color() }
 				
