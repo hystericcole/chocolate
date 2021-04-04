@@ -108,6 +108,36 @@ extension CHCLT {
 		
 		public func difference(_ color:Color) -> Scalar { return CIELAB.difference(cielab, color.cielab) }
 		
+		public func interpolate(towards color:CHCLT.Color, by s:CHCLT.Scalar) -> Self {
+			let n = 1 - s;
+			let a = hcl
+			let b = color.hcl
+			let l = a.z * n + b.z * s
+			let c = a.y * n + b.y * s
+			let h:CHCLT.Scalar
+			
+			let aHasHue = a.y > 0 && a.z > 0 && a.z < 1
+			let bHasHue = a.y > 0 && a.z > 0 && a.z < 1
+			
+			guard c > 0, aHasHue || bHasHue else {
+				return Color(chclt, gray:l, alpha:alpha * n + color.alpha * s)
+			}
+			
+			if aHasHue && bHasHue {
+				let ah = modf(a.x).1
+				let bh = modf(b.x).1
+				let dh = ah - bh
+				let eh = dh.magnitude > 0.5 ? ah < 0.5 ? bh - 1 : bh + 1 : bh
+				let n = s - 1
+				
+				h = ah * n + eh * s
+			} else {
+				h = aHasHue ? a.x : b.x
+			}
+			
+			return Color(chclt, hue:h, chroma:c, luma:l, alpha:alpha * n + color.alpha * s)
+		}
+		
 		public func rgba() -> String { return String(format:"RGBA(%.3g, %.3g, %.3g, %.3g)", red, green, blue, alpha) }
 		public func web(allowFormat:Int = 0) -> String { return Color.web(uint, allowFormat:allowFormat) }
 		public func css(withAlpha:Int = 0) -> String { return Color.css(display, withAlpha:withAlpha) }

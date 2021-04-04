@@ -78,7 +78,7 @@ class ChocolateThemeViewController: BaseViewController {
 	var samples:[Sample] = []
 	
 	let themeView = ChocolateThemeViewable()
-	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged), trackInset:3)
+	let sliderHue = ChocolateGradientSlider(value:2/3, action:#selector(hueChanged), trackInset:-1)
 	let sliderDeriveContrast = SliderWithInteriorRange(value:0.5, range:-2 ... 2, action:#selector(deriveChanged), interiorRange:9/16 ... 11/16)
 	let sliderDeriveChroma = SliderWithInteriorRange(value:0.0, range:-2 ... 2, action:#selector(deriveChanged), interiorRange:0.25 ... 0.75)
 	let sliderContrasting = SliderWithInteriorRange(value:0.5, range:-1 ... 1, action:#selector(deriveChanged), interiorRange:9/16 ... 63/64)
@@ -385,6 +385,27 @@ class ChocolateThemeViewController: BaseViewController {
 			group.view?.ordered = layout()
 		}
 	}
+	
+	func copyToPasteboard() {
+		guard let layer = themeView.themeLayer else { return }
+		
+		let size = layer.bounds.size
+		
+		guard let mutable = MutableImage(size:size, scale:layer.contentsScale, opaque:true) else { return }
+		
+		mutable.context.unflip()
+		layer.draw(in:mutable.context)
+		
+		guard let data = mutable.image.pngData() else { return }
+		
+		PlatformPasteboard.general.setPNG(data)
+	}
+	
+#if os(macOS)
+	@objc func copy(_ sender:Any?) { copyToPasteboard() }
+#else
+	override func copy(_ sender:Any?) { copyToPasteboard() }
+#endif
 }
 
 //	MARK: -

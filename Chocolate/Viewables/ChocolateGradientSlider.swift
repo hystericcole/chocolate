@@ -124,6 +124,17 @@ class ChocolateGradientSlider: Viewable.Group {
 	func applyModel(model:ColorModel, axis:Int, chclt:CHCLT, hue:CHCLT.Scalar, count:Int = 360) {
 		let linear = model.linearColors(axis:axis, chclt:chclt, hue:hue, count:count)
 		let colors = linear.compactMap { $0.color() }
+		let c = linear.count
+		
+		if c > 0 {
+			let s = value
+			let n = 1 - s
+			let i = Int(floor(s * Double(c - 1)))
+			let l = chclt.luma(linear[i].vector) * n + chclt.luma(linear[min(i + 1, c - 1)].vector) * s
+			let g = chclt.contrast.lumaContrasting(l, value:1.0)
+			
+			thumbColor = CHCLT.Color(chclt, gray:g).color()
+		}
 		
 		track.colors = colors
 	}

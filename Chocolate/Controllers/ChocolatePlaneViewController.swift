@@ -38,7 +38,7 @@ class ChocolatePlaneViewController: BaseViewController {
 	
 	let indicatorRadius:CGFloat = 33.5
 	let planeView = ChocolatePlaneView()
-	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged), trackInset:3)
+	let slider = ChocolateGradientSlider(value:0.5, action:#selector(sliderChanged), trackInset:-1)
 	let picker = Viewable.Picker(titles:Axis.titles, attributes:Style.medium.attributes, select:1, action:#selector(axisChanged))
 	let indicator = Viewable.Color(.black)
 	var positionIndicator = Layout.Align(Layout.empty)
@@ -105,9 +105,11 @@ class ChocolatePlaneViewController: BaseViewController {
 	}
 	
 	func refreshGradient() {
+		let mode = planeView.mode
+		let chclt = self.chclt
 		let point = positionIndicator.point()
 		
-		slider.applyModel(model:planeView.mode.model, axis:planeView.mode.axis, chclt:chclt, hue:point.x.native)
+		slider.applyModel(model:mode.model, axis:mode.axis, chclt:chclt, hue:point.x.native)
 	}
 	
 	func computeIndicatorColors(_ unit:CGPoint) -> IndicatorColors {
