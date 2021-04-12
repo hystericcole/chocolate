@@ -501,14 +501,14 @@ function prepare() {
 				<div class='notes'>Text has the same hue and chroma with a minimally contrasting luma.</div>
 			</div>
 			<div class='color-controls'>
-				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-red' oninput='handleRGB()' /> Red <output id='output-red' for='input-red'></output>%</div>
-				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-green' oninput='handleRGB()' /> Green <output id='output-green' for='input-green'></output>%</div>
-				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-blue' oninput='handleRGB()' /> Blue <output id='output-blue' for='input-blue'></output>%</div>
-				<div class='color-control control'><input type='text' id='input-web-rgb' oninput='handleWeb()' /></div>
 				<div class='color-control control'><input type='range' min='0' max='360' step='0.1' id='input-hue' oninput='handleCHCLT()' /> Hue <output id='output-hue' for='input-hue'></output>°</div>
 				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-chroma' oninput='handleCHCLT()' /> Chroma <output id='output-chroma' for='input-chroma'></output>%</div>
 				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-luma' oninput='handleCHCLT()' /> Luma <output id='output-luma' for='input-luma'></output>☼</div>
 				<div class='color-control control'><input type='text' id='input-web-hcl' oninput='handleWebCHCLT()' /></div>
+				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-red' oninput='handleRGB()' /> Red <output id='output-red' for='input-red'></output>%</div>
+				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-green' oninput='handleRGB()' /> Green <output id='output-green' for='input-green'></output>%</div>
+				<div class='color-control control'><input type='range' min='0' max='100' step='0.1' id='input-blue' oninput='handleRGB()' /> Blue <output id='output-blue' for='input-blue'></output>%</div>
+				<div class='color-control control'><input type='text' id='input-web-rgb' oninput='handleWeb()' /></div>
 			</div>
 			<div class='gradient-samples'>
 				<div class='gradient-sample sample rgb-sample spaced'><span class='text-sample'>RGB</span></div>
@@ -516,40 +516,42 @@ function prepare() {
 				<div class='notes'>Choose starting color above and ending color below.</div>
 			</div>
 			<div class='gradient-controls'>
-				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-red' oninput='handleGradientRGB()' /> Red <output id='gradient-output-red' for='gradient-red'></output>%</div>
-				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-green' oninput='handleGradientRGB()' /> Green <output id='gradient-output-green' for='gradient-green'></output>%</div>
-				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-blue' oninput='handleGradientRGB()' /> Blue <output id='gradient-output-blue' for='gradient-blue'></output>%</div>
-				<br/>
 				<div class='gradient-control control'><input type='range' min='0' max='360' step='0.1' id='gradient-hue' oninput='handleGradientCHCLT()' /> Hue <output id='gradient-output-hue' for='gradient-hue'></output>°</div>
 				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-chroma' oninput='handleGradientCHCLT()' /> Chroma <output id='gradient-output-chroma' for='gradient-chroma'></output>%</div>
 				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-luma' oninput='handleGradientCHCLT()' /> Luma <output id='gradient-output-luma' for='gradient-luma'></output>☼</div>
+				<br/>
+				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-red' oninput='handleGradientRGB()' /> Red <output id='gradient-output-red' for='gradient-red'></output>%</div>
+				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-green' oninput='handleGradientRGB()' /> Green <output id='gradient-output-green' for='gradient-green'></output>%</div>
+				<div class='gradient-control control'><input type='range' min='0' max='100' step='0.1' id='gradient-blue' oninput='handleGradientRGB()' /> Blue <output id='gradient-output-blue' for='gradient-blue'></output>%</div>
 			</div>
 			<div class='divider'>
 				<hr/>
+				<img src='img/CHCLT_sRGB_gamut.png' alt="CHCLT sRGB gamut" />
 			<div>
 			<div class='article'>
-				<p>The Cole Color Model is like HSL with perceptual luminance.  Using perceptual luminance means that as the hue or chroma change, the color will appear to have a consistent luminance.  Compare this to HSL, where blues and yellows with the same lightness have drastically different luminance.</p>
-				<p>The H in CHCLT, like HSL or LCH, is hue.  Hue is a measure of the ratio of primary colors.  The primary colors are at mathematically significant positions in the hue range, like LCH, not evenly distributed like HSL.  CHCLT uses red as a reference color for hue, so like HSL and HSV red is at both ends of the hue range.</p>
-				<p>The middle C in CHCLT is chroma, which is similar to saturation in HSL.  Higher chroma creates a more intense, saturated color.  Lower chroma creates a less intense, desaturated color.  Pure grays have zero chroma, and fully saturated colors like primary colors have a chroma of one.</p>
-				<p>The L in CHCLT is luma.  Luma is related to the luminance of the color, and equals the gray value of a color with zero chroma.  Black has luma zero and white has luma one.  Luma can be used to easily find colors that are legible in contrast to other colors.</p>
-				<p>This page uses sRGB as the underlying color space for CHCLT to transform, but CHCLT can be used with any RGB color space that has a reversible transfer function and luminance function, e.g. any color space that can be converted to and from CIEXYZ.</p>
-				<p>The T in CHCLT is transform.  This color model started as a series of transforms on RGB colors, and did not become a color model until operations on hue were defined.</p>
-				<p>The color sliders above have ranges between 0 and 100 (or 360 for hue) but the underlying math for CHCLT always uses a range of zero to one for all components.</p>
-				<p>Hue is cyclic, so any value for hue is valid.  Luma ranges from zero for black to one for white, with all the colors between.  Chroma ranges from zero for gray to one for maximum saturation in gamut.  Negative chroma values will create a complementary color.  Chroma values with a magnitude exceeding one will create an RGB color that is out of gamut, but may be valid in some contexts.</p>
-				<p>True perceptual uniformity is difficult.  CIECAM02 is a good example of how difficult.  CHCLT has a perceptual luminance based on the underlying color space, which is usually a good approximation.  The Lab color space provides a better approximation, but it is difficult to stay in gamut while operating in the Lab color space.</p>
-				<p>Luma makes it easy to find contrasting colors.  There are standards like WCAG G17 and G18 that define the luminance based contrast between colors using an offset ratio of luminances.  Colors with a sufficient ratio are considered more legible and satisfy accessibility guidelines.  CHCLT uses a difference of luma instead of a ratio of luminance.  Just use a color with a luma that differs by at least 0.5 (for G18) or 0.6 (for G17) to create a contrasting color.  The text examples use 0.5 as the luma difference.</p>
-				<p>Gradients in RGB color space tend to go through gray and tend to have inconsistent luminance.  Using CHCLT to define the color stops of a gradient allow the gradient to follow a curve through RGB space and have predictable luminance.  That curve can be similar to the gradients created by the cube helix method.</p>
-				<p>Conversion to and from RGB is computationally expensive compared to color models like HSL or HSV.  The Cole color model is well suited to choosing the colors for a theme or palette in a user interface, but not to image processing.</p>
-				<p>Below is a reference Javascript implementation of the core CHCLT conversion to and from sRGB.  All the <span class='code'>v</span> functions are vector operations to replace the original <span class='code'>simd</span> logic.</p>
+				<p>The above image shows the full CHCLT sRGB gamut at maximum chroma.  Luma increases linearly from bottom to top and hue from left to right.  Pure blue has a hue closer to red than green, and has a low luma where pure yellow is near the top with a high luma.  There is a sinuous line passing through the primary and secondary colors where saturation is highest.</p>
+				<p>If you desaturate this image using an image editor, it will become a smooth grayscale gradient.  Luminance is constant across each horizontal band.  The sinuous line of primaries will disappear when color is discarded, assuming the image editor desaturates in the sRGB color space.</p>
+				<p>CHCLT makes it easy to move around this image from one color to another in intuitive straight lines.  Finding contrasting and complementary colors becomes simple. This opens up the possibility of setting up color palettes as rules relating to a primary color instead of hand picking each color.</p>
+				<p>A similar image of HSL would have all the primary and secondary colors evenly distributed along a straight line at the center of the image, and desaturating would not produce a smooth gradient.  A similar image of LABch would be a little smoother with better color uniformity, and have a sinuous line of primaries in slightly different positions.</p>
+				<p>The Cole Color Model is functionally and aesthetically between HSL and LABch.  Having perceptual luminance goes a long way towards perceptual uniformity, without giving up the basic utility of a model that maps directly to and from the RGB cube.</p>
+				<p>This is a Javascript reference implementation of the core RGB to CHCLT conversion methods, using the sRGB color space.  All the <span class='code'>v</span> functions are vector operations to replace the original <span class='code'>simd</span> logic.</p>
 			</div>
 			<div class='source'>
 				<pre id='source'></pre>
 			</div>
 			<div class='article'>
 				<p>The luminance coefficients are computed directly from the chromaticities for increased precision.  Rodrigues rotation is used to rotate <span class='code'>reference</span> around <span class='code'>axis</span> and compute the <span class='code'>sum</span> vector.</p>
-				<p>The underlying color model defines transfer functions to move a color between linear and display spaces, and CHCLT also factors out luminance for a third, flattened space.  Addition and multiplication are well defined in linear space, and angles between colors are measured in the flat space.</p>
-				<p>Luma is defined in display space, and relates directly to luminance in linear space.  Hue is in flat space.  Chroma is in flat space and also depends on luminance in linear space.</p>
-				<p>The color vector in the flat space has a length, and that length correlates to perceptual color intensity.  Reducing the length of that vector desaturates the color, so the length is called saturation.</p>
+				<p>Hue, the H in CHCLT, is the ratio of primary components.  The primary colors are at mathematically significant positions in the hue range, like LABch, not evenly distributed like HSL.  CHCLT uses red as a reference color for hue, so like HSL and HSV red is at both ends of the hue range, with green near ⅓ and blue near ⅔ of the range.</p>
+				<p>Chroma, the middle C in CHCLT, is the ratio to maximum saturation within gamut.  Intense, saturated colors have high chroma, and grayish, desaturated colors have low chroma, down to zero chroma for pure gray.  A primary color would have a chroma of one, and desaturating by half would produce a color with chroma of one half.</p>
+				<p>Luma, the L in CHCLT, is the display luminance.  Luminance is computed in linear space, and when luminance is transferred to display space the value is luma.  A color with zero chroma will have a gray value equal to the luma.</p>
+				<p>The T in CHCLT is transform.  This color model started as a series of transforms on RGB colors, and did not become a color model until operations on hue were defined.</p>
+				<p>This page uses sRGB as the underlying color space for CHCLT to transform, but CHCLT can be used with any RGB color space that has a reversible transfer function and luminance function, e.g. any color space that can be converted to and from CIEXYZ.</p>
+				<p>The underlying color space defines transfer functions to move a color between linear and display spaces, and CHCLT also factors out luminance for a third, flattened space.  Addition and multiplication are well defined in linear space, and angles and lengths are measured in the flat space.  Luma is in display, luminance in linear, chroma combines linear and flat, and hue is in flat space.</p>
+				<p>The color sliders above have ranges between 0 and 100 (or 360 for hue) but the underlying math for CHCLT always uses a range of zero to one for all components.  Hue is cyclic.  Luma ranges from zero for black to one for white, with all the colors in between.  Chroma ranges from zero for gray to one for maximum saturation in gamut.  Negative chroma values will create a complementary color.  Chroma values with a magnitude exceeding one will create an RGB color that is out of gamut, but may be valid in some contexts.</p>
+				<p>True perceptual uniformity is difficult.  CIECAM02 is a good example of how difficult.  CHCLT has a perceptual luminance based on the underlying color space, which is usually a good approximation.  The LAB color space provides a better approximation, but it is difficult to stay in gamut while operating in the LAB color space.</p>
+				<p>Conversion to and from RGB is computationally expensive compared to color models like HSL or HSV.  The Cole Color Model is well suited to choosing the colors for a theme or palette in a user interface, but not to image processing.  Many operations, like adjusting luma or chroma, can be done without a full conversion to CHCLT.</p>
+				<p>There are standards like WCAG G17 and G18 that define the luminance based contrast between colors using an offset ratio of luminances.  Pairs of colors with a sufficient ratio are considered more legible and satisfy accessibility guidelines.  CHCLT uses a difference of luma instead of a ratio of luminance.  Just use a color with a luma that differs by at least 0.5 (for G18) or 0.6 (for G17) to create a contrasting color.  The text examples above use 0.5 as the luma difference.</p>
+				<p>Gradients in RGB color space tend to go through gray and tend to have inconsistent luminance.  Using CHCLT to define the color stops of a gradient allow the gradient to follow a curve through RGB space and have predictable luminance.  That curve can be similar to the gradients created by the cube helix method.</p>
 				<p></p>
 			</div>
 		</div>
