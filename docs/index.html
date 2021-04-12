@@ -312,27 +312,33 @@ function assignHCL(prefix, hcl) {
 function applyColorToSample(rgb, hcl) {
 	var luma = hcl[2] < 0.5 ? hcl[2] + 0.5 : hcl[2] - 0.5
 	var minimallyContrasting = srgb_from_chclt([hcl[0], hcl[1], luma])
-	var primary = css_from_rgb(rgb)
-	var inverse = css_from_rgb(minimallyContrasting)
+	var primary = web_from_rgb(rgb)
+	var inverse = web_from_rgb(minimallyContrasting)
 	var sampleStyle = "background:" + primary + ";color:" + inverse
 	var inverseStyle = "background:" + inverse + ";color:" + primary
+	var index, count, items
 	
-	for ( var element of elements('color-sample') ) {
-		element.style = sampleStyle
+	items = elements('color-sample')
+	count = items.length
+	for ( index = 0 ; index < count ; ++index ) {
+		assignAttribute(items[index], 'style', sampleStyle)
 	}
 	
-	for ( var element of elements('inverted-sample') ) {
-		element.style = inverseStyle
+	items = elements('inverted-sample')
+	count = items.length
+	for ( index = 0 ; index < count ; ++index ) {
+		assignAttribute(items[index], 'style', inverseStyle)
 	}
 }
 
 function applyColorToGradient(fromRGB, toRGB, fromHCL, toHCL) {
 	var luma = fromHCL[2] < 0.5 ? fromHCL[2] + 0.75 : fromHCL[2] - 0.75
 	var stronglyContrasting = srgb_from_chclt([fromHCL[0], fromHCL[1], luma])
-	var inverse = css_from_rgb(stronglyContrasting)
+	var inverse = web_from_rgb(stronglyContrasting)
 	var rgb = "color:" + inverse + ";background:linear-gradient(90deg, " + web_from_rgb(fromRGB) + ", " + web_from_rgb(toRGB) + ")"
 	var hcl = "color:" + inverse + ";background:linear-gradient(90deg"
 	var factor, interpolated, converted, stop, stops = 100
+	var index, count, items
 	
 	for ( stop = 0 ; stop <= stops ; ++stop ) {
 		factor = 1.0 * stop / stops
@@ -344,12 +350,16 @@ function applyColorToGradient(fromRGB, toRGB, fromHCL, toHCL) {
 	
 	hcl += ")"
 	
-	for ( var element of elements('rgb-sample') ) {
-		element.style = rgb
+	items = elements('rgb-sample')
+	count = items.length
+	for ( index = 0 ; index < count ; ++index ) {
+		assignAttribute(items[index], 'style', rgb)
 	}
 	
-	for ( var element of elements('hcl-sample') ) {
-		element.style = hcl
+	items = elements('hcl-sample')
+	count = items.length
+	for ( index = 0 ; index < count ; ++index ) {
+		assignAttribute(items[index], 'style', hcl)
 	}
 }
 
